@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 declare global {
   interface Window {
@@ -26,18 +26,19 @@ interface PagesResponse {
 }
 
 export default function FacebookLoginPage() {
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
+
   useEffect(() => {
-    // Load Facebook SDK
     window.fbAsyncInit = function () {
       window.FB.init({
-        appId: '1471736117322956', // Replace with your actual App ID
+        appId: '1471736117322956',
         cookie: true,
         xfbml: true,
         version: 'v19.0',
       });
     };
 
-    // Inject SDK script
     if (!document.getElementById('facebook-jssdk')) {
       const js = document.createElement('script');
       js.id = 'facebook-jssdk';
@@ -47,12 +48,15 @@ export default function FacebookLoginPage() {
   }, []);
 
   const handleLogin = () => {
+    setLoading(true);
+    setMessage('');
     window.FB.login(
       (response: facebook.StatusResponse) => {
         if (response.authResponse?.accessToken) {
           fetchPages();
         } else {
-          console.warn('❌ Login failed or cancelled');
+          setLoading(false);
+          setMessage('❌ Login failed or cancelled');
         }
       },
       {
@@ -64,11 +68,8 @@ export default function FacebookLoginPage() {
 
   const fetchPages = () => {
     window.FB.api('/me/accounts', async (response: PagesResponse) => {
-      console.log('📄 Pages:', response);
-
       if (response.data?.length > 0) {
         const page = response.data[0];
-        alert(`📘 Page: ${page.name}\n🔑 Page Token: ${page.access_token}`);
 
         try {
           const res = await fetch('/api/save-page', {
@@ -81,36 +82,54 @@ export default function FacebookLoginPage() {
           });
 
           if (res.ok) {
-            console.log('✅ Token saved to database');
+            setMessage(`✅ Token for "${page.name}" saved successfully.`);
           } else {
-            console.error('❌ Failed to save token:', await res.json());
+            setMessage('❌ Failed to save token');
           }
         } catch (err) {
-          console.error('❌ Network error while saving token:', err);
+          setMessage('❌ Network error while saving token');
+        } finally {
+          setLoading(false);
         }
       } else {
-        alert('❌ No pages found or missing permissions.');
+        setMessage('❌ No pages found or missing permissions.');
+        setLoading(false);
       }
     });
   };
 
   return (
-    <main style={{ padding: 20 }}>
-      <h1>🔐 Facebook Page Access Token Generator</h1>
-      <button
-        onClick={handleLogin}
-        style={{
-          padding: '10px 20px',
-          fontSize: '16px',
-          background: '#1877f2',
-          color: '#fff',
-          border: 'none',
-          borderRadius: '5px',
-          cursor: 'pointer',
-        }}
-      >
-        Login with Facebook
-      </button>
+    <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-100 to-indigo-200 px-4">
+      <div className="bg-white/70 backdrop-blur-md rounded-2xl shadow-lg p-8 max-w-md w-full text-center space-y-4">
+        <h1 className="text-2xl font-bold text-indigo-900">
+          🔐 Facebook Page Access Token Generator
+        </h1>
+        <p className="text-sm text-indigo-700">
+          Login with Facebook to save a Page Token you manage.
+        </p>
+
+        <button
+          onClick={handleLogin}
+          disabled={loading}
+          className="w-full py-2 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium transition disabled:opacity-60"
+        >
+          {loading ? 'Logging in...' : 'Login with Facebook'}
+        </button>
+
+        {message && (
+          <div
+            className={`mt-2 text-sm ${
+              message.startsWith('✅') ? 'text-green-600' : 'text-red-600'
+            }`}
+          >
+            {message}
+          </div>
+        )}
+
+        <footer className="text-xs text-gray-500 mt-4">
+          Your page tokens are saved securely.
+        </footer>
+      </div>
     </main>
   );
 }
