@@ -50,21 +50,19 @@ export default function FacebookLoginPage() {
     window.FB.login(
       (response: facebook.StatusResponse) => {
         if (response.authResponse && response.authResponse.accessToken) {
-          const accessToken = response.authResponse.accessToken;
-          console.log('✅ User token:', accessToken);
-          fetchPages(accessToken);
+          fetchPages();
         } else {
           console.warn('❌ Login failed or cancelled');
         }
       },
       {
         scope:
-          'pages_show_list,pages_read_engagement,,pages_manage_posts',
+          'pages_show_list,pages_read_engagement,pages_manage_posts',
       }
     );
   };
 
-  const fetchPages = (userToken: string) => {
+  const fetchPages = () => {
     window.FB.api('/me/accounts', (response: PagesResponse) => {
       console.log('📄 Pages:', response);
       if (response.data?.length > 0) {
