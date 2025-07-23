@@ -27,9 +27,13 @@ export default function PagePostsView() {
         throw new Error(data.error || 'Something went wrong');
       }
 
-      setPosts(data.posts.data || []);
-    } catch (err: any) {
-      setError(err.message || 'Failed to fetch posts');
+      setPosts(data.posts?.data || []);
+    } catch (err) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('An unknown error occurred');
+      }
     } finally {
       setLoading(false);
     }
