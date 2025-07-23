@@ -2,6 +2,20 @@
 
 import { useState } from 'react';
 import { fetchWithAuth } from '@/lib/fetch';
+import {
+  Box,
+  TextField,
+  Button,
+  Typography,
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  CircularProgress,
+} from '@mui/material';
 
 interface Post {
   id: string;
@@ -41,62 +55,83 @@ export default function PagePostsView() {
   };
 
   return (
-    <main className="min-h-screen bg-gray-100 py-10 px-4">
-      <div className="max-w-3xl mx-auto bg-white rounded-xl shadow-md p-6 space-y-6">
-        <h1 className="text-2xl font-bold text-gray-800">📄 Facebook Page Posts Viewer</h1>
+    <Box
+      sx={{
+        minHeight: '100vh',
+        py: 10,
+        px: 4,
+        backgroundColor: 'background.default', // Use theme background color
+      }}
+    >
+      <Paper elevation={3} sx={{ maxWidth: '700px', mx: 'auto', p: 4, display: 'flex', flexDirection: 'column', gap: 3 }}>
+        <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold', color: 'text.primary' }}>
+          📄 Facebook Page Posts Viewer
+        </Typography>
 
-        <div className="flex gap-2 items-center">
-          <input
-            type="text"
-            placeholder="Enter Facebook Page ID"
+        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+          <TextField
+            label="Enter Facebook Page ID"
+            variant="outlined"
             value={pageId}
             onChange={(e) => setPageId(e.target.value)}
-            className="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+            fullWidth
+            sx={{ flexGrow: 1 }}
+            disabled={loading}
           />
-          <button
+          <Button
+            variant="contained"
+            color="primary"
             onClick={handleFetch}
             disabled={!pageId || loading}
-            className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition disabled:opacity-50"
+            sx={{ height: '56px' }} // Match TextField height
           >
-            {loading ? 'Loading...' : 'Fetch Posts'}
-          </button>
-        </div>
+            {loading ? <CircularProgress size={24} color="inherit" /> : 'Fetch Posts'}
+          </Button>
+        </Box>
 
-        {error && <p className="text-red-600 text-sm">{error}</p>}
+        {error && (
+          <Typography color="error" variant="body2">
+            {error}
+          </Typography>
+        )}
 
         {posts.length > 0 && (
-          <div className="overflow-x-auto">
-            <table className="min-w-full border text-sm text-gray-700">
-              <thead>
-                <tr className="bg-gray-200 text-left">
-                  <th className="py-2 px-4">🆔 ID</th>
-                  <th className="py-2 px-4">📝 Message</th>
-                  <th className="py-2 px-4">📅 Created</th>
-                </tr>
-              </thead>
-              <tbody>
+          <TableContainer component={Paper}>
+            <Table sx={{ minWidth: 650 }} aria-label="simple table">
+              <TableHead>
+                <TableRow sx={{ backgroundColor: 'grey.200' }}>
+                  <TableCell sx={{ fontWeight: 'bold' }}>🆔 ID</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>📝 Message</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>📅 Created</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
                 {posts.map((post) => (
-                  <tr key={post.id} className="border-t">
-                    <td className="py-2 px-4 font-mono">{post.id}</td>
-                    <td className="py-2 px-4">
-                      {post.story ? post.story : <em className="text-gray-400">No story</em>}
-                    </td>
-                    <td className="py-2 px-4">
+                  <TableRow key={post.id} sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
+                    <TableCell component="th" scope="row" sx={{ fontFamily: 'monospace' }}>
+                      {post.id}
+                    </TableCell>
+                    <TableCell>
+                      {post.story ? post.story : <em style={{ color: 'grey' }}>No story</em>}
+                    </TableCell>
+                    <TableCell>
                       {post.created_time
                         ? new Date(post.created_time).toLocaleString()
                         : '-'}
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </TableBody>
+            </Table>
+          </TableContainer>
         )}
 
         {posts.length === 0 && !loading && !error && (
-          <p className="text-gray-500 text-sm italic">No posts to display.</p>
+          <Typography color="text.secondary" variant="body2" fontStyle="italic">
+            No posts to display.
+          </Typography>
         )}
-      </div>
-    </main>
+      </Paper>
+    </Box>
   );
 }

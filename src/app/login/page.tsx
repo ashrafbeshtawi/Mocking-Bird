@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { Box, TextField, Button, Typography, Paper } from '@mui/material';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
@@ -30,38 +31,51 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex items-center justify-center h-screen">
-      <form onSubmit={handleSubmit} className="bg-white p-6 rounded shadow-md">
-        <h1 className="text-2xl mb-4">Login</h1>
-        {error && <p className="text-red-500">{error}</p>}
-        <div className="mb-4">
-          <label className="block mb-1">Username</label>
-          <input
-            type="text"
+    <Box
+      display="flex"
+      alignItems="center"
+      justifyContent="center"
+      minHeight="100vh"
+      sx={{ backgroundColor: 'background.default' }} // Use theme background color
+    >
+      <Paper elevation={3} sx={{ p: 4, width: '100%', maxWidth: '400px' }}>
+        <Typography variant="h4" component="h1" gutterBottom align="center">
+          Login
+        </Typography>
+        {error && (
+          <Typography color="error" align="center" gutterBottom>
+            {error}
+          </Typography>
+        )}
+        <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <TextField
+            label="Username"
+            variant="outlined"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            className="w-full p-2 border rounded"
+            required
           />
-        </div>
-        <div className="mb-4">
-          <label className="block mb-1">Password</label>
-          <input
+          <TextField
+            label="Password"
+            variant="outlined"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full p-2 border rounded"
+            required
           />
-        </div>
-        <button type="submit" className="w-full bg-blue-500 text-white p-2 rounded">
-          Login
-        </button>
-        <div className="mt-4 text-center">
-          <span>Do not have an account? </span>
-          <Link href="/register" className="text-blue-500">
-            Register
-          </Link>
-        </div>
-      </form>
-    </div>
+          <Button variant="contained" color="primary" type="submit">
+            Login
+          </Button>
+        </Box>
+        <Box mt={2} textAlign="center">
+          <Typography variant="body2">
+            Do not have an account?{' '}
+            <Link href="/register" passHref>
+              <Button color="primary" size="small">Register</Button>
+            </Link>
+          </Typography>
+        </Box>
+      </Paper>
+    </Box>
   );
 }

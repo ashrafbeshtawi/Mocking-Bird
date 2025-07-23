@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Box, TextField, Button, Typography, Paper } from '@mui/material';
 
 export default function RegisterPage() {
   const [username, setUsername] = useState('');
@@ -29,41 +30,51 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="flex items-center justify-center h-screen">
-      <form onSubmit={handleSubmit} className="bg-white p-6 rounded shadow-md">
-        <h1 className="text-2xl mb-4">Register</h1>
-        {error && <p className="text-red-500">{error}</p>}
-        <div className="mb-4">
-          <label className="block mb-1">Username</label>
-          <input
-            type="text"
+    <Box
+      display="flex"
+      alignItems="center"
+      justifyContent="center"
+      minHeight="100vh"
+      sx={(theme) => ({ backgroundColor: theme.palette.background.default })}
+    >
+      <Paper elevation={3} sx={{ p: 4, width: '100%', maxWidth: '400px' }}>
+        <Typography variant="h4" component="h1" gutterBottom align="center">
+          Register
+        </Typography>
+        {error && (
+          <Typography color="error" align="center" gutterBottom>
+            {error}
+          </Typography>
+        )}
+        <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <TextField
+            label="Username"
+            variant="outlined"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            className="w-full p-2 border rounded"
+            required
           />
-        </div>
-        <div className="mb-4">
-          <label className="block mb-1">Email</label>
-          <input
+          <TextField
+            label="Email"
+            variant="outlined"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full p-2 border rounded"
+            required
           />
-        </div>
-        <div className="mb-4">
-          <label className="block mb-1">Password</label>
-          <input
+          <TextField
+            label="Password"
+            variant="outlined"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full p-2 border rounded"
+            required
           />
-        </div>
-        <button type="submit" className="w-full bg-blue-500 text-white p-2 rounded">
-          Register
-        </button>
-      </form>
-    </div>
+          <Button variant="contained" color="primary" type="submit">
+            Register
+          </Button>
+        </Box>
+      </Paper>
+    </Box>
   );
 }

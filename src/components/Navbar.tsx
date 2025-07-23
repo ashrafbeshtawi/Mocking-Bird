@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { AppBar, Toolbar, Button, Typography, Box } from '@mui/material';
 
 const navLinks = [
   { href: '/', label: 'Home' },
@@ -13,22 +14,29 @@ export default function Navbar() {
   const pathname = usePathname();
 
   return (
-    <nav className="bg-gray-800 p-4">
-      <div className="container mx-auto flex justify-between items-center">
-        <div className="flex items-center space-x-4">
+    <AppBar position="static" sx={{ backgroundColor: '#1976d2' }}> {/* Using primary color from theme */}
+      <Toolbar>
+        <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+          Mocking Bird
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 2 }}>
           {navLinks.map(({ href, label }) => (
-            <Link
+            <Button
               key={href}
+              component={Link} // Use Link from next/link for routing
               href={href}
-              className={`text-white hover:text-gray-300 ${
-                pathname === href ? 'font-bold' : ''
-              }`}
+              color={pathname === href ? 'secondary' : 'inherit'} // Highlight active link with secondary color
+              variant={pathname === href ? 'contained' : 'text'} // Use contained for active, text for inactive
+              sx={{
+                color: pathname === href ? 'white' : 'white', // Ensure text is white
+                fontWeight: pathname === href ? 'bold' : 'normal',
+              }}
             >
               {label}
-            </Link>
+            </Button>
           ))}
-        </div>
-      </div>
-    </nav>
+        </Box>
+      </Toolbar>
+    </AppBar>
   );
 }
