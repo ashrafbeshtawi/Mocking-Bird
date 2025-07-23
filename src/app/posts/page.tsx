@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { fetchWithAuth } from '@/lib/fetch';
 
 interface Post {
   id: string;
@@ -20,7 +21,7 @@ export default function PagePostsView() {
     setLoading(true);
 
     try {
-      const res = await fetch(`/api/page-posts?pageId=${pageId}`);
+      const res = await fetchWithAuth(`/api/page-posts?pageId=${pageId}`);
       const data = await res.json();
 
       if (!res.ok) {
