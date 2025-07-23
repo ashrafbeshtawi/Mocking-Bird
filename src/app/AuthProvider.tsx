@@ -4,46 +4,52 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import jwt from 'jsonwebtoken';
 
+const PUBLIC_ROUTES = ['/', '/login', '/register'];
+
 export default function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
     const token = sessionStorage.getItem('token');
-    if (!token) {
-      if (pathname !== '/login' && pathname !== '/register') {
-        router.push('/login');
-      }
+    const isPublicRoute = PUBLIC_ROUTES.includes(pathname);
+
+    if (!token && !isPublicRoute) {
+      router.push('/login');
       return;
     }
 
-    try {
-      const decoded = jwt.decode(token);
-      if (!decoded || typeof decoded === 'string' || !decoded.exp) {
+    if (token) {
+      try {
+        const decoded = jwt.decode(token);
+        if (!decoded || typeof decoded === 'string' || !decoded.exp) {
+          sessionStorage.removeItem('token');
+          if (!isPublicRoute) {
+            router.push('/login');
+          }
+          return;
+        }
+
+        const isExpired = decoded.exp * 1000 < Date.now();
+        if (isExpired) {
+          sessionStorage.removeItem('token');
+          if (!isPublicRoute) {
+            router.push('/login');
+          }
+        }
+      } catch (error) {
         sessionStorage.removeItem('token');
-        if (pathname !== '/login' && pathname !== '/register') {
+        if (!isPublicRoute) {
           router.push('/login');
         }
-        return;
-      }
-      const isExpired = decoded.exp * 1000 < Date.now();
-      if (isExpired) {
-        sessionStorage.removeItem('token');
-        if (pathname !== '/login' && pathname !== '/register') {
-          router.push('/login');
-        }
-      }
-    } catch (error) {
-      sessionStorage.removeItem('token');
-      if (pathname !== '/login' && pathname !== '/register') {
-        router.push('/login');
       }
     }
   }, [pathname, router]);
 
   const token = typeof window !== 'undefined' ? sessionStorage.getItem('token') : null;
+  const isPublicRoute = PUBLIC_ROUTES.includes(pathname);
 
-  if (!token && pathname !== '/login' && pathname !== '/register') {
+  if (!token && !isPublicRoute) {
     return null;
   }
 
