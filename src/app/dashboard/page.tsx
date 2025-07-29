@@ -10,6 +10,13 @@ import {
   Alert,
   AlertTitle,
   useTheme,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
 } from '@mui/material';
 import FacebookIcon from '@mui/icons-material/Facebook'; // Using MUI icon for Facebook
 
@@ -38,11 +45,53 @@ interface PagesResponse {
   };
 }
 
+// Interface for connected pages from our backend
+interface ConnectedPage {
+  page_id: string;
+  page_access_token: string;
+}
+
 export default function FacebookConnectPage() {
   const theme = useTheme(); // Access the current Material UI theme for consistent styling
-  const [loading, setLoading] = useState<boolean>(false); // State to manage loading indicators
+  const [loading, setLoading] = useState<boolean>(false); // State to manage loading indicators for Facebook login/save
+  const [fetchingPages, setFetchingPages] = useState<boolean>(true); // State to manage loading for fetching connected pages
   const [error, setError] = useState<string | null>(null);   // State to store any error messages
   const [success, setSuccess] = useState<string | null>(null); // State to store success messages
+  const [connectedPages, setConnectedPages] = useState<ConnectedPage[]>([]); // State to store connected pages
+
+  // Function to fetch connected pages from our backend
+  const fetchConnectedPages = useCallback(async () => {
+    setFetchingPages(true);
+    setError(null);
+    try {
+      const token = sessionStorage.getItem('token');
+      if (!token) {
+        setError('Authentication token not found. Please log in to your account first.');
+        setFetchingPages(false);
+        return;
+      }
+
+      const response = await fetch('/api/get-pages', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `Backend error: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      setConnectedPages(result.pages);
+    } catch (err: unknown) {
+      console.error('Error fetching connected pages:', err);
+      setError((err as Error)?.message || 'An unexpected error occurred while fetching connected pages.');
+    } finally {
+      setFetchingPages(false);
+    }
+  }, []);
 
   // Effect to load the Facebook SDK script once the component mounts
   useEffect(() => {
@@ -67,7 +116,10 @@ export default function FacebookConnectPage() {
       js.src = 'https://connect.facebook.net/en_US/sdk.js'; // Official SDK URL
       document.body.appendChild(js);
     }
-  }, []); // Empty dependency array ensures this effect runs only once on mount
+
+    // Fetch connected pages when the component mounts
+    fetchConnectedPages();
+  }, [fetchConnectedPages]); // Dependency array includes fetchConnectedPages
 
   /**
    * Saves the obtained Facebook Page ID and Access Token to your backend.
@@ -108,6 +160,7 @@ export default function FacebookConnectPage() {
         const result = await response.json();
         console.log('Backend Save Result:', result);
         setSuccess('🎉 Page successfully connected and saved to your account!'); // Inform user of success
+        fetchConnectedPages(); // Re-fetch pages after a successful save
       } catch (err: unknown) {
         console.error('Error saving page to backend:', err);
         setError((err as Error)?.message || 'An unexpected error occurred while saving the page data.'); // Display detailed error
@@ -115,7 +168,7 @@ export default function FacebookConnectPage() {
         setLoading(false); // Always reset loading state
       }
     },
-    [] // Dependencies: None, as this function uses stable values or parameters
+    [fetchConnectedPages] // Dependencies: `fetchConnectedPages` to re-fetch after save
   );
 
   /**
@@ -153,7 +206,7 @@ export default function FacebookConnectPage() {
   );
 
   /**
-   * Handles the click event for the "Login with Facebook" button.
+   * Handles the click event for the "Add Facebook Page" button.
    * Initiates the Facebook login process with specified permissions.
    */
   const handleLogin = useCallback(() => {
@@ -187,24 +240,36 @@ export default function FacebookConnectPage() {
   }, [fetchPages]); // Dependency: `fetchPages` function
 
   return (
-    <Container maxWidth="sm" sx={{ mt: 8, textAlign: 'center' }}>
-      <Box
-        sx={{
-          p: 4,
-          borderRadius: theme.shape.borderRadius,
-          boxShadow: theme.shadows[3],
-          bgcolor: theme.palette.background.paper,
-        }}
-      >
-        <FacebookIcon sx={{ fontSize: 80, color: '#1877f2', mb: 2 }} />
-        <Typography variant="h5" component="h1" gutterBottom sx={{ mb: 3, fontWeight: theme.typography.fontWeightBold }}>
-          Connect Your Facebook Page
-        </Typography>
-        <Typography variant="body1" sx={{ mb: 4, color: theme.palette.text.secondary }}>
-          Click the button below to securely log in with Facebook and grant Mockingbird access to your pages for automated posting.
+    <Box sx={{ flexGrow: 1, p: 3 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 4 }}>
+        {/* Add Facebook Page Button */}
+        <Button
+          variant="contained"
+          color="primary"
+          size="large"
+          onClick={handleLogin}
+          disabled={loading}
+          startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <FacebookIcon />}
+          sx={{
+            backgroundColor: '#1877f2',
+            '&:hover': {
+              backgroundColor: '#155eaf',
+            },
+            '&.Mui-disabled': {
+                backgroundColor: theme.palette.action.disabledBackground,
+                color: theme.palette.action.disabled,
+            }
+          }}
+        >
+          {loading ? 'Connecting...' : 'Add Facebook Page'}
+        </Button>
+      </Box>
+
+      <Container maxWidth="md" sx={{ mt: 4, textAlign: 'center' }}>
+        <Typography variant="h5" component="h2" gutterBottom sx={{ mb: 3, fontWeight: theme.typography.fontWeightBold }}>
+          Connected Facebook Pages
         </Typography>
 
-        {/* Display Error Alert if an error occurs */}
         {error && (
           <Alert severity="error" sx={{ mb: 3 }}>
             <AlertTitle>Error</AlertTitle>
@@ -212,7 +277,6 @@ export default function FacebookConnectPage() {
           </Alert>
         )}
 
-        {/* Display Success Alert if the operation is successful */}
         {success && (
           <Alert severity="success" sx={{ mb: 3 }}>
             <AlertTitle>Success</AlertTitle>
@@ -220,32 +284,40 @@ export default function FacebookConnectPage() {
           </Alert>
         )}
 
-        {/* Login Button with integrated loading indicator */}
-        <Button
-          variant="contained"
-          color="primary" // Uses theme's primary color, or can be overridden for specific branding
-          size="large"
-          onClick={handleLogin}
-          disabled={loading} // Disable button while operations are in progress
-          startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <FacebookIcon />}
-          sx={{
-            minWidth: 200,
-            py: 1.5,
-            fontSize: '1rem',
-            backgroundColor: '#1877f2', // Override to Facebook blue for branding
-            '&:hover': {
-              backgroundColor: '#155eaf', // Darker Facebook blue on hover
-            },
-            // Custom styles for disabled state to ensure visibility
-            '&.Mui-disabled': {
-                backgroundColor: theme.palette.action.disabledBackground,
-                color: theme.palette.action.disabled,
-            }
-          }}
-        >
-          {loading ? 'Connecting...' : 'Login with Facebook'}
-        </Button>
-      </Box>
-    </Container>
+        {fetchingPages ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+            <CircularProgress />
+          </Box>
+        ) : connectedPages.length === 0 ? (
+          <Typography variant="body1" sx={{ mt: 4, color: theme.palette.text.secondary }}>
+            No Facebook pages connected yet. Click "Add Facebook Page" to connect one.
+          </Typography>
+        ) : (
+          <TableContainer component={Paper} sx={{ mt: 4, boxShadow: theme.shadows[3] }}>
+            <Table sx={{ minWidth: 650 }} aria-label="connected facebook pages table">
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Page ID</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Access Token (Partial)</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {connectedPages.map((page) => (
+                  <TableRow
+                    key={page.page_id}
+                    sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
+                  >
+                    <TableCell component="th" scope="row">
+                      {page.page_id}
+                    </TableCell>
+                    <TableCell>{page.page_access_token ? `${page.page_access_token.substring(0, 10)}...` : 'N/A'}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
+      </Container>
+    </Box>
   );
 }

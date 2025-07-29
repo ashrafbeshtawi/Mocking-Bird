@@ -11,6 +11,7 @@ const pool = new Pool({
 // Define the expected structure of the request body
 type RequestBody = {
   page_id: string;
+  page_name: string;
   // 💡 Changed from 'access_token' to 'page_access_token' to match schema
   page_access_token: string;
 };
@@ -64,9 +65,9 @@ export async function POST(req: NextRequest) {
       } else {
         // 6. If the page does not exist for this user, insert a new record into 'facebook_pages'
         await client.query(
-          'INSERT INTO facebook_pages (user_id, page_id, page_access_token) VALUES ($1, $2, $3)',
+          'INSERT INTO facebook_pages (user_id, page_id, page_name, page_access_token) VALUES ($1, $2, $3, $4)',
           // 💡 Changed from 'access_token' to 'page_access_token' in query
-          [parsedUserId, body.page_id, body.page_access_token]
+          [parsedUserId, body.page_id, body.page_name, body.page_access_token]
         );
         console.log(`Page ${body.page_id} inserted for user ${parsedUserId}.`);
       }

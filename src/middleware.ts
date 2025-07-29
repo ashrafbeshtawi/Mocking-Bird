@@ -69,7 +69,11 @@ export async function middleware(req: NextRequest) {
     });
   }
 }
-
+// add exception for login & register routes
 export const config = {
-  matcher: ['/api/page-posts/:path*', '/api/save-page', '/api/tweet'],
+  matcher: [
+    // Match all /api/* routes except login and register
+    '/api((?!/login|/register).*)',
+  ],
 };
+
