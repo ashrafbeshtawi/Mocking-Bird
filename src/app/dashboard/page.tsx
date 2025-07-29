@@ -126,7 +126,7 @@ export default function FacebookConnectPage() {
    * This function sends the data along with the user's JWT for authentication.
    */
   const savePageToBackend = useCallback(
-    async (pageId: string, pageAccessToken: string) => {
+    async (pageId: string, pageName: string, pageAccessToken: string) => {
       setLoading(true); // Indicate loading state for the save operation
       setError(null);    // Clear any previous errors
       setSuccess(null);  // Clear any previous success messages
@@ -148,7 +148,7 @@ export default function FacebookConnectPage() {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`, // 🔑 Include the JWT in the Authorization header
           },
-          body: JSON.stringify({ page_id: pageId, page_access_token: pageAccessToken }),
+          body: JSON.stringify({ page_id: pageId, page_name: pageName, page_access_token: pageAccessToken }),
         });
 
         // Check if the backend response was successful (status 2xx)
@@ -188,7 +188,7 @@ export default function FacebookConnectPage() {
           for (const page of response.data) {
             console.log(`📄 Found Facebook Page: ${page.name} (ID: ${page.id})`);
             // Proceed to save the page's ID and access token to your backend
-            await savePageToBackend(page.id, page.access_token);
+            await savePageToBackend(page.id, page.name, page.access_token);
           }
         } else {
           // No pages found or insufficient permissions
