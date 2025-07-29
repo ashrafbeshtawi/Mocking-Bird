@@ -132,10 +132,11 @@ export default function FacebookConnectPage() {
       window.FB.api('/me/accounts', async (response: PagesResponse) => {
         // Check if there are pages and if the response is valid
         if (response && response.data?.length > 0) {
-          const page = response.data[0]; // 🎯 For simplicity, we are taking the first page found
-          console.log('📄 Found Facebook Page:', page);
-          // Proceed to save the page's ID and access token to your backend
-          await savePageToBackend(page.id, page.access_token);
+          for (const page of response.data) {
+            console.log(`📄 Found Facebook Page: ${page.name} (ID: ${page.id})`);
+            // Proceed to save the page's ID and access token to your backend
+            await savePageToBackend(page.id, page.access_token);
+          }
         } else {
           // No pages found or insufficient permissions
           setLoading(false); // End loading if no pages found

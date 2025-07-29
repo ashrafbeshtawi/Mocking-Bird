@@ -4,7 +4,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import jwt from 'jsonwebtoken';
 
-const PUBLIC_ROUTES = ['/', '/login', '/register'];
+const PUBLIC_ROUTES = ['/', '/about', '/login', '/register'];
 
 export default function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();

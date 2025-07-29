@@ -19,30 +19,29 @@ import {
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import { useEffect, useState, useCallback } from 'react';
-// Removed 'styled' and 'keyframes' imports as we're using sx prop
-// const styled and keyframes are removed
 
-// Define navigation links
-const navLinks = [
-  { href: '/', label: 'Home' },
-  { href: '/facebook-connect', label: 'Connect Facebook Page' },
-  { href: '/posts', label: 'Page Posts' },
-];
-
-// Define keyframe for subtle logo animation directly in a string for sx prop
-const bounceAnimation = `
-  @keyframes bounce {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-3px); }
+// Define navigation links based on login status
+const getNavLinks = (isLoggedIn : boolean) => {
+  if (isLoggedIn) {
+    return [
+      { href: '/', label: 'Home' },
+      { href: '/about', label: 'About' },
+      { href: '/dashboard', label: 'Dashboard' },
+    ];
+  } else {
+    return [
+      { href: '/', label: 'Home' },
+      { href: '/about', label: 'About' },
+    ];
   }
-`;
+};
 
 export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
-  const theme = useTheme(); // Access the current theme (light/dark mode colors available)
-  const isMobile = useMediaQuery(theme.breakpoints.down('md')); // Check for mobile breakpoint
-  const [drawerOpen, setDrawerOpen] = useState(false); // State for mobile drawer
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [hasToken, setHasToken] = useState(false);
 
   // Check for token on component mount and path changes
@@ -59,15 +58,18 @@ export default function Navbar() {
   // Handle user logout
   const handleLogout = useCallback(() => {
     sessionStorage.removeItem('token');
-    setHasToken(false); // Update state immediately
-    router.push('/login'); // Redirect to login page
-    if (isMobile) setDrawerOpen(false); // Close drawer on logout if mobile
-  }, [router, isMobile]); // Include router and isMobile in deps
+    setHasToken(false);
+    router.push('/login');
+    if (isMobile) setDrawerOpen(false);
+  }, [router, isMobile]);
+
+  // Get dynamic navigation links based on token presence
+  const currentNavLinks = getNavLinks(hasToken);
 
   // Drawer content for mobile
   const drawer = (
     <Box
-      onClick={handleDrawerToggle} // Close drawer when clicking anywhere inside
+      onClick={handleDrawerToggle}
       sx={{
         width: 250,
         bgcolor: theme.palette.background.paper,
@@ -77,7 +79,7 @@ export default function Navbar() {
       role="presentation"
     >
       <List>
-        {navLinks.map((item) => (
+        {currentNavLinks.map((item) => (
           <ListItem key={item.href} disablePadding>
             <ListItemButton
               component={Link}
@@ -163,7 +165,7 @@ export default function Navbar() {
 
         {/* Navigation Links and Auth Buttons (Desktop) */}
         <Box sx={{ display: { xs: 'none', md: 'flex' }, gap: 2, alignItems: 'center' }}>
-          {navLinks.map(({ href, label }) => (
+          {currentNavLinks.map(({ href, label }) => (
             <Button
               key={href}
               component={Link}
@@ -221,7 +223,7 @@ export default function Navbar() {
             <Button
               onClick={handleLogout}
               variant="outlined"
-              color="primary" // Will use theme.palette.primary.main for border and text
+              color="primary"
               sx={{ textTransform: 'none', borderRadius: theme.shape.borderRadius }}
             >
               Logout
@@ -248,7 +250,7 @@ export default function Navbar() {
         open={drawerOpen}
         onClose={handleDrawerToggle}
         ModalProps={{
-          keepMounted: true, // Better open performance on mobile.
+          keepMounted: true,
         }}
       >
         {drawer}
