@@ -366,7 +366,7 @@ export default function FacebookConnectPage() {
           </Box>
         ) : connectedPages.length === 0 ? (
           <Typography variant="body1" sx={{ mt: 4, color: theme.palette.text.secondary }}>
-            No Facebook pages connected yet. Click "Add Facebook Page" to connect one.
+            No Facebook pages connected yet. Click &apos;Add Facebook Page&apos; to connect one.
           </Typography>
         ) : (
           <TableContainer component={Paper} sx={{ mt: 4, boxShadow: theme.shadows[3] }}>
@@ -420,7 +420,7 @@ export default function FacebookConnectPage() {
         <DialogTitle id="alert-dialog-title">{"Confirm Deletion"}</DialogTitle>
         <DialogContent>
           <DialogContentText id="alert-dialog-description">
-            Are you sure you want to delete the Facebook page "{pageToDelete?.name}" (ID: {pageToDelete?.id})? This action cannot be undone.
+            Are you sure you want to delete the Facebook page {pageToDelete?.name} (ID: {pageToDelete?.id})? This action cannot be undone.
           </DialogContentText>
         </DialogContent>
         <DialogActions>
