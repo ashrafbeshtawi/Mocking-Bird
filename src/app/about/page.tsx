@@ -40,7 +40,7 @@ export default function AboutPage() {
           </Typography>
           <Typography variant="body1" sx={{ color: theme.palette.text.secondary }}>
             We understand the challenges of maintaining a consistent online presence.
-            That's why we've built a reliable, set-it-and-forget-it solution that
+            That&apos;s why we&apos;ve built a reliable, set-it-and-forget-it solution that
             saves you time and ensures your audience never misses an update.
           </Typography>
         </Box>
@@ -52,9 +52,8 @@ export default function AboutPage() {
           </Typography>
           <Grid container spacing={4} sx={{ mt: 4 }}>
             {/* Feature Card 1 */}
-            <Grid item xs={12} md={4}>
+            <Grid>
               <Paper
-                elevation={theme.shadows[2]}
                 sx={{
                   padding: theme.spacing(4),
                   textAlign: 'center',
@@ -81,9 +80,8 @@ export default function AboutPage() {
               </Paper>
             </Grid>
             {/* Feature Card 2 */}
-            <Grid item xs={12} md={4}>
+            <Grid>
               <Paper
-                elevation={theme.shadows[2]}
                 sx={{
                   padding: theme.spacing(4),
                   textAlign: 'center',
@@ -109,9 +107,8 @@ export default function AboutPage() {
               </Paper>
             </Grid>
             {/* Feature Card 3 */}
-            <Grid item xs={12} md={4}>
+            <Grid>
               <Paper
-                elevation={theme.shadows[2]}
                 sx={{
                   padding: theme.spacing(4),
                   textAlign: 'center',
@@ -145,7 +142,7 @@ export default function AboutPage() {
             How It Works
           </Typography>
           <Grid container spacing={4} alignItems="center" sx={{ mt: 4 }}>
-            <Grid item xs={12} md={6}>
+            <Grid>
               <Box sx={{ mb: 4 }}>
                 <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
                     <CheckCircleOutlineIcon color="primary" sx={{ mr: 1 }} /> 1. Connect Your Accounts
@@ -171,7 +168,7 @@ export default function AboutPage() {
                 </Typography>
               </Box>
             </Grid>
-            <Grid item xs={12} md={6} sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+            <Grid sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
               <Box
                 component="img"
                 src="https://via.placeholder.com/400x300?text=Flow+Diagram"
