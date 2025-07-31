@@ -333,6 +333,12 @@ export default function FacebookConnectPage() {
         >
           {loading ? 'Connecting...' : 'Add Facebook Page'}
         </Button>
+            <button
+      className="bg-blue-500 text-white px-4 py-2 rounded"
+      onClick={() => window.location.href = '/api/twitter/login'}
+    >
+      Connect with Twitter
+    </button>
       </Box>
 
       <Container maxWidth="md" sx={{ mt: 4, textAlign: 'center' }}>
