@@ -48,7 +48,7 @@ interface PagesResponse {
 // Interface for connected pages from our backend
 interface ConnectedPage {
   page_id: string;
-  page_access_token: string;
+  page_name: string;
 }
 
 export default function FacebookConnectPage() {
@@ -298,7 +298,7 @@ export default function FacebookConnectPage() {
               <TableHead>
                 <TableRow>
                   <TableCell sx={{ fontWeight: 'bold' }}>Page ID</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Access Token (Partial)</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Page Name</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -310,7 +310,7 @@ export default function FacebookConnectPage() {
                     <TableCell component="th" scope="row">
                       {page.page_id}
                     </TableCell>
-                    <TableCell>{page.page_access_token ? `${page.page_access_token.substring(0, 10)}...` : 'N/A'}</TableCell>
+                    <TableCell>{page.page_name ??'N/A'}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

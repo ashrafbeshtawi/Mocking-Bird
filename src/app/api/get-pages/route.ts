@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
     try {
       // 4. Query the 'facebook_pages' table to get all pages for the user
       const { rows: pages } = await client.query(
-        'SELECT page_id, page_access_token FROM facebook_pages WHERE user_id = $1',
+        'SELECT page_id, page_name FROM facebook_pages WHERE user_id = $1',
         [parsedUserId]
       );
 
