@@ -17,8 +17,15 @@ import {
   TableHead,
   TableRow,
   Paper,
+  IconButton, // Import IconButton
+  Dialog, // Import Dialog
+  DialogActions, // Import DialogActions
+  DialogContent, // Import DialogContent
+  DialogContentText, // Import DialogContentText
+  DialogTitle, // Import DialogTitle
 } from '@mui/material';
 import FacebookIcon from '@mui/icons-material/Facebook'; // Using MUI icon for Facebook
+import DeleteIcon from '@mui/icons-material/Delete'; // Import DeleteIcon
 
 // Extend Window interface for Facebook SDK to ensure TypeScript recognizes FB object
 declare global {
@@ -58,6 +65,9 @@ export default function FacebookConnectPage() {
   const [error, setError] = useState<string | null>(null);   // State to store any error messages
   const [success, setSuccess] = useState<string | null>(null); // State to store success messages
   const [connectedPages, setConnectedPages] = useState<ConnectedPage[]>([]); // State to store connected pages
+  const [deletingPageId, setDeletingPageId] = useState<string | null>(null); // State to track which page is being deleted
+  const [openConfirmDialog, setOpenConfirmDialog] = useState<boolean>(false); // State for confirmation dialog
+  const [pageToDelete, setPageToDelete] = useState<{ id: string; name: string } | null>(null); // State to store page info for deletion
 
   // Function to fetch connected pages from our backend
   const fetchConnectedPages = useCallback(async () => {
@@ -170,6 +180,66 @@ export default function FacebookConnectPage() {
     },
     [fetchConnectedPages] // Dependencies: `fetchConnectedPages` to re-fetch after save
   );
+
+  /**
+   * Opens the confirmation dialog for deleting a Facebook Page.
+   */
+  const handleDeletePageClick = useCallback((pageId: string, pageName: string) => {
+    setPageToDelete({ id: pageId, name: pageName });
+    setOpenConfirmDialog(true);
+  }, []);
+
+  /**
+   * Handles the actual deletion of a Facebook Page from the backend after confirmation.
+   */
+  const confirmDeletePage = useCallback(async () => {
+    if (!pageToDelete) return;
+
+    setOpenConfirmDialog(false); // Close the dialog
+    setDeletingPageId(pageToDelete.id); // Set the ID of the page being deleted to show loading state
+    setError(null);
+    setSuccess(null);
+
+    const token = sessionStorage.getItem('token');
+    if (!token) {
+      setError('Authentication token not found. Please log in to your account first.');
+      setDeletingPageId(null);
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/delete-page', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ page_id: pageToDelete.id }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `Backend error: ${response.statusText}`);
+      }
+
+      setSuccess('🗑️ Facebook page deleted successfully!');
+      fetchConnectedPages(); // Re-fetch pages after successful deletion
+    } catch (err: unknown) {
+      console.error('Error deleting Facebook page:', err);
+      setError((err as Error)?.message || 'An unexpected error occurred while deleting the page.');
+    } finally {
+      setDeletingPageId(null); // Reset deleting state
+      setPageToDelete(null); // Clear page to delete
+    }
+  }, [pageToDelete, fetchConnectedPages]); // Dependencies: `pageToDelete`, `fetchConnectedPages`
+
+  /**
+   * Closes the confirmation dialog without deleting.
+   */
+  const handleCloseConfirmDialog = useCallback(() => {
+    setOpenConfirmDialog(false);
+    setPageToDelete(null);
+  }, []);
 
   /**
    * Fetches the user's Facebook pages after a successful Facebook login.
@@ -299,6 +369,7 @@ export default function FacebookConnectPage() {
                 <TableRow>
                   <TableCell sx={{ fontWeight: 'bold' }}>Page ID</TableCell>
                   <TableCell sx={{ fontWeight: 'bold' }}>Page Name</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Actions</TableCell> {/* New column for actions */}
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -311,6 +382,20 @@ export default function FacebookConnectPage() {
                       {page.page_id}
                     </TableCell>
                     <TableCell>{page.page_name ??'N/A'}</TableCell>
+                    <TableCell>
+                      <IconButton
+                        aria-label="delete"
+                        onClick={() => handleDeletePageClick(page.page_id, page.page_name ?? 'N/A')}
+                        color="error"
+                        disabled={deletingPageId === page.page_id} // Disable button while deleting
+                      >
+                        {deletingPageId === page.page_id ? (
+                          <CircularProgress size={20} color="inherit" />
+                        ) : (
+                          <DeleteIcon />
+                        )}
+                      </IconButton>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -318,6 +403,29 @@ export default function FacebookConnectPage() {
           </TableContainer>
         )}
       </Container>
+
+      {/* Confirmation Dialog */}
+      <Dialog
+        open={openConfirmDialog}
+        onClose={handleCloseConfirmDialog}
+        aria-labelledby="alert-dialog-title"
+        aria-describedby="alert-dialog-description"
+      >
+        <DialogTitle id="alert-dialog-title">{"Confirm Deletion"}</DialogTitle>
+        <DialogContent>
+          <DialogContentText id="alert-dialog-description">
+            Are you sure you want to delete the Facebook page "{pageToDelete?.name}" (ID: {pageToDelete?.id})? This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseConfirmDialog} color="primary">
+            Cancel
+          </Button>
+          <Button onClick={confirmDeletePage} color="error" autoFocus>
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
