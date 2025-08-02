@@ -46,7 +46,7 @@ export default function Navbar() {
 
   // Check for token on component mount and path changes
   useEffect(() => {
-    const token = sessionStorage.getItem('token');
+    const token = localStorage.getItem('token');
     setHasToken(!!token);
   }, [pathname]);
 
@@ -57,7 +57,7 @@ export default function Navbar() {
 
   // Handle user logout
   const handleLogout = useCallback(() => {
-    sessionStorage.removeItem('token');
+    localStorage.removeItem('token');
     setHasToken(false);
     router.push('/login');
     if (isMobile) setDrawerOpen(false);

@@ -11,7 +11,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   const pathname = usePathname();
 
   useEffect(() => {
-    const token = sessionStorage.getItem('token');
+    const token = localStorage.getItem('token');
     const isPublicRoute = PUBLIC_ROUTES.includes(pathname);
 
     if (!token && !isPublicRoute) {
@@ -23,7 +23,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
       try {
         const decoded = jwt.decode(token);
         if (!decoded || typeof decoded === 'string' || !decoded.exp) {
-          sessionStorage.removeItem('token');
+          localStorage.removeItem('token');
           if (!isPublicRoute) {
             router.push('/login');
           }
@@ -32,13 +32,13 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
 
         const isExpired = decoded.exp * 1000 < Date.now();
         if (isExpired) {
-          sessionStorage.removeItem('token');
+          localStorage.removeItem('token');
           if (!isPublicRoute) {
             router.push('/login');
           }
         }
       } catch (error) {
-        sessionStorage.removeItem('token');
+        localStorage.removeItem('token');
         if (!isPublicRoute) {
           router.push('/login');
         }
@@ -46,7 +46,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     }
   }, [pathname, router]);
 
-  const token = typeof window !== 'undefined' ? sessionStorage.getItem('token') : null;
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   const isPublicRoute = PUBLIC_ROUTES.includes(pathname);
 
   if (!token && !isPublicRoute) {

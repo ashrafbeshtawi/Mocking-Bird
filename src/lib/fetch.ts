@@ -1,5 +1,5 @@
 export const fetchWithAuth = (url: string, options: RequestInit = {}) => {
-  const token = sessionStorage.getItem('token');
+  const token = localStorage.getItem('token');
   const headers = {
     ...options.headers,
     'Content-Type': 'application/json',

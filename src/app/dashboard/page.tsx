@@ -74,7 +74,7 @@ export default function FacebookConnectPage() {
     setFetchingPages(true);
     setError(null);
     try {
-      const token = sessionStorage.getItem('token');
+      const token = localStorage.getItem('token');
       if (!token) {
         setError('Authentication token not found. Please log in to your account first.');
         setFetchingPages(false);
@@ -142,7 +142,7 @@ export default function FacebookConnectPage() {
       setSuccess(null);  // Clear any previous success messages
 
       // Retrieve the JWT from session storage
-      const token = sessionStorage.getItem('token');
+      const token = localStorage.getItem('token');
 
       // Check if JWT is available; if not, inform the user and stop
       if (!token) {
@@ -200,7 +200,7 @@ export default function FacebookConnectPage() {
     setError(null);
     setSuccess(null);
 
-    const token = sessionStorage.getItem('token');
+    const token = localStorage.getItem('token');
     if (!token) {
       setError('Authentication token not found. Please log in to your account first.');
       setDeletingPageId(null);
