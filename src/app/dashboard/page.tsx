@@ -24,6 +24,7 @@ import {
   DialogContentText, // Import DialogContentText
   DialogTitle, // Import DialogTitle
 } from '@mui/material';
+import TwitterIcon from '@mui/icons-material/Twitter';
 import FacebookIcon from '@mui/icons-material/Facebook'; // Using MUI icon for Facebook
 import DeleteIcon from '@mui/icons-material/Delete'; // Import DeleteIcon
 
@@ -311,7 +312,7 @@ export default function FacebookConnectPage() {
 
   return (
     <Box sx={{ flexGrow: 1, p: 3 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 4 }}>
+      <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start', mb: 4 }}>
         {/* Add Facebook Page Button */}
         <Button
           variant="contained"
@@ -333,12 +334,27 @@ export default function FacebookConnectPage() {
         >
           {loading ? 'Connecting...' : 'Add Facebook Page'}
         </Button>
-            <button
-      className="bg-blue-500 text-white px-4 py-2 rounded"
-      onClick={() => window.location.href = '/api/twitter/login'}
-    >
-      Connect with Twitter
-    </button>
+        <Button
+          variant="contained"
+          size="large"
+          component="a"
+          href="/api/twitter/login"
+          target="_blank"
+          rel="noopener noreferrer"
+          startIcon={<TwitterIcon />}
+          sx={{
+            backgroundColor: '#000',
+            color: '#fff',
+            textTransform: 'none',
+            fontWeight: 600,
+            '&:hover': {
+              backgroundColor: '#222',
+            },
+            boxShadow: '0 2px 4px 0 rgba(0,0,0,0.15)',
+          }}
+        >
+          Add Twitter Account
+        </Button>
       </Box>
 
       <Container maxWidth="md" sx={{ mt: 4, textAlign: 'center' }}>

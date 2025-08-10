@@ -13,6 +13,7 @@ export async function GET(req: NextRequest) {
   if (!oauth_token || !oauth_verifier || !oauth_token_secret) {
     return NextResponse.json({ error: 'Missing OAuth info' }, { status: 400 });
   }
+  console.log('Received OAuth token and verifier:', oauth_token, oauth_verifier);
 
   const oauth = getOAuth();
 
