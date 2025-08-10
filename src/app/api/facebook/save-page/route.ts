@@ -50,14 +50,14 @@ export async function POST(req: NextRequest) {
     try {
       // 4. Check if the page already exists for this specific user in the 'facebook_pages' table
       const { rows } = await client.query(
-        'SELECT * FROM facebook_pages WHERE user_id = $1 AND page_id = $2',
+        'SELECT * FROM connected_facebook_pages WHERE user_id = $1 AND page_id = $2',
         [parsedUserId, body.page_id]
       );
 
       if (rows.length > 0) {
         // 5. If the page exists for this user, update its page_access_token and created_at timestamp
         await client.query(
-          'UPDATE facebook_pages SET page_access_token = $1, created_at = CURRENT_TIMESTAMP WHERE user_id = $2 AND page_id = $3',
+          'UPDATE connected_facebook_pages SET page_access_token = $1, created_at = CURRENT_TIMESTAMP WHERE user_id = $2 AND page_id = $3',
           // 💡 Changed from 'access_token' to 'page_access_token' in query
           [body.page_access_token, parsedUserId, body.page_id]
         );
@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
       } else {
         // 6. If the page does not exist for this user, insert a new record into 'facebook_pages'
         await client.query(
-          'INSERT INTO facebook_pages (user_id, page_id, page_name, page_access_token) VALUES ($1, $2, $3, $4)',
+          'INSERT INTO connected_facebook_pages (user_id, page_id, page_name, page_access_token) VALUES ($1, $2, $3, $4)',
           // 💡 Changed from 'access_token' to 'page_access_token' in query
           [parsedUserId, body.page_id, body.page_name, body.page_access_token]
         );

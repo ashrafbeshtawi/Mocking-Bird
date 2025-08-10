@@ -1,4 +1,6 @@
-export const fetchWithAuth = (url: string, options: RequestInit = {}) => {
+const fetchWithAuth = (url: string, options: RequestInit = {}) => {
+  console.error('Using token for fetch:');
+
   const token = localStorage.getItem('token');
   const headers = {
     ...options.headers,
@@ -8,3 +10,5 @@ export const fetchWithAuth = (url: string, options: RequestInit = {}) => {
 
   return fetch(url, { ...options, headers });
 };
+
+export { fetchWithAuth };

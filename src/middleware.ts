@@ -73,7 +73,7 @@ export async function middleware(req: NextRequest) {
 export const config = {
   matcher: [
     // Match all /api/* routes except login and register
-    '/api((?!/login|/register|/twitter).*)',
+    '/api((?!/login|/register|/twitter/login|/twitter/callback).*)',
   ],
 };
 

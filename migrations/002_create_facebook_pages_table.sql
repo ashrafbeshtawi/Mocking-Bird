@@ -1,6 +1,6 @@
-CREATE TABLE facebook_pages (
+CREATE TABLE connected_facebook_pages (
     id SERIAL PRIMARY KEY,
-    user_id INTEGER NOT NULL REFERENCES users(id),
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     page_name TEXT NOT NULL,
     page_id TEXT NOT NULL,
     page_access_token TEXT NOT NULL,

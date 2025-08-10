@@ -27,7 +27,7 @@ import {
 import TwitterIcon from '@mui/icons-material/Twitter';
 import FacebookIcon from '@mui/icons-material/Facebook'; // Using MUI icon for Facebook
 import DeleteIcon from '@mui/icons-material/Delete'; // Import DeleteIcon
-
+import {fetchWithAuth} from '@/lib/fetch'; // Custom fetch function for auth
 // Extend Window interface for Facebook SDK to ensure TypeScript recognizes FB object
 declare global {
   interface Window {
@@ -69,6 +69,7 @@ export default function FacebookConnectPage() {
   const [deletingPageId, setDeletingPageId] = useState<string | null>(null); // State to track which page is being deleted
   const [openConfirmDialog, setOpenConfirmDialog] = useState<boolean>(false); // State for confirmation dialog
   const [pageToDelete, setPageToDelete] = useState<{ id: string; name: string } | null>(null); // State to store page info for deletion
+  const [twitterLoading, setTwitterLoading] = useState<boolean>(false); // State to manage loading for Twitter connect
 
   // Function to fetch connected pages from our backend
   const fetchConnectedPages = useCallback(async () => {
@@ -81,13 +82,8 @@ export default function FacebookConnectPage() {
         setFetchingPages(false);
         return;
       }
-
-      const response = await fetch('/api/get-pages', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      
+      const response = await fetchWithAuth('/api/facebook/get-pages');
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -153,7 +149,7 @@ export default function FacebookConnectPage() {
       }
 
       try {
-        const response = await fetch('/api/save-page', {
+        const response = await fetch('/api/facebook/save-page', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -209,7 +205,7 @@ export default function FacebookConnectPage() {
     }
 
     try {
-      const response = await fetch('/api/delete-page', {
+      const response = await fetch('/api/facebook/delete-page', {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -280,7 +276,7 @@ export default function FacebookConnectPage() {
    * Handles the click event for the "Add Facebook Page" button.
    * Initiates the Facebook login process with specified permissions.
    */
-  const handleLogin = useCallback(() => {
+  const handleAddFacebookPage = useCallback(() => {
     setLoading(true); // Indicate loading state for Facebook login
     setError(null);
     setSuccess(null);
@@ -310,6 +306,16 @@ export default function FacebookConnectPage() {
     );
   }, [fetchPages]); // Dependency: `fetchPages` function
 
+  const handleAddTwitterAccount = useCallback(() => {
+    setTwitterLoading(true);
+    fetchWithAuth('/api/twitter/login')
+    // Simulate an async operation
+    setTimeout(() => {
+      setTwitterLoading(false);
+      alert('Twitter connection not yet implemented.');
+    }, 1500);
+  }, []);
+
   return (
     <Box sx={{ flexGrow: 1, p: 3 }}>
       <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start', mb: 4 }}>
@@ -318,7 +324,7 @@ export default function FacebookConnectPage() {
           variant="contained"
           color="primary"
           size="large"
-          onClick={handleLogin}
+          onClick={handleAddFacebookPage}
           disabled={loading}
           startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <FacebookIcon />}
           sx={{
@@ -337,19 +343,23 @@ export default function FacebookConnectPage() {
         <Button
           variant="contained"
           size="large"
-          component="a"
-          href="/api/twitter/login"
-          target="_blank"
           rel="noopener noreferrer"
-          startIcon={<TwitterIcon />}
+          href={'/api/twitter/login?jwt=' + localStorage.getItem('token')} // Pass JWT in query params
+          target='_blank'
+          disabled={twitterLoading}
+          startIcon={twitterLoading ? <CircularProgress size={20} color="inherit" /> : <TwitterIcon />}
           sx={{
             backgroundColor: '#000',
-            color: '#fff',
-            textTransform: 'none',
-            fontWeight: 600,
             '&:hover': {
               backgroundColor: '#222',
             },
+            '&.Mui-disabled': {
+                backgroundColor: theme.palette.action.disabledBackground,
+                color: theme.palette.action.disabled,
+            },
+            color: '#fff',
+            textTransform: 'none',
+            fontWeight: 600,
             boxShadow: '0 2px 4px 0 rgba(0,0,0,0.15)',
           }}
         >

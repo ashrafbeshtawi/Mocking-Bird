@@ -64,6 +64,19 @@ export async function GET(req: NextRequest) {
       maxAge: 15 * 60, // 15 minutes
     });
 
+    const jwt = req.nextUrl.searchParams.get('jwt');
+    console.log('JWT from URL parameter:', jwt);
+
+    if (jwt) {
+      res.cookies.set('jwt', jwt, {
+        path: '/',
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 15 * 60, // 15 minutes
+      });
+    }
+
     return res;
   } catch (error) {
     console.error('Twitter OAuth error:', error);
