@@ -1,10 +1,10 @@
-// layout.tsx
+
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
-import AuthProvider from "./AuthProvider";
-import MuiThemeProvider from "./ThemeProvider"; // ← the new client wrapper
+import { AuthProvider } from "./hooks/AuthProvider";
+import MuiThemeProvider from "./ThemeProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -28,9 +28,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <AuthProvider>
           <MuiThemeProvider>
             <Navbar />

@@ -76,16 +76,13 @@ export default function FacebookConnectPage() {
     setFetchingPages(true);
     setError(null);
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        setError('Authentication token not found. Please log in to your account first.');
-        setFetchingPages(false);
-        return;
-      }
-      
-      const response = await fetchWithAuth('/api/facebook/get-pages');
+      const response = await fetch('/api/facebook/get-pages', { credentials: 'include' });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          window.location.href = '/login'; // redirect on unauthorized
+          return;
+        }
         const errorData = await response.json();
         throw new Error(errorData.message || `Backend error: ${response.statusText}`);
       }
@@ -134,48 +131,37 @@ export default function FacebookConnectPage() {
    */
   const savePageToBackend = useCallback(
     async (pageId: string, pageName: string, pageAccessToken: string) => {
-      setLoading(true); // Indicate loading state for the save operation
-      setError(null);    // Clear any previous errors
-      setSuccess(null);  // Clear any previous success messages
-
-      // Retrieve the JWT from session storage
-      const token = localStorage.getItem('token');
-
-      // Check if JWT is available; if not, inform the user and stop
-      if (!token) {
-        setError('Authentication token not found. Please log in to your account first.');
-        setLoading(false);
-        return;
-      }
+      setLoading(true);
+      setError(null);
+      setSuccess(null);
 
       try {
         const response = await fetch('/api/facebook/save-page', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`, // 🔑 Include the JWT in the Authorization header
-          },
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include', // 🔑 send cookie automatically
           body: JSON.stringify({ page_id: pageId, page_name: pageName, page_access_token: pageAccessToken }),
         });
 
-        // Check if the backend response was successful (status 2xx)
         if (!response.ok) {
-          const errorData = await response.json(); // Attempt to read error message from backend
+          if (response.status === 401) {
+            window.location.href = '/login';
+            return;
+          }
+          const errorData = await response.json();
           throw new Error(errorData.message || `Backend error: ${response.statusText}`);
         }
 
-        const result = await response.json();
-        console.log('Backend Save Result:', result);
-        setSuccess('🎉 Page successfully connected and saved to your account!'); // Inform user of success
-        fetchConnectedPages(); // Re-fetch pages after a successful save
+        setSuccess('🎉 Page successfully connected and saved to your account!');
+        fetchConnectedPages();
       } catch (err: unknown) {
         console.error('Error saving page to backend:', err);
-        setError((err as Error)?.message || 'An unexpected error occurred while saving the page data.'); // Display detailed error
+        setError((err as Error)?.message || 'An unexpected error occurred while saving the page data.');
       } finally {
-        setLoading(false); // Always reset loading state
+        setLoading(false);
       }
     },
-    [fetchConnectedPages] // Dependencies: `fetchConnectedPages` to re-fetch after save
+    [fetchConnectedPages]
   );
 
   /**
@@ -192,43 +178,38 @@ export default function FacebookConnectPage() {
   const confirmDeletePage = useCallback(async () => {
     if (!pageToDelete) return;
 
-    setOpenConfirmDialog(false); // Close the dialog
-    setDeletingPageId(pageToDelete.id); // Set the ID of the page being deleted to show loading state
+    setOpenConfirmDialog(false);
+    setDeletingPageId(pageToDelete.id);
     setError(null);
     setSuccess(null);
-
-    const token = localStorage.getItem('token');
-    if (!token) {
-      setError('Authentication token not found. Please log in to your account first.');
-      setDeletingPageId(null);
-      return;
-    }
 
     try {
       const response = await fetch('/api/facebook/delete-page', {
         method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include', // 🔑 send cookie automatically
         body: JSON.stringify({ page_id: pageToDelete.id }),
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          window.location.href = '/login';
+          return;
+        }
         const errorData = await response.json();
         throw new Error(errorData.message || `Backend error: ${response.statusText}`);
       }
 
       setSuccess('🗑️ Facebook page deleted successfully!');
-      fetchConnectedPages(); // Re-fetch pages after successful deletion
+      fetchConnectedPages();
     } catch (err: unknown) {
       console.error('Error deleting Facebook page:', err);
       setError((err as Error)?.message || 'An unexpected error occurred while deleting the page.');
     } finally {
-      setDeletingPageId(null); // Reset deleting state
-      setPageToDelete(null); // Clear page to delete
+      setDeletingPageId(null);
+      setPageToDelete(null);
     }
-  }, [pageToDelete, fetchConnectedPages]); // Dependencies: `pageToDelete`, `fetchConnectedPages`
+  }, [pageToDelete, fetchConnectedPages]);
 
   /**
    * Closes the confirmation dialog without deleting.

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { Pool } from 'pg';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import { serialize } from 'cookie';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_STRING,
@@ -33,11 +34,24 @@ export async function POST(req: Request) {
         throw new Error('JWT_SECRET is not defined');
       }
 
+      // Create JWT valid for 30 days
       const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, {
-        expiresIn: '1h',
+        expiresIn: '30d',
       });
 
-      return NextResponse.json({ token });
+      // Create HTTP-only cookie
+      const cookie = serialize('jwt', token, {
+        httpOnly: false,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 60 * 60 * 24 * 30, // 30 days
+        path: '/',
+      });
+
+      const res = NextResponse.json({ message: 'Login successful' });
+      res.headers.set('Set-Cookie', cookie);
+      return res;
+
     } finally {
       client.release();
     }
