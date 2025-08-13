@@ -325,7 +325,7 @@ export default function FacebookConnectPage() {
           variant="contained"
           size="large"
           rel="noopener noreferrer"
-          href={'/api/twitter/login?jwt=' + localStorage.getItem('token')} // Pass JWT in query params
+          href={'/api/twitter/login'}
           target='_blank'
           disabled={twitterLoading}
           startIcon={twitterLoading ? <CircularProgress size={20} color="inherit" /> : <TwitterIcon />}

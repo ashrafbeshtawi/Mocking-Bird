@@ -4,6 +4,7 @@ import { getOAuth } from '@/lib/twitter-oauth';
 import axios from 'axios';
 import { Pool } from 'pg';
 import { verifyAuthToken } from '@/lib/auth-utils'
+import { cookies } from 'next/headers';
 const pool = new Pool({
   connectionString: process.env.DATABASE_STRING,
 });
@@ -14,7 +15,8 @@ export async function GET(req: NextRequest) {
   const oauth_verifier = searchParams.get('oauth_verifier');
 
   const oauth_token_secret = req.cookies.get('twitter_oauth_token_secret')?.value;
-  const jwt = req.cookies.get('jwt')?.value;
+  const jwt = req.cookies.get('temp_jwt')?.value;
+  console.log(req.cookies.getAll())
   if (!oauth_token || !oauth_verifier || !oauth_token_secret || !jwt) {
     return NextResponse.json({ error: 'Missing OAuth info or JWT' }, { status: 400 });
   }
