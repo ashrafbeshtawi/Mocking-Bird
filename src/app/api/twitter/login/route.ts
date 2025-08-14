@@ -13,6 +13,7 @@ export async function GET(req: NextRequest) {
       method: 'POST',
       data: {
         oauth_callback: process.env.X_CALLBACK_URL!,
+        x_auth_access_type: 'write'
       },
     };
 

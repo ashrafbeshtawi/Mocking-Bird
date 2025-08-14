@@ -4,7 +4,6 @@ import { getOAuth } from '@/lib/twitter-oauth';
 import axios from 'axios';
 import { Pool } from 'pg';
 import { verifyAuthToken } from '@/lib/auth-utils'
-import { cookies } from 'next/headers';
 const pool = new Pool({
   connectionString: process.env.DATABASE_STRING,
 });
