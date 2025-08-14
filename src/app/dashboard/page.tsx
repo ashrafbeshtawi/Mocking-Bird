@@ -68,8 +68,29 @@ export default function FacebookConnectPage() {
   const [connectedPages, setConnectedPages] = useState<ConnectedPage[]>([]); // State to store connected pages
   const [deletingPageId, setDeletingPageId] = useState<string | null>(null); // State to track which page is being deleted
   const [openConfirmDialog, setOpenConfirmDialog] = useState<boolean>(false); // State for confirmation dialog
-  const [pageToDelete, setPageToDelete] = useState<{ id: string; name: string } | null>(null); // State to store page info for deletion
+  const [pageToDelete, setPageToDelete] = useState<{ id: string; name: string; platform: string } | null>(null); // State to store page info for deletion
   const [twitterLoading, setTwitterLoading] = useState<boolean>(false); // State to manage loading for Twitter connect
+  const [connectedXAccounts, setConnectedXAccounts] = useState<{ id: string; name: string }[]>([]); // State for connected X accounts
+
+  // Function to fetch connected X accounts from backend
+  const fetchConnectedXAccounts = useCallback(async () => {
+    try {
+      const response = await fetchWithAuth('/api/twitter/get-accounts');
+      if (!response.ok) {
+        if (response.status === 401) {
+          window.location.href = '/login';
+          return;
+        }
+        const errorData = await response.json();
+        throw new Error(errorData.message || `Backend error: ${response.statusText}`);
+      }
+      const result = await response.json();
+      setConnectedXAccounts(result.accounts || []);
+    } catch (err: unknown) {
+      console.error('Error fetching connected X accounts:', err);
+      // Optionally set an error state for X accounts
+    }
+  }, []);
 
   // Function to fetch connected pages from our backend
   const fetchConnectedPages = useCallback(async () => {
@@ -123,7 +144,9 @@ export default function FacebookConnectPage() {
 
     // Fetch connected pages when the component mounts
     fetchConnectedPages();
-  }, [fetchConnectedPages]); // Dependency array includes fetchConnectedPages
+    fetchConnectedXAccounts();
+  }, [fetchConnectedPages, fetchConnectedXAccounts]); // Dependency array includes fetchConnectedPages and fetchConnectedXAccounts
+
 
   /**
    * Saves the obtained Facebook Page ID and Access Token to your backend.
@@ -167,8 +190,8 @@ export default function FacebookConnectPage() {
   /**
    * Opens the confirmation dialog for deleting a Facebook Page.
    */
-  const handleDeletePageClick = useCallback((pageId: string, pageName: string) => {
-    setPageToDelete({ id: pageId, name: pageName });
+  const handleDeletePageClick = useCallback((pageId: string, pageName: string, platform: string) => {
+    setPageToDelete({ id: pageId, name: pageName, platform });
     setOpenConfirmDialog(true);
   }, []);
 
@@ -182,9 +205,10 @@ export default function FacebookConnectPage() {
     setDeletingPageId(pageToDelete.id);
     setError(null);
     setSuccess(null);
+    const URL =  pageToDelete.platform === 'facebook' ? '/api/facebook/delete-page' : '/api/twitter/delete-account'; // Adjust URL based on platform
 
     try {
-      const response = await fetch('/api/facebook/delete-page', {
+      const response = await fetch(URL, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include', // 🔑 send cookie automatically
@@ -200,16 +224,17 @@ export default function FacebookConnectPage() {
         throw new Error(errorData.message || `Backend error: ${response.statusText}`);
       }
 
-      setSuccess('🗑️ Facebook page deleted successfully!');
+      setSuccess('🗑️ page deleted successfully!');
       fetchConnectedPages();
+      fetchConnectedXAccounts();
     } catch (err: unknown) {
-      console.error('Error deleting Facebook page:', err);
+      console.error('Error deleting page:', err);
       setError((err as Error)?.message || 'An unexpected error occurred while deleting the page.');
     } finally {
       setDeletingPageId(null);
       setPageToDelete(null);
     }
-  }, [pageToDelete, fetchConnectedPages]);
+  }, [pageToDelete, fetchConnectedPages, fetchConnectedXAccounts]);
 
   /**
    * Closes the confirmation dialog without deleting.
@@ -382,7 +407,7 @@ export default function FacebookConnectPage() {
                 <TableRow>
                   <TableCell sx={{ fontWeight: 'bold' }}>Page ID</TableCell>
                   <TableCell sx={{ fontWeight: 'bold' }}>Page Name</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Actions</TableCell> {/* New column for actions */}
+                  <TableCell sx={{ fontWeight: 'bold' }}>Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -398,11 +423,56 @@ export default function FacebookConnectPage() {
                     <TableCell>
                       <IconButton
                         aria-label="delete"
-                        onClick={() => handleDeletePageClick(page.page_id, page.page_name ?? 'N/A')}
+                        onClick={() => handleDeletePageClick(page.page_id, page.page_name ?? 'N/A', 'facebook')}
                         color="error"
-                        disabled={deletingPageId === page.page_id} // Disable button while deleting
+                        disabled={deletingPageId === page.page_id}
                       >
                         {deletingPageId === page.page_id ? (
+                          <CircularProgress size={20} color="inherit" />
+                        ) : (
+                          <DeleteIcon />
+                        )}
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
+
+        {/* Connected X (Twitter) Accounts Table */}
+        <Typography variant="h5" component="h2" gutterBottom sx={{ mb: 3, mt: 6, fontWeight: theme.typography.fontWeightBold }}>
+          Connected X Accounts
+        </Typography>
+        {connectedXAccounts.length === 0 ? (
+          <Typography variant="body1" sx={{ mt: 2, color: theme.palette.text.secondary }}>
+            No X accounts connected yet. Click &apos;Add Twitter Account&apos; to connect one.
+          </Typography>
+        ) : (
+          <TableContainer component={Paper} sx={{ mt: 2, boxShadow: theme.shadows[3] }}>
+            <Table sx={{ minWidth: 650 }} aria-label="connected x accounts table">
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Account ID</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Username</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {connectedXAccounts.map((account) => (
+                  <TableRow key={account.id}>
+                    <TableCell component="th" scope="row">
+                      {account.id}
+                    </TableCell>
+                    <TableCell>{account.name ?? 'N/A'}</TableCell>
+                    <TableCell>
+                      <IconButton
+                        aria-label="delete"
+                        onClick={() => handleDeletePageClick(account.id, account.name ?? 'N/A', 'twitter')}
+                        color="error"
+                        disabled={deletingPageId === account.id}
+                      >
+                        {deletingPageId === account.id ? (
                           <CircularProgress size={20} color="inherit" />
                         ) : (
                           <DeleteIcon />
@@ -427,7 +497,7 @@ export default function FacebookConnectPage() {
         <DialogTitle id="alert-dialog-title">{"Confirm Deletion"}</DialogTitle>
         <DialogContent>
           <DialogContentText id="alert-dialog-description">
-            Are you sure you want to delete the Facebook page {pageToDelete?.name} (ID: {pageToDelete?.id})? This action cannot be undone.
+            Are you sure you want to delete the page {pageToDelete?.name} (ID: {pageToDelete?.id})? This action cannot be undone.
           </DialogContentText>
         </DialogContent>
         <DialogActions>

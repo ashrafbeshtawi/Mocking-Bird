@@ -37,7 +37,7 @@ export async function DELETE(req: NextRequest) {
     try {
       // 4. Delete the Facebook page from the database, ensuring it belongs to the user
       const result = await client.query(
-        'DELETE FROM facebook_pages WHERE page_id = $1 AND user_id = $2 RETURNING page_id',
+        'DELETE FROM connected_facebook_pages WHERE page_id = $1 AND user_id = $2 RETURNING page_id',
         [page_id, parsedUserId]
       );
 
