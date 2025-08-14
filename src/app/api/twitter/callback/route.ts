@@ -1,107 +1,93 @@
 // app/api/twitter/callback/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { getOAuth } from '@/lib/twitter-oauth';
 import axios from 'axios';
 import { Pool } from 'pg';
-import { verifyAuthToken } from '@/lib/auth-utils'
-const pool = new Pool({
-  connectionString: process.env.DATABASE_STRING,
-});
+import { verifyAuthToken } from '@/lib/auth-utils';
+const pool = new Pool({ connectionString: process.env.DATABASE_STRING });
 
 export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const oauth_token = searchParams.get('oauth_token');
-  const oauth_verifier = searchParams.get('oauth_verifier');
-
-  const oauth_token_secret = req.cookies.get('twitter_oauth_token_secret')?.value;
-  const jwt = req.cookies.get('temp_jwt')?.value;
-  console.log(req.cookies.getAll())
-  if (!oauth_token || !oauth_verifier || !oauth_token_secret || !jwt) {
-    return NextResponse.json({ error: 'Missing OAuth info or JWT' }, { status: 400 });
-  }
-  const userId = await verifyAuthToken(jwt);
-  console.log('Received OAuth token and verifier:', oauth_token, oauth_verifier, userId);
-
-  const oauth = getOAuth();
-
-  const requestData = {
-    url: 'https://api.twitter.com/oauth/access_token',
-    method: 'POST',
-    data: {
-      oauth_token,
-      oauth_verifier,
-    },
-  };
-
-  const headers = oauth.toHeader(
-    oauth.authorize(requestData, {
-      key: oauth_token,
-      secret: oauth_token_secret,
-    })
-  );
-
   try {
-    const response = await axios.post(
-      requestData.url,
-      new URLSearchParams({ oauth_verifier }),
+    const url = new URL(req.url);
+    const code = url.searchParams.get('code');
+    const state = url.searchParams.get('state');
+    const jwt = req.cookies.get('temp_jwt')?.value;
+
+    if (!code || !jwt) {
+      return NextResponse.json({ error: 'Missing code or JWT' }, { status: 400 });
+    }
+
+    const userId = await verifyAuthToken(jwt);
+    console.log('OAuth2 code received:', code, 'for user:', userId);
+
+    // Retrieve PKCE verifier from cookie
+    const codeVerifier = req.cookies.get('twitter_pkce_verifier')?.value;
+    if (!codeVerifier) {
+      return NextResponse.json({ error: 'Missing PKCE code verifier' }, { status: 400 });
+    }
+
+    // Exchange code for access + refresh tokens
+    const tokenResponse = await axios.post(
+      'https://api.twitter.com/2/oauth2/token',
+      new URLSearchParams({
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: process.env.X_CALLBACK_URL!,
+        code_verifier: codeVerifier,
+      }).toString(),
       {
         headers: {
-          ...headers,
           'Content-Type': 'application/x-www-form-urlencoded',
+          'Authorization': `Basic ${Buffer.from(`${process.env.X_CLIENT_ID}:${process.env.X_CLIENT_SECRET}`).toString('base64')}`,
         },
       }
     );
 
-    const result = Object.fromEntries(new URLSearchParams(response.data));
-    const { oauth_token: accessToken, oauth_token_secret: accessSecret, user_id: xUserId, screen_name: username } = result;
 
-    if (!accessToken || !accessSecret || !xUserId || !username) {
-      return NextResponse.json({ error: 'Failed to get access token or user info from Twitter' }, { status: 500 });
+    const { access_token, refresh_token, expires_in, scope, token_type } = tokenResponse.data;
+
+    if (!access_token) {
+      return NextResponse.json({ error: 'Failed to get access token from Twitter' }, { status: 500 });
     }
 
+    // Optionally, fetch the authenticated user's info
+    const userResponse = await axios.get('https://api.twitter.com/2/users/me', {
+      headers: { Authorization: `Bearer ${access_token}` },
+    });
+
+    const { id: xUserId, username } = userResponse.data.data;
+    if (!xUserId || !username) {
+      return NextResponse.json({ error: 'Failed to get user info from Twitter' }, { status: 500 });
+    }
+
+    // Store or update the Twitter account in DB
     const client = await pool.connect();
     try {
-      // Check if the X account is already connected to this user
       const existingAccount = await client.query(
         'SELECT * FROM connected_x_accounts WHERE user_id = $1 AND x_user_id = $2',
         [userId, xUserId]
       );
 
       if (existingAccount.rows.length > 0) {
-        // Update existing account
         await client.query(
-          'UPDATE connected_x_accounts SET oauth_token = $1, oauth_token_secret = $2, username = $3, oauth_verifier = $6 WHERE user_id = $4 AND x_user_id = $5',
-          [accessToken, accessSecret, username, userId, xUserId, oauth_verifier]
+          'UPDATE connected_x_accounts SET oauth_token = $1, refresh_token = $2, username = $3 WHERE user_id = $4 AND x_user_id = $5',
+          [access_token, refresh_token, username, userId, xUserId]
         );
         console.log(`Updated X account for user ${userId}: ${username}`);
       } else {
-        // Insert new account
         await client.query(
-          'INSERT INTO connected_x_accounts (user_id, oauth_token, oauth_token_secret, x_user_id, username, oauth_verifier) VALUES ($1, $2, $3, $4, $5, $6)',
-          [userId, accessToken, accessSecret, xUserId, username, oauth_verifier]
+          'INSERT INTO connected_x_accounts (user_id, oauth_token, refresh_token, x_user_id, username) VALUES ($1, $2, $3, $4, $5)',
+          [userId, access_token, refresh_token, xUserId, username]
         );
         console.log(`Connected new X account for user ${userId}: ${username}`);
       }
 
-      // Close the tab
-      return new NextResponse(`
-        <script>
-          window.close();
-        </script>
-      `, {
-        headers: {
-          'Content-Type': 'text/html',
-        },
-      });
+      // Close the OAuth popup/tab
+      return new NextResponse(`<script>window.close();</script>`, { headers: { 'Content-Type': 'text/html' } });
 
-    } catch (dbError) {
-      console.error('Database operation failed:', dbError);
-      return NextResponse.json({ error: 'Failed to save X account to database' }, { status: 500 });
     } finally {
       client.release();
     }
-  } catch (error) {
-    console.error('Twitter OAuth access token exchange failed:', error);
-    return NextResponse.json({ error: 'Failed to exchange OAuth token' }, { status: 500 });
+  } catch (err) {
+    return NextResponse.json({ error: 'Failed to process Twitter OAuth2 callback' }, { status: 500 });
   }
 }

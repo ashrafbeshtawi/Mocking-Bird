@@ -16,13 +16,13 @@ export async function GET(req: NextRequest) {
     const client = await pool.connect();
     try {
       const result = await client.query(
-        'SELECT id, username FROM connected_x_accounts WHERE user_id = $1',
+        'SELECT x_user_id, username FROM connected_x_accounts WHERE user_id = $1',
         [userId]
       );
 
       return NextResponse.json({
         success: true,
-        accounts: result.rows.map(row => ({ id: row.id, name: row.username }))
+        accounts: result.rows.map(row => ({ id: row.x_user_id, name: row.username }))
       });
 
     } catch (dbError) {

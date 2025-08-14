@@ -23,7 +23,7 @@ export async function DELETE(req: NextRequest) {
     const client = await pool.connect();
     try {
       const result = await client.query(
-        'DELETE FROM connected_x_accounts WHERE id = $1 AND user_id = $2 RETURNING id',
+        'DELETE FROM connected_x_accounts WHERE x_user_id = $1 AND user_id = $2 RETURNING id',
         [page_id, userId]
       );
 
