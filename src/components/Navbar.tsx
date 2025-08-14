@@ -25,8 +25,9 @@ const getNavLinks = (isLoggedIn: boolean) =>
   isLoggedIn
     ? [
         { href: '/', label: 'Home' },
+        { href: '/dashboard', label: 'Dashboard' },
+        { href: '/publish', label: 'Publish' },
         { href: '/about', label: 'About' },
-        { href: '/dashboard', label: 'Dashboard' }
       ]
     : [
         { href: '/', label: 'Home' },
