@@ -29,7 +29,11 @@ export interface FacebookPublishResult {
 export interface FacebookPublishError {
   platform: 'facebook';
   page_id: string;
-  error: unknown;
+  error: {
+    message: string;
+    code?: string;
+    details?: unknown;
+  };
 }
 
 export class FacebookPublisher {
@@ -122,7 +126,13 @@ export class FacebookPublisher {
         failed.push({
           platform: 'facebook',
           page_id: token.page_id,
-          error: axios.isAxiosError(error) ? error.response?.data : 'Unknown error',
+          error: axios.isAxiosError(error)
+            ? {
+                message: error.response?.data?.error?.message || error.message,
+                code: error.response?.data?.error?.code?.toString(),
+                details: error.response?.data,
+              }
+            : { message: 'Unknown error during Facebook publish' },
         });
       }
     });

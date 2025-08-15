@@ -41,12 +41,13 @@ export default function PublishComponent() {
   const [facebookPages, setFacebookPages] = useState<ConnectedPage[]>([]);
   const [xAccounts, setXAccounts] = useState<ConnectedXAccount[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ message: string; details?: unknown[] } | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [postText, setPostText] = useState<string>('');
   const [selectedFacebookPages, setSelectedFacebookPages] = useState<string[]>([]);
   const [selectedXAccounts, setSelectedXAccounts] = useState<string[]>([]);
   const [isPublishing, setIsPublishing] = useState<boolean>(false);
+  const [publishResults, setPublishResults] = useState<{ successful: unknown[]; failed: unknown[] } | null>(null);
 
   // Character count and warning for Twitter
   const charCount = postText.length;
@@ -64,7 +65,7 @@ export default function PublishComponent() {
       setFacebookPages(result.pages);
     } catch (err: unknown) {
       console.error('Error fetching Facebook pages:', err);
-      setError((err as Error)?.message || 'An unexpected error occurred while fetching Facebook pages.');
+      setError({ message: (err as Error)?.message || 'An unexpected error occurred while fetching Facebook pages.' });
     }
   }, []);
 
@@ -80,7 +81,7 @@ export default function PublishComponent() {
       setXAccounts(result.accounts);
     } catch (err: unknown) {
       console.error('Error fetching X accounts:', err);
-      setError((err as Error)?.message || 'An unexpected error occurred while fetching X accounts.');
+      setError({ message: (err as Error)?.message || 'An unexpected error occurred while fetching X accounts.' });
     }
   }, []);
 
@@ -116,19 +117,19 @@ export default function PublishComponent() {
     setSuccess(null);
 
     if (selectedFacebookPages.length === 0 && selectedXAccounts.length === 0) {
-      setError('Please select at least one page or account to publish to.');
+      setError({ message: 'Please select at least one page or account to publish to.' });
       setIsPublishing(false);
       return;
     }
 
     if (postText.trim() === '') {
-      setError('Post text cannot be empty.');
+      setError({ message: 'Post text cannot be empty.' });
       setIsPublishing(false);
       return;
     }
 
     if (isTwitterWarning) {
-        setError(`Your post exceeds the ${TWITTER_CHAR_LIMIT} character limit for X (Twitter). Please shorten your text or deselect X accounts.`);
+        setError({ message: `Your post exceeds the ${TWITTER_CHAR_LIMIT} character limit for X (Twitter). Please shorten your text or deselect X accounts.` });
         setIsPublishing(false);
         return;
     }
@@ -147,18 +148,29 @@ export default function PublishComponent() {
         body: JSON.stringify(postData),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to publish post.');
-      }
+      const responseData = await response.json();
 
-      setSuccess('🎉 Your post has been published successfully!');
-      setPostText('');
-      setSelectedFacebookPages([]);
-      setSelectedXAccounts([]);
+      if (response.status === 207) { // Partial success
+        setPublishResults(responseData);
+        setSuccess('Some posts were published successfully, but others failed. See details below.');
+        setError(null); // Clear any previous errors
+      } else if (!response.ok) {
+        setError({ message: responseData.error || 'Failed to publish post.', details: responseData.details });
+        setSuccess(null); // Clear any previous success
+        setPublishResults(null);
+      } else { // Full success (status 200)
+        setSuccess('🎉 Your post has been published successfully!');
+        setPublishResults(responseData);
+        setError(null); // Clear any previous errors
+        setPostText('');
+        setSelectedFacebookPages([]);
+        setSelectedXAccounts([]);
+      }
     } catch (err: unknown) {
       console.error('Publishing error:', err);
-      setError((err as Error)?.message || 'An unexpected error occurred during publishing.');
+      setError({ message: (err as Error)?.message || 'An unexpected error occurred during publishing.' });
+      setSuccess(null);
+      setPublishResults(null);
     } finally {
       setIsPublishing(false);
     }
@@ -184,13 +196,50 @@ export default function PublishComponent() {
         {error && (
           <Alert severity="error" sx={{ mb: 3 }}>
             <AlertTitle>Error</AlertTitle>
-            {error}
+            {error.message}
+            {error.details && (
+              <Box component="ul" sx={{ mt: 1, pl: 2 }}>
+                {error.details.map((detail, index) => (
+                  <Typography component="li" variant="body2" key={index}>
+                    {String(detail)}
+                  </Typography>
+                ))}
+              </Box>
+            )}
           </Alert>
         )}
         {success && (
           <Alert severity="success" sx={{ mb: 3 }}>
             <AlertTitle>Success</AlertTitle>
             {success}
+            {publishResults?.successful && publishResults.successful.length > 0 && (
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="subtitle2">Successfully Published To:</Typography>
+                <Box component="ul" sx={{ mt: 1, pl: 2 }}>
+                  {publishResults.successful.map((item: unknown, index: number) => (
+                    <Typography component="li" variant="body2" key={index}>
+                      {(item as { platform: string; page_id: string; account_id: string }).platform === 'facebook'
+                        ? `Facebook Page: ${(item as { page_id: string }).page_id}`
+                        : `X Account: ${(item as { account_id: string }).account_id}`}
+                    </Typography>
+                  ))}
+                </Box>
+              </Box>
+            )}
+            {publishResults?.failed && publishResults.failed.length > 0 && (
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="subtitle2" color="error">Failed To Publish To:</Typography>
+                <Box component="ul" sx={{ mt: 1, pl: 2 }}>
+                  {publishResults.failed.map((item: unknown, index: number) => (
+                    <Typography component="li" variant="body2" key={index}>
+                      {(item as { platform: string; page_id?: string; account_id?: string; error?: { message?: string; code?: string } }).platform === 'facebook'
+                        ? `Facebook Page: ${(item as { page_id?: string }).page_id}`
+                        : `X Account: ${(item as { account_id?: string }).account_id}`} - {(item as { error?: { message?: string } }).error?.message || 'Unknown error'} (Code: {(item as { error?: { code?: string } }).error?.code || 'N/A'})
+                    </Typography>
+                  ))}
+                </Box>
+              </Box>
+            )}
           </Alert>
         )}
 
@@ -264,7 +313,7 @@ export default function PublishComponent() {
               </Grid>
 
               {/* X Accounts Section */}
-              <Grid >
+              <Grid>
                 <Typography variant="subtitle1" component="h3" sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                   <TwitterIcon sx={{ color: '#000', mr: 1 }} />
                   X Accounts

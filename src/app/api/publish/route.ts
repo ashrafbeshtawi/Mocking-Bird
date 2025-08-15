@@ -129,13 +129,15 @@ export async function POST(req: NextRequest) {
     }
 
     logger.info(`All posts published successfully [${requestId}]`);
-    return NextResponse.json({ 
-      message: 'All posts published successfully.', 
-      results: allSuccessful 
+    return NextResponse.json({
+      message: 'All posts published successfully.',
+      results: allSuccessful
     }, { status: 200 });
 
   } catch (err) {
     logger.error(`Request processing failed [${requestId}]`, err);
-    return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
+    // Check if the error is an instance of Error to safely access its message property
+    const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

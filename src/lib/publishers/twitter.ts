@@ -25,7 +25,11 @@ export interface TwitterPublishResult {
 export interface TwitterPublishError {
   platform: 'x';
   account_id: string;
-  error: unknown;
+  error: {
+    message: string;
+    code?: string;
+    details?: unknown;
+  };
 }
 
 export class TwitterPublisher {
@@ -132,8 +136,18 @@ export class TwitterPublisher {
         logger.warn(`Token expired for ${account.username} — refreshing`);
         try {
           accessToken = await this.refreshToken(account, userId);
-        } catch {
-          failed.push({ platform: 'x', account_id: account.x_user_id, error: 'Token refresh failed' });
+        } catch (refreshError) {
+          failed.push({
+            platform: 'x',
+            account_id: account.x_user_id,
+            error: axios.isAxiosError(refreshError)
+              ? {
+                  message: refreshError.response?.data?.detail || refreshError.message,
+                  code: refreshError.response?.status?.toString(),
+                  details: refreshError.response?.data,
+                }
+              : { message: 'Unknown error during token refresh' },
+          });
           continue;
         }
       }
@@ -152,7 +166,17 @@ export class TwitterPublisher {
         successful.push({ platform: 'x', account_id: account.x_user_id, result: response.data });
       } catch (error) {
         logger.error(`Failed to publish to ${account.username}`, error);
-        failed.push({ platform: 'x', account_id: account.x_user_id, error });
+        failed.push({
+          platform: 'x',
+          account_id: account.x_user_id,
+          error: axios.isAxiosError(error)
+            ? {
+                message: error.response?.data?.detail || error.message,
+                code: error.response?.status?.toString(),
+                details: error.response?.data,
+              }
+            : { message: 'Unknown error during X publish' },
+        });
       }
     }
 
