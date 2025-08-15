@@ -117,8 +117,8 @@ export async function POST(req: NextRequest) {
     // Return appropriate response
     if (allFailed.length > 0) {
       logger.warn(`Partial success - some posts failed [${requestId}]`, {
-        successfulPlatforms: allSuccessful.map(s => `${s.platform}:${s.page_id || s.account_id}`),
-        failedPlatforms: allFailed.map(f => `${f.platform}:${f.page_id || f.account_id}`)
+        successfulPlatforms: allSuccessful.map(s => `${s.platform}:${s.platform === 'facebook' ? s.page_id : s.account_id}`),
+        failedPlatforms: allFailed.map(f => `${f.platform}:${f.platform === 'facebook' ? f.page_id : f.account_id}`)
       });
 
       return NextResponse.json({
