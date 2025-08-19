@@ -105,15 +105,62 @@ export async function POST(req: NextRequest) {
     const allSuccessful = [...fbResults.successful, ...xResults.successful];
     const allFailed = [...fbResults.failed, ...xResults.failed];
 
-    logger.info(`Publishing completed [${requestId}]`, {
-      totalSuccessful: allSuccessful.length,
-      totalFailed: allFailed.length,
-      facebookSuccessful: fbResults.successful.length,
-      facebookFailed: fbResults.failed.length,
-      twitterSuccessful: xResults.successful.length,
-      twitterFailed: xResults.failed.length
-    });
+    // 💡 START of updated logic to save to database with names
+    logger.info(`Saving publish result to database [${requestId}]`);
+    const client = await pool.connect();
+    
+    try {
+      // Look up names for successful posts
+      const successfulFacebookNames = allSuccessful
+        .filter(result => result.platform === 'facebook' && 'page_id' in result)
+        .map(result => {
+          const page = fbTokens.find(token => token.page_id === (result as { page_id: string }).page_id);
+          return page ? page.page_name : (result as { page_id: string }).page_id;
+        });
+      
+      const successfulTwitterUsernames = allSuccessful
+        .filter(result => result.platform === 'x' && 'account_id' in result)
+        .map(result => {
+          const account = xTokens.find(token => token.x_user_id === (result as { account_id: string }).account_id);
+          return account ? account.username : (result as { account_id: string }).account_id;
+        });
+        
+      // Look up names for failed posts
+      const failedFacebookNames = allFailed
+        .filter(result => result.platform === 'facebook' && 'page_id' in result)
+        .map(result => {
+          const page = fbTokens.find(token => token.page_id === (result as { page_id: string }).page_id);
+          return page ? page.page_name : (result as { page_id: string }).page_id;
+        });
+        
+      const failedTwitterUsernames = allFailed
+        .filter(result => result.platform === 'x' && 'account_id' in result)
+        .map(result => {
+          const account = xTokens.find(token => token.x_user_id === (result as { account_id: string }).account_id);
+          return account ? account.username : (result as { account_id: string }).account_id;
+        });
 
+      await client.query(
+        'INSERT INTO publish_history (user_id, content, successful_facebook, successful_twitter, failed_facebook, failed_twitter) VALUES ($1, $2, $3, $4, $5, $6)',
+        [
+          parseInt(userId),
+          text,
+          successfulFacebookNames,
+          successfulTwitterUsernames,
+          failedFacebookNames,
+          failedTwitterUsernames
+        ]
+      );
+      
+      logger.info(`Publish result saved to database successfully [${requestId}]`);
+
+    } catch (dbError) {
+      logger.error(`Failed to save publish result to database [${requestId}]`, dbError);
+    } finally {
+      client.release();
+    }
+    // 💡 END of updated logic
+    
     // Return appropriate response
     if (allFailed.length > 0) {
       logger.warn(`Partial success - some posts failed [${requestId}]`, {
@@ -136,7 +183,6 @@ export async function POST(req: NextRequest) {
 
   } catch (err) {
     logger.error(`Request processing failed [${requestId}]`, err);
-    // Check if the error is an instance of Error to safely access its message property
     const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }

@@ -1,217 +1,70 @@
-'use client';
 
 import React from 'react';
-import {
-  Typography,
-  Button,
-  Container,
-  Box,
-  Paper,
-  Grid,
-  useTheme,
-} from '@mui/material';
+import { Container, Box, Typography, Button, Paper, Stack } from '@mui/material';
 import Link from 'next/link';
-
-// --- @mui/icons-material Imports ---
-import TwitterIcon from '@mui/icons-material/X';
 import FacebookIcon from '@mui/icons-material/Facebook';
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import SettingsIcon from '@mui/icons-material/Settings';
-import PublishIcon from '@mui/icons-material/Publish';
-
+import TwitterIcon from '@mui/icons-material/X';
+import BarChartIcon from '@mui/icons-material/BarChart';
+import SecurityIcon from '@mui/icons-material/Security';
 
 export default function AboutPage() {
-  const theme = useTheme();
-
   return (
-    <Box sx={{ flexGrow: 1 }}>
-      <Container maxWidth="lg" sx={{ py: 8 }}>
-        {/* About Us Section */}
-        <Box sx={{ my: 8, textAlign: 'center' }}>
-          <Typography variant="h3" component="h1" gutterBottom sx={{ fontWeight: 700, mb: 3 }}>
-            About Mockingbird
-          </Typography>
-          <Typography variant="h5" component="p" sx={{ mb: 4, opacity: 0.9, color: theme.palette.text.secondary }}>
-            At Mockingbird, we believe in simplifying your social media management.
-            Our mission is to help content creators, marketers, and businesses
-            efficiently share their valuable content across multiple platforms,
-            starting with seamless Facebook to Twitter (X) automation.
-          </Typography>
-          <Typography variant="body1" sx={{ color: theme.palette.text.secondary }}>
-            We understand the challenges of maintaining a consistent online presence.
-            That&apos;s why we&apos;ve built a reliable, set-it-and-forget-it solution that
-            saves you time and ensures your audience never misses an update.
-          </Typography>
-        </Box>
+    <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', display: 'flex', flexDirection: 'column' }}>
+      <Container maxWidth="md" sx={{ textAlign: 'center', mt: 8, mb: 6 }}>
+        <Typography variant="h2" component="h1" fontWeight={800} color="primary" gutterBottom>
+          🐦 Mockingbird
+        </Typography>
+        <Typography variant="h5" color="text.secondary" sx={{ mb: 4 }}>
+          Automate your social media cross-posting. Effortlessly share your Facebook posts to Twitter (X) and keep your audience engaged everywhere.
+        </Typography>
+      </Container>
 
-        {/* Key Features Section (Moved from old HomePage) */}
-        <Box id="features" sx={{ my: 8 }}>
-          <Typography variant="h4" component="h2" align="center" gutterBottom>
-            Key Features
-          </Typography>
-          <Grid container spacing={4} sx={{ mt: 4 }}>
-            {/* Feature Card 1 */}
-            <Grid>
-              <Paper
-                sx={{
-                  padding: theme.spacing(4),
-                  textAlign: 'center',
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  borderRadius: theme.shape.borderRadius,
-                  transition: 'transform 0.3s ease-in-out, box-shadow 0.3s ease',
-                  '&:hover': {
-                    transform: 'translateY(-5px)',
-                    boxShadow: theme.shadows[6],
-                  },
-                }}
-              >
-                <FacebookIcon sx={{ fontSize: 60, color: 'primary.main', mb: 2 }} />
-                <Typography variant="h6" gutterBottom>
-                  Facebook to Twitter (X)
-                </Typography>
-                <Typography variant="body1" sx={{ color: theme.palette.text.secondary }}>
-                  Automatically share your Facebook Page posts directly to your Twitter (X) account.
-                  Keep your audience updated everywhere.
-                </Typography>
-              </Paper>
-            </Grid>
-            {/* Feature Card 2 */}
-            <Grid>
-              <Paper
-                sx={{
-                  padding: theme.spacing(4),
-                  textAlign: 'center',
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  borderRadius: theme.shape.borderRadius,
-                  transition: 'transform 0.3s ease-in-out, box-shadow 0.3s ease',
-                  '&:hover': {
-                    transform: 'translateY(-5px)',
-                    boxShadow: theme.shadows[6],
-                  },
-                }}
-              >
-                <AutoAwesomeIcon sx={{ fontSize: 60, color: 'secondary.main', mb: 2 }} />
-                <Typography variant="h6" gutterBottom>
-                  Set & Forget Automation
-                </Typography>
-                <Typography variant="body1" sx={{ color: theme.palette.text.secondary }}>
-                  Configure once and let Mockingbird handle the rest. Your content goes live instantly.
-                </Typography>
-              </Paper>
-            </Grid>
-            {/* Feature Card 3 */}
-            <Grid>
-              <Paper
-                sx={{
-                  padding: theme.spacing(4),
-                  textAlign: 'center',
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  borderRadius: theme.shape.borderRadius,
-                  transition: 'transform 0.3s ease-in-out, box-shadow 0.3s ease',
-                  '&:hover': {
-                    transform: 'translateY(-5px)',
-                    boxShadow: theme.shadows[6],
-                  },
-                }}
-              >
-                <TwitterIcon sx={{ fontSize: 60, color: 'primary.main', mb: 2 }} />
-                <Typography variant="h6" gutterBottom>
-                  Maintain Your Brand Voice
-                </Typography>
-                <Typography variant="body1" sx={{ color: theme.palette.text.secondary }}>
-                  Ensure consistency across platforms. Your posts reflect your brand, wherever they appear.
-                </Typography>
-              </Paper>
-            </Grid>
-          </Grid>
-        </Box>
+      <Container maxWidth="lg" sx={{ mb: 8 }}>
+        <Stack direction={{ xs: 'column', md: 'row' }} spacing={4} justifyContent="center" alignItems="stretch">
+          <Paper elevation={3} sx={{ p: 4, flex: 1, textAlign: 'center', borderRadius: 4 }}>
+            <FacebookIcon sx={{ fontSize: 48, color: 'primary.main', mb: 2 }} />
+            <TwitterIcon sx={{ fontSize: 48, color: 'primary.main', mb: 2, ml: 2 }} />
+            <Typography variant="h6" color="primary" fontWeight={700} gutterBottom>Automated Cross-Posting</Typography>
+            <Typography color="text.secondary">Connect your Facebook and Twitter accounts. Mockingbird automatically shares your posts across platforms, saving you time.</Typography>
+          </Paper>
+          <Paper elevation={3} sx={{ p: 4, flex: 1, textAlign: 'center', borderRadius: 4 }}>
+            <BarChartIcon sx={{ fontSize: 48, color: 'secondary.main', mb: 2 }} />
+            <Typography variant="h6" color="secondary" fontWeight={700} gutterBottom>Publish History & Analytics</Typography>
+            <Typography color="text.secondary">Track your cross-posts and view engagement stats. Stay informed and optimize your social strategy.</Typography>
+          </Paper>
+          <Paper elevation={3} sx={{ p: 4, flex: 1, textAlign: 'center', borderRadius: 4 }}>
+            <SecurityIcon sx={{ fontSize: 48, color: 'success.main', mb: 2 }} />
+            <Typography variant="h6" color="success.main" fontWeight={700} gutterBottom>Secure & Private</Typography>
+            <Typography color="text.secondary">Your data is protected with industry-standard security. You control your connections and privacy.</Typography>
+          </Paper>
+        </Stack>
+      </Container>
 
-        {/* How It Works Section (Moved from old HomePage) */}
-        <Box id="how-it-works" sx={{ my: 8 }}>
-          <Typography variant="h4" component="h2" align="center" gutterBottom>
-            How It Works
-          </Typography>
-          <Grid container spacing={4} alignItems="center" sx={{ mt: 4 }}>
-            <Grid>
-              <Box sx={{ mb: 4 }}>
-                <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
-                    <CheckCircleOutlineIcon color="primary" sx={{ mr: 1 }} /> 1. Connect Your Accounts
-                </Typography>
-                <Typography variant="body1" sx={{ mb: 2, color: theme.palette.text.secondary }}>
-                  Easily link your Facebook Page and Twitter (X) account using our secure login process. We guide you through obtaining the necessary permissions.
-                </Typography>
-              </Box>
-              <Box sx={{ mb: 4 }}>
-                <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
-                    <SettingsIcon color="secondary" sx={{ mr: 1 }} /> 2. Set Up Your Rule
-                </Typography>
-                <Typography variant="body1" sx={{ mb: 2, color: theme.palette.text.secondary }}>
-                  Choose your Facebook Page as the source. Mockingbird will monitor it for new posts.
-                </Typography>
-              </Box>
-              <Box>
-                <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
-                    <PublishIcon sx={{ color: theme.palette.info.main, mr: 1 }} /> 3. Automate Publishing
-                </Typography>
-                <Typography variant="body1" sx={{ color: theme.palette.text.secondary }}>
-                  When you publish a new post on Facebook, Mockingbird automatically fetches it and creates a corresponding tweet on Twitter (X), including text and media (if applicable).
-                </Typography>
-              </Box>
-            </Grid>
-            <Grid sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-              <Box
-                component="img"
-                src="https://via.placeholder.com/400x300?text=Flow+Diagram"
-                alt="Workflow diagram"
-                sx={{ maxWidth: '100%', height: 'auto', borderRadius: theme.shape.borderRadius, boxShadow: theme.shadows[6] }}
-              />
-            </Grid>
-          </Grid>
-        </Box>
-
-        {/* Call to Action Section (Re-used for About page) */}
-        <Box sx={{ my: 8, textAlign: 'center' }}>
-          <Typography variant="h4" component="h2" gutterBottom>
-            Ready to Simplify Your Social Presence?
-          </Typography>
-          <Typography variant="body1" sx={{ mb: 4, color: theme.palette.text.secondary }}>
-            Join Mockingbird today and take the hassle out of cross-platform content sharing.
-          </Typography>
-          <Button
-            variant="contained"
-            color="primary"
-            size="large"
-            component={Link}
-            href="/login"
-          >
-            Sign Up Now
-          </Button>
+      <Container maxWidth="md" sx={{ mb: 8, textAlign: 'center' }}>
+        <Typography variant="h5" fontWeight={700} color="text.primary" gutterBottom>How It Works</Typography>
+        <Box component="ol" sx={{ textAlign: 'left', display: 'inline-block', mx: 'auto', color: 'text.secondary', fontSize: 18, lineHeight: 2 }}>
+          <li>Sign up and connect your Facebook and Twitter accounts.</li>
+          <li>Choose which Facebook pages and Twitter accounts to link.</li>
+          <li>Post on Facebook—Mockingbird automatically shares it to Twitter (X).</li>
+          <li>View your publish history and analytics in your dashboard.</li>
         </Box>
       </Container>
 
-      {/* Footer Section */}
-      <Box component="footer" sx={{
-        bgcolor: theme.palette.primary.main,
-        color: theme.palette.primary.contrastText,
-        py: 4,
-        textAlign: 'center'
-      }}>
-        <Container maxWidth="lg">
-          <Typography variant="body2">&copy; {new Date().getFullYear()} Mockingbird. All rights reserved.</Typography>
-          <Box sx={{ mt: 1 }}>
-            <Link href="#" passHref style={{ color: theme.palette.primary.contrastText, textDecoration: 'none', margin: theme.spacing(0, 1) }}>Privacy Policy</Link>
-            <Link href="#" passHref style={{ color: theme.palette.primary.contrastText, textDecoration: 'none', margin: theme.spacing(0, 1) }}>Terms of Service</Link>
-          </Box>
+      <Container maxWidth="sm" sx={{ mb: 8, textAlign: 'center' }}>
+        <Typography variant="h6" color="primary" fontWeight={700} gutterBottom>What Our Users Say</Typography>
+        <Paper elevation={2} sx={{ bgcolor: 'white', borderRadius: 2, boxShadow: 1, p: 3, mb: 2 }}>
+          <Typography variant="body1" fontStyle="italic" color="text.secondary">“Mockingbird saves me hours every week. My posts reach more people, and I never forget to update both platforms!”</Typography>
+          <Typography variant="caption" color="text.disabled" display="block" mt={1}>— Social Media Manager</Typography>
+        </Paper>
+        <Paper elevation={2} sx={{ bgcolor: 'white', borderRadius: 2, boxShadow: 1, p: 3 }}>
+          <Typography variant="body1" fontStyle="italic" color="text.secondary">“Setup was a breeze, and the analytics help me see what’s working. Highly recommend!”</Typography>
+          <Typography variant="caption" color="text.disabled" display="block" mt={1}>— Small Business Owner</Typography>
+        </Paper>
+      </Container>
+
+      <Box component="footer" sx={{ bgcolor: 'primary.main', color: 'primary.contrastText', py: 4, textAlign: 'center', flexShrink: 0 }}>
+        <Container maxWidth="md">
+          <Typography variant="body2">© 2025 Mockingbird. All rights reserved.</Typography>
         </Container>
       </Box>
     </Box>

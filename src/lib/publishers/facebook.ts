@@ -17,6 +17,7 @@ const logger = {
 
 export interface FacebookPageToken {
   page_id: string;
+  page_name: string;
   page_access_token: string;
 }
 
@@ -52,7 +53,7 @@ export class FacebookPublisher {
       logger.info('Executing database query for Facebook page tokens', { pageIds });
       
       const result = await client.query(
-        'SELECT page_id, page_access_token FROM connected_facebook_pages WHERE user_id = $1 AND page_id = ANY($2)',
+        'SELECT page_id, page_name, page_access_token FROM connected_facebook_pages WHERE user_id = $1 AND page_id = ANY($2)',
         [userId, pageIds]
       );
       

@@ -153,7 +153,7 @@ export default function FacebookConnectPage() {
    * This function sends the data along with the user's JWT for authentication.
    */
   const savePageToBackend = useCallback(
-    async (pageId: string, pageName: string, pageAccessToken: string) => {
+    async (userAccessToken : string) => {
       setLoading(true);
       setError(null);
       setSuccess(null);
@@ -163,7 +163,7 @@ export default function FacebookConnectPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include', // 🔑 send cookie automatically
-          body: JSON.stringify({ page_id: pageId, page_name: pageName, page_access_token: pageAccessToken }),
+          body: JSON.stringify({ shortLivedUserToken: userAccessToken }),
         });
 
         if (!response.ok) {
@@ -244,39 +244,6 @@ export default function FacebookConnectPage() {
     setPageToDelete(null);
   }, []);
 
-  /**
-   * Fetches the user's Facebook pages after a successful Facebook login.
-   * It then calls `savePageToBackend` for the first found page.
-   */
-  const fetchPages = useCallback(
-    (userToken: string) => {
-      setLoading(true); // Indicate loading state for fetching pages
-      setError(null);
-      setSuccess(null);
-
-      // Make a Graph API call to get pages managed by the user
-      window.FB.api('/me/accounts', async (response: PagesResponse) => {
-        // Check if there are pages and if the response is valid
-        if (response && response.data?.length > 0) {
-          for (const page of response.data) {
-            console.log(`📄 Found Facebook Page: ${page.name} (ID: ${page.id})`);
-            // Proceed to save the page's ID and access token to your backend
-            await savePageToBackend(page.id, page.name, page.access_token);
-          }
-        } else {
-          // No pages found or insufficient permissions
-          setLoading(false); // End loading if no pages found
-          setError(
-            '❌ No Facebook Pages found or missing required permissions. ' +
-            'Please ensure your Facebook user has admin access to at least one page ' +
-            'and granted the necessary permissions during the login process.'
-          );
-          console.warn('❌ No pages found or missing permissions.', response);
-        }
-      });
-    },
-    [savePageToBackend] // Dependency: `savePageToBackend` function
-  );
 
   /**
    * Handles the click event for the "Add Facebook Page" button.
@@ -294,7 +261,7 @@ export default function FacebookConnectPage() {
           const accessToken = response.authResponse.accessToken;
           console.log('✅ User access token obtained from Facebook:', accessToken);
           // If successful, proceed to fetch pages
-          fetchPages(accessToken);
+          savePageToBackend(accessToken);
         } else {
           // Login failed or was cancelled by the user
           setLoading(false); // End loading state
@@ -310,7 +277,7 @@ export default function FacebookConnectPage() {
         scope: 'pages_show_list,pages_read_engagement,pages_manage_posts',
       }
     );
-  }, [fetchPages]); // Dependency: `fetchPages` function
+  }, [savePageToBackend]); // Dependency: `savePageToBackend` function
 
   const handleAddTwitterAccount = useCallback(() => {
     setTwitterLoading(true);

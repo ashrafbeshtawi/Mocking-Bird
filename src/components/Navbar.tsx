@@ -27,6 +27,7 @@ const getNavLinks = (isLoggedIn: boolean) =>
         { href: '/', label: 'Home' },
         { href: '/dashboard', label: 'Dashboard' },
         { href: '/publish', label: 'Publish' },
+        { href: '/publish-history', label: 'Publish History' },
         { href: '/about', label: 'About' },
       ]
     : [

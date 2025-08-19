@@ -5,80 +5,126 @@ import { Pool } from 'pg';
 
 // Initialize PostgreSQL connection pool
 const pool = new Pool({
-  connectionString: process.env.DATABASE_STRING, // Ensure this env variable is set
+  connectionString: process.env.DATABASE_STRING,
 });
 
 // Define the expected structure of the request body
 type RequestBody = {
-  page_id: string;
-  page_name: string;
-  // 💡 Changed from 'access_token' to 'page_access_token' to match schema
-  page_access_token: string;
+  // Renamed from user_access_token for clarity
+  shortLivedUserToken: string;
 };
+
+interface Page {
+  id: string;
+  name: string;
+  access_token: string;
+}
+
+interface PagesResponse {
+  data: Page[];
+}
 
 export async function POST(req: NextRequest) {
   try {
-    // 1. Get user_id from the custom 'x-user-id' header set by the middleware
     const userId = req.headers.get('x-user-id');
 
-    // If middleware is correctly configured and working, userId should always be present.
-    // This check acts as a safeguard.
     if (!userId) {
-      console.error('[SavePage API Error] User ID not found in headers. Middleware might be missing or failed.');
-      return NextResponse.json({ error: 'Authentication required: User ID not provided.' }, { status: 401 });
+      console.error('[SavePage API Error] User ID not found in headers.');
+      return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
     }
 
     const body = (await req.json()) as RequestBody;
 
-    // 2. Basic validation for request body parameters
-    // 💡 Changed from 'access_token' to 'page_access_token'
-    if (!body.page_id || !body.page_access_token) {
-      return NextResponse.json({ error: 'Missing page_id or page_access_token in request body.' }, { status: 400 });
+    if (!body.shortLivedUserToken) {
+      return NextResponse.json({ error: 'Missing shortLivedUserToken in request body.' }, { status: 400 });
     }
 
-    // 💡 Ensure userId is parsed to INTEGER as per schema if it comes as string from header
     const parsedUserId = parseInt(userId, 10);
     if (isNaN(parsedUserId)) {
       console.error(`[SavePage API Error] Invalid user ID format in header: ${userId}`);
       return NextResponse.json({ error: 'Invalid user ID format.' }, { status: 400 });
     }
 
+    const APP_ID = process.env.FB_APP_ID;
+    const APP_SECRET = process.env.FB_APP_SECRET;
+
+    if (!APP_ID || !APP_SECRET) {
+      throw new Error("Missing Facebook APP_ID or APP_SECRET environment variables.");
+    }
+
+    // Step 1: Exchange the short-lived user token for a long-lived one
+    const exchangeUrl = `https://graph.facebook.com/v19.0/oauth/access_token?` +
+        `grant_type=fb_exchange_token&` +
+        `client_id=${APP_ID}&` +
+        `client_secret=${APP_SECRET}&` +
+        `fb_exchange_token=${body.shortLivedUserToken}`;
+    const exchangeResponse = await fetch(exchangeUrl);
+    const exchangeData = await exchangeResponse.json();
+    if (exchangeData.error) {
+      throw new Error(`Facebook API Error during token exchange: ${exchangeData.error.message}`);
+    }
+
+    const longLivedUserToken = exchangeData.access_token;
+    if (!longLivedUserToken) {
+      throw new Error('Failed to obtain long-lived user token from exchange.');
+    }
+
+    // Step 2: Use the long-lived user token to get the pages
+    const pagesUrl = `https://graph.facebook.com/v19.0/me/accounts?access_token=${longLivedUserToken}`;
+    const pagesResponse = await fetch(pagesUrl);
+    const pagesData: PagesResponse = await pagesResponse.json();
+
+    if (!pagesData.data) {
+        throw new Error('Failed to fetch pages from Facebook.');
+    }
 
     // 3. Connect to the database
     const client = await pool.connect();
-    console.log(`Connected to database for user ${parsedUserId} to save page ${body.page_id}.`);
+    
     try {
-      // 4. Check if the page already exists for this specific user in the 'facebook_pages' table
-      const { rows } = await client.query(
-        'SELECT * FROM connected_facebook_pages WHERE user_id = $1 AND page_id = $2',
-        [parsedUserId, body.page_id]
-      );
+      // Step 3a: Begin a database transaction for atomicity
+      await client.query('BEGIN');
 
-      if (rows.length > 0) {
-        // 5. If the page exists for this user, update its page_access_token and created_at timestamp
-        await client.query(
-          'UPDATE connected_facebook_pages SET page_access_token = $1, created_at = CURRENT_TIMESTAMP WHERE user_id = $2 AND page_id = $3',
-          // 💡 Changed from 'access_token' to 'page_access_token' in query
-          [body.page_access_token, parsedUserId, body.page_id]
+      // Step 4: Loop through all pages and save/update them in the database
+      for (const page of pagesData.data) {
+        const longLivedPageToken = page.access_token;
+        
+        const { rows } = await client.query(
+          'SELECT * FROM connected_facebook_pages WHERE user_id = $1 AND page_id = $2',
+          [parsedUserId, page.id]
         );
-        console.log(`Page ${body.page_id} updated for user ${parsedUserId}.`);
-      } else {
-        // 6. If the page does not exist for this user, insert a new record into 'facebook_pages'
-        await client.query(
-          'INSERT INTO connected_facebook_pages (user_id, page_id, page_name, page_access_token) VALUES ($1, $2, $3, $4)',
-          // 💡 Changed from 'access_token' to 'page_access_token' in query
-          [parsedUserId, body.page_id, body.page_name, body.page_access_token]
-        );
-        console.log(`Page ${body.page_id} inserted for user ${parsedUserId}.`);
+
+        if (rows.length > 0) {
+          // 5. If the page exists for this user, update its token
+          await client.query(
+            'UPDATE connected_facebook_pages SET page_access_token = $1, created_at = CURRENT_TIMESTAMP WHERE user_id = $2 AND page_id = $3',
+            [longLivedPageToken, parsedUserId, page.id]
+          );
+          console.log(`Page ${page.id} updated for user ${parsedUserId}.`);
+        } else {
+          // 6. If the page does not exist, insert a new record
+          await client.query(
+            'INSERT INTO connected_facebook_pages (user_id, page_id, page_name, page_access_token) VALUES ($1, $2, $3, $4)',
+            [parsedUserId, page.id, page.name, longLivedPageToken]
+          );
+          console.log(`Page ${page.id} inserted for user ${parsedUserId}.`);
+        }
       }
+
+      // Step 7: Commit the transaction
+      await client.query('COMMIT');
+    } catch (dbError) {
+      // If any error occurs, rollback the transaction
+      await client.query('ROLLBACK');
+      console.error('[SavePage API DB Error]', dbError);
+      throw dbError; // Re-throw to be caught by the outer try-catch
     } finally {
       client.release(); // Always release the client back to the pool
     }
 
-    return NextResponse.json({ success: true, message: 'Facebook page saved successfully!' });
+    return NextResponse.json({ success: true, message: 'Facebook pages saved successfully!' });
   } catch (error) {
     console.error('[SavePage API Error]', error);
-    // Provide a generic error message for security, log the specific error on the server
     return NextResponse.json({ error: 'Internal Server Error.' }, { status: 500 });
   }
 }

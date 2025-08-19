@@ -49,11 +49,9 @@ export default function PublishComponent() {
   const [isPublishing, setIsPublishing] = useState<boolean>(false);
   const [publishResults, setPublishResults] = useState<{ successful: unknown[]; failed: unknown[] } | null>(null);
 
-  // Character count and warning for Twitter
   const charCount = postText.length;
   const isTwitterWarning = charCount > TWITTER_CHAR_LIMIT && selectedXAccounts.length > 0;
 
-  // Fetch connected Facebook pages from the backend
   const fetchConnectedPages = useCallback(async () => {
     try {
       const response = await fetchWithAuth('/api/facebook/get-pages');
@@ -69,7 +67,6 @@ export default function PublishComponent() {
     }
   }, []);
 
-  // Fetch connected X accounts from the backend
   const fetchConnectedXAccounts = useCallback(async () => {
     try {
       const response = await fetchWithAuth('/api/twitter/get-accounts');
@@ -84,6 +81,18 @@ export default function PublishComponent() {
       setError({ message: (err as Error)?.message || 'An unexpected error occurred while fetching X accounts.' });
     }
   }, []);
+
+  // 💡 Add this new useEffect hook
+  // It runs whenever facebookPages or xAccounts arrays are populated.
+  // It automatically selects all IDs from the fetched data.
+  useEffect(() => {
+    if (facebookPages.length > 0) {
+      setSelectedFacebookPages(facebookPages.map(page => page.page_id));
+    }
+    if (xAccounts.length > 0) {
+      setSelectedXAccounts(xAccounts.map(account => account.id));
+    }
+  }, [facebookPages, xAccounts]);
 
   // Initial data fetch on component mount
   useEffect(() => {
@@ -110,7 +119,6 @@ export default function PublishComponent() {
     );
   };
 
-  // Handle the publish action
   const handlePublish = async () => {
     setIsPublishing(true);
     setError(null);
@@ -141,7 +149,6 @@ export default function PublishComponent() {
     };
 
     try {
-      // Assuming a single backend endpoint to handle multi-platform publishing
       const response = await fetchWithAuth('/api/publish', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -153,18 +160,19 @@ export default function PublishComponent() {
       if (response.status === 207) { // Partial success
         setPublishResults(responseData);
         setSuccess('Some posts were published successfully, but others failed. See details below.');
-        setError(null); // Clear any previous errors
+        setError(null);
       } else if (!response.ok) {
         setError({ message: responseData.error || 'Failed to publish post.', details: responseData.details });
-        setSuccess(null); // Clear any previous success
+        setSuccess(null);
         setPublishResults(null);
-      } else { // Full success (status 200)
+      } else { // Full success
         setSuccess('🎉 Your post has been published successfully!');
         setPublishResults(responseData);
-        setError(null); // Clear any previous errors
+        setError(null);
         setPostText('');
-        setSelectedFacebookPages([]);
-        setSelectedXAccounts([]);
+        // This resets the selection after a successful publish
+        setSelectedFacebookPages(facebookPages.map(page => page.page_id));
+        setSelectedXAccounts(xAccounts.map(account => account.id));
       }
     } catch (err: unknown) {
       console.error('Publishing error:', err);
@@ -184,7 +192,6 @@ export default function PublishComponent() {
     );
   }
 
-  // Combine both types of connected accounts into a single array for easier checking
   const allConnectedAccounts = [...facebookPages, ...xAccounts];
 
   return (
@@ -248,7 +255,6 @@ export default function PublishComponent() {
             <Typography variant="h6" color="text.secondary">
               No accounts are connected. Please connect your Facebook Pages and X accounts first.
             </Typography>
-            {/* You could add a link or button to the connection page here */}
           </Box>
         ) : (
           <>
@@ -282,7 +288,6 @@ export default function PublishComponent() {
               Select Accounts to Publish to
             </Typography>
             <Grid container spacing={2}>
-              {/* Facebook Pages Section */}
               <Grid>
                 <Typography variant="subtitle1" component="h3" sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                   <FacebookIcon color="primary" sx={{ mr: 1 }} />
@@ -312,7 +317,6 @@ export default function PublishComponent() {
                 </Paper>
               </Grid>
 
-              {/* X Accounts Section */}
               <Grid>
                 <Typography variant="subtitle1" component="h3" sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                   <TwitterIcon sx={{ color: '#000', mr: 1 }} />
