@@ -1,0 +1,311 @@
+'use client';
+
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  Container,
+  Box,
+  Typography,
+  Paper,
+  Button,
+  TextField,
+  CircularProgress,
+  Alert,
+  AlertTitle,
+  useTheme,
+  List,
+  ListItem,
+  ListItemText,
+  IconButton,
+  Tooltip,
+  Divider,
+} from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
+import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
+import SaveIcon from '@mui/icons-material/Save';
+import { fetchWithAuth } from '@/lib/fetch';
+
+// Interface for a single AI prompt
+interface AiPrompt {
+  id: number;
+  title: string;
+  prompt: string;
+  created_at: string;
+}
+
+export default function AiPromptsComponent() {
+  const theme = useTheme();
+  const [prompts, setPrompts] = useState<AiPrompt[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [newPromptTitle, setNewPromptTitle] = useState<string>('');
+  const [newPromptContent, setNewPromptContent] = useState<string>('');
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [editingPromptId, setEditingPromptId] = useState<number | null>(null);
+  const [editedTitle, setEditedTitle] = useState<string>('');
+  const [editedPrompt, setEditedPrompt] = useState<string>('');
+
+  const fetchPrompts = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetchWithAuth('/api/ai/prompts');
+      if (!response.ok) {
+        if (response.status === 401) {
+          window.location.href = '/login';
+          return;
+        }
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch AI prompts.');
+      }
+      const result = await response.json();
+      setPrompts(result.prompts || []);
+    } catch (err: unknown) {
+      console.error('Error fetching prompts:', err);
+      setError((err as Error)?.message || 'An unexpected error occurred while fetching prompts.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchPrompts();
+  }, [fetchPrompts]);
+
+  const handleAddPrompt = async () => {
+    if (newPromptTitle.trim() === '' || newPromptContent.trim() === '') {
+      setError('Title and prompt content cannot be empty.');
+      return;
+    }
+
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      const response = await fetchWithAuth('/api/ai/prompts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: newPromptTitle, prompt: newPromptContent }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to add prompt.');
+      }
+
+      setNewPromptTitle('');
+      setNewPromptContent('');
+      fetchPrompts(); // Refresh the list
+    } catch (err: unknown) {
+      console.error('Error adding prompt:', err);
+      setError((err as Error)?.message || 'An unexpected error occurred while adding the prompt.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeletePrompt = async (id: number) => {
+    if (window.confirm('Are you sure you want to delete this prompt?')) {
+      try {
+        const response = await fetchWithAuth('/api/ai/prompts', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to delete prompt.');
+        }
+
+        fetchPrompts(); // Refresh the list
+      } catch (err: unknown) {
+        console.error('Error deleting prompt:', err);
+        setError((err as Error)?.message || 'An unexpected error occurred while deleting the prompt.');
+      }
+    }
+  };
+
+  const handleEditClick = (prompt: AiPrompt) => {
+    setEditingPromptId(prompt.id);
+    setEditedTitle(prompt.title);
+    setEditedPrompt(prompt.prompt);
+  };
+
+  const handleSaveEdit = async () => {
+    if (editedTitle.trim() === '' || editedPrompt.trim() === '') {
+      setError('Title and prompt content cannot be empty.');
+      return;
+    }
+
+    try {
+      const response = await fetchWithAuth('/api/ai/prompts', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: editingPromptId, title: editedTitle, prompt: editedPrompt }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update prompt.');
+      }
+
+      setEditingPromptId(null);
+      fetchPrompts(); // Refresh the list
+    } catch (err: unknown) {
+      console.error('Error updating prompt:', err);
+      setError((err as Error)?.message || 'An unexpected error occurred while updating the prompt.');
+    }
+  };
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  return (
+    <Container maxWidth="lg" sx={{ mt: 4 }}>
+      <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: theme.typography.fontWeightBold, mb: 3 }}>
+        AI Prompts
+      </Typography>
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          <AlertTitle>Error</AlertTitle>
+          {error}
+        </Alert>
+      )}
+
+      {/* Form to Add New Prompt */}
+      <Paper elevation={3} sx={{ p: 4, mb: 4 }}>
+        <Typography variant="h6" gutterBottom>
+          Add New Prompt
+        </Typography>
+        <TextField
+          label="Prompt Title"
+          fullWidth
+          value={newPromptTitle}
+          onChange={(e) => setNewPromptTitle(e.target.value)}
+          variant="outlined"
+          sx={{ mb: 2 }}
+        />
+        <TextField
+          label="Prompt Content"
+          multiline
+          rows={4}
+          fullWidth
+          value={newPromptContent}
+          onChange={(e) => setNewPromptContent(e.target.value)}
+          variant="outlined"
+          sx={{ mb: 2 }}
+        />
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={handleAddPrompt}
+          disabled={isSaving}
+          startIcon={isSaving ? <CircularProgress size={20} color="inherit" /> : <AddIcon />}
+        >
+          {isSaving ? 'Saving...' : 'Add Prompt'}
+        </Button>
+      </Paper>
+      
+      <Divider sx={{ my: 4 }} />
+
+      {/* List of Existing Prompts */}
+      <Paper elevation={3} sx={{ p: 4 }}>
+        <Typography variant="h6" gutterBottom>
+          Your Saved Prompts
+        </Typography>
+        {prompts.length === 0 ? (
+          <Typography variant="body1" color="text.secondary" sx={{ mt: 2 }}>
+            You haven&apos;t saved any prompts yet.
+          </Typography>
+        ) : (
+          <List>
+            {prompts.map((prompt) => (
+              <Box key={prompt.id}>
+                {editingPromptId === prompt.id ? (
+                  <Box sx={{ my: 2 }}>
+                    <TextField
+                      label="Edit Title"
+                      fullWidth
+                      value={editedTitle}
+                      onChange={(e) => setEditedTitle(e.target.value)}
+                      variant="outlined"
+                      sx={{ mb: 2 }}
+                    />
+                    <TextField
+                      label="Edit Content"
+                      multiline
+                      rows={4}
+                      fullWidth
+                      value={editedPrompt}
+                      onChange={(e) => setEditedPrompt(e.target.value)}
+                      variant="outlined"
+                      sx={{ mb: 2 }}
+                    />
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      onClick={handleSaveEdit}
+                      startIcon={<SaveIcon />}
+                    >
+                      Save
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      color="secondary"
+                      onClick={() => setEditingPromptId(null)}
+                      sx={{ ml: 2 }}
+                    >
+                      Cancel
+                    </Button>
+                  </Box>
+                ) : (
+                  <ListItem
+                    secondaryAction={
+                      <Box>
+                        <Tooltip title="Edit">
+                          <IconButton edge="end" aria-label="edit" onClick={() => handleEditClick(prompt)}>
+                            <EditIcon />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Delete">
+                          <IconButton edge="end" aria-label="delete" onClick={() => handleDeletePrompt(prompt.id)}>
+                            <DeleteIcon color="error" />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+                    }
+                  >
+                    <ListItemText
+                      primary={
+                        <Typography variant="subtitle1" fontWeight="bold">
+                          {prompt.title}
+                        </Typography>
+                      }
+                      secondary={
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{ whiteSpace: 'pre-wrap' }}
+                        >
+                          {prompt.prompt}
+                        </Typography>
+                      }
+                    />
+                  </ListItem>
+                )}
+                <Divider component="li" />
+              </Box>
+            ))}
+          </List>
+        )}
+      </Paper>
+    </Container>
+  );
+}
