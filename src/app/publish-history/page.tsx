@@ -124,7 +124,7 @@ export default function PublishHistoryComponent() {
                   <TableCell>
                     <Grid container spacing={1}>
                       {item.successful_facebook.map((name, index) => (
-                        <Grid item key={`fb-success-${index}`}>
+                        <Grid key={`fb-success-${index}`}>
                           <Chip
                             icon={<FacebookIcon sx={{ fontSize: 16 }} />}
                             label={name}
@@ -135,7 +135,7 @@ export default function PublishHistoryComponent() {
                         </Grid>
                       ))}
                       {item.successful_twitter.map((username, index) => (
-                        <Grid item key={`x-success-${index}`}>
+                        <Grid key={`x-success-${index}`}>
                           <Chip
                             icon={<TwitterIcon sx={{ fontSize: 16 }} />}
                             label={`@${username}`}
@@ -153,7 +153,7 @@ export default function PublishHistoryComponent() {
                   <TableCell>
                     <Grid container spacing={1}>
                       {item.failed_facebook.map((name, index) => (
-                        <Grid item key={`fb-failed-${index}`}>
+                        <Grid key={`fb-failed-${index}`}>
                           <Chip
                             icon={<FacebookIcon sx={{ fontSize: 16 }} />}
                             label={name}
@@ -164,7 +164,7 @@ export default function PublishHistoryComponent() {
                         </Grid>
                       ))}
                       {item.failed_twitter.map((username, index) => (
-                        <Grid item key={`x-failed-${index}`}>
+                        <Grid key={`x-failed-${index}`}>
                           <Chip
                             icon={<TwitterIcon sx={{ fontSize: 16 }} />}
                             label={`@${username}`}
