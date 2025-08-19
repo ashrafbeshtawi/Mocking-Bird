@@ -18,6 +18,11 @@ import {
   IconButton,
   Tooltip,
   Divider,
+  Dialog, // Import Dialog
+  DialogActions, // Import DialogActions
+  DialogContent, // Import DialogContent
+  DialogContentText, // Import DialogContentText
+  DialogTitle, // Import DialogTitle
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -44,6 +49,10 @@ export default function AiPromptsComponent() {
   const [editingPromptId, setEditingPromptId] = useState<number | null>(null);
   const [editedTitle, setEditedTitle] = useState<string>('');
   const [editedPrompt, setEditedPrompt] = useState<string>('');
+  const [openConfirmDialog, setOpenConfirmDialog] = useState<boolean>(false);
+  const [promptToDeleteId, setPromptToDeleteId] = useState<number | null>(null);
+  const [promptToDeleteTitle, setPromptToDeleteTitle] = useState<string>('');
+
 
   const fetchPrompts = useCallback(async () => {
     setLoading(true);
@@ -104,26 +113,44 @@ export default function AiPromptsComponent() {
     }
   };
 
-  const handleDeletePrompt = async (id: number) => {
-    if (window.confirm('Are you sure you want to delete this prompt?')) {
-      try {
-        const response = await fetchWithAuth('/api/ai/prompts', {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id }),
-        });
+  const handleDeletePrompt = (id: number, title: string) => {
+    setPromptToDeleteId(id);
+    setPromptToDeleteTitle(title);
+    setOpenConfirmDialog(true);
+  };
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Failed to delete prompt.');
-        }
+  const confirmDelete = async () => {
+    if (!promptToDeleteId) return;
 
-        fetchPrompts(); // Refresh the list
-      } catch (err: unknown) {
-        console.error('Error deleting prompt:', err);
-        setError((err as Error)?.message || 'An unexpected error occurred while deleting the prompt.');
+    setOpenConfirmDialog(false);
+    setError(null);
+
+    try {
+      const response = await fetchWithAuth('/api/ai/prompts', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: promptToDeleteId }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete prompt.');
       }
+
+      fetchPrompts(); // Refresh the list
+    } catch (err: unknown) {
+      console.error('Error deleting prompt:', err);
+      setError((err as Error)?.message || 'An unexpected error occurred while deleting the prompt.');
+    } finally {
+      setPromptToDeleteId(null);
+      setPromptToDeleteTitle('');
     }
+  };
+
+  const handleCloseDialog = () => {
+    setOpenConfirmDialog(false);
+    setPromptToDeleteId(null);
+    setPromptToDeleteTitle('');
   };
 
   const handleEditClick = (prompt: AiPrompt) => {
@@ -278,7 +305,7 @@ export default function AiPromptsComponent() {
                           </IconButton>
                         </Tooltip>
                         <Tooltip title="Delete">
-                          <IconButton edge="end" aria-label="delete" onClick={() => handleDeletePrompt(prompt.id)}>
+                          <IconButton edge="end" aria-label="delete" onClick={() => handleDeletePrompt(prompt.id, prompt.title)}>
                             <DeleteIcon color="error" />
                           </IconButton>
                         </Tooltip>
@@ -309,6 +336,29 @@ export default function AiPromptsComponent() {
           </List>
         )}
       </Paper>
+
+      {/* Confirmation Dialog */}
+      <Dialog
+        open={openConfirmDialog}
+        onClose={handleCloseDialog}
+        aria-labelledby="alert-dialog-title"
+        aria-describedby="alert-dialog-description"
+      >
+        <DialogTitle id="alert-dialog-title">{"Confirm Deletion"}</DialogTitle>
+        <DialogContent>
+          <DialogContentText id="alert-dialog-description">
+            Are you sure you want to delete the prompt &quot;{promptToDeleteTitle}&quot;? This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDialog} color="primary">
+            Cancel
+          </Button>
+          <Button onClick={confirmDelete} color="error" autoFocus>
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 }
