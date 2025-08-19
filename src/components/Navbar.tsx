@@ -15,7 +15,8 @@ import {
   ListItemButton,
   ListItemText,
   useMediaQuery,
-  useTheme
+  useTheme,
+  Divider
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import { useState, useCallback } from 'react';
@@ -24,11 +25,10 @@ import { useAuth } from '../app/hooks/AuthProvider';
 const getNavLinks = (isLoggedIn: boolean) =>
   isLoggedIn
     ? [
-        { href: '/', label: 'Home' },
         { href: '/dashboard', label: 'Dashboard' },
         { href: '/publish', label: 'Publish' },
-        { href: '/publish-history', label: 'Publish History' },
-        { href: '/ai', label: 'AI' },
+        { href: '/publish-history', label: 'History' },
+        { href: '/ai', label: 'AI Prompts' },
         { href: '/about', label: 'About' },
       ]
     : [
@@ -52,7 +52,6 @@ export default function Navbar() {
 
   const handleLogout = useCallback(async () => {
     try {
-      // Standard: Call API to clear server-side cookie
       const res = await fetch('/api/logout', {
         method: 'POST',
         credentials: 'include'
@@ -60,13 +59,9 @@ export default function Navbar() {
 
       if (!res.ok) throw new Error('Logout failed');
 
-      // Update client auth state
       setIsLoggedIn(false);
-
-      // Redirect to login
       router.push('/login');
 
-      // Close mobile drawer if open
       if (isMobile) setDrawerOpen(false);
     } catch (err) {
       console.error('Logout failed', err);
@@ -94,39 +89,30 @@ export default function Navbar() {
               href={item.href}
               selected={pathname === item.href}
               sx={{
-                color:
-                  pathname === item.href
-                    ? theme.palette.primary.main
-                    : theme.palette.text.primary,
-                bgcolor:
-                  pathname === item.href
-                    ? theme.palette.action.selected
-                    : 'inherit',
-                '&:hover': { bgcolor: theme.palette.action.hover }
+                '&.Mui-selected': {
+                  color: theme.palette.primary.main,
+                  fontWeight: theme.typography.fontWeightBold,
+                  backgroundColor: theme.palette.action.selected,
+                },
+                '&:hover': {
+                  backgroundColor: theme.palette.action.hover,
+                },
               }}
             >
               <ListItemText primary={item.label} />
             </ListItemButton>
           </ListItem>
         ))}
-
+        <Divider />
         {!isLoggedIn ? (
           <>
             <ListItem disablePadding>
-              <ListItemButton
-                component={Link}
-                href="/login"
-                selected={pathname === '/login'}
-              >
+              <ListItemButton component={Link} href="/login">
                 <ListItemText primary="Login" />
               </ListItemButton>
             </ListItem>
             <ListItem disablePadding>
-              <ListItemButton
-                component={Link}
-                href="/register"
-                selected={pathname === '/register'}
-              >
+              <ListItemButton component={Link} href="/register">
                 <ListItemText primary="Register" />
               </ListItemButton>
             </ListItem>
@@ -148,17 +134,17 @@ export default function Navbar() {
   return (
     <AppBar
       position="sticky"
+      elevation={0}
       sx={{
         backgroundColor: theme.palette.background.paper,
         color: theme.palette.text.primary,
-        boxShadow: theme.shadows[1],
-        borderBottom: `1px solid ${theme.palette.divider}`
+        borderBottom: `1px solid ${theme.palette.divider}`,
       }}
     >
-      <Toolbar sx={{ justifyContent: 'space-between', padding: 2 }}>
+      <Toolbar sx={{ justifyContent: 'space-between', px: { xs: 2, md: 4 } }}>
         <Link href="/" style={{ textDecoration: 'none' }}>
-          <Typography variant="h6">
-            <span className="bird-icon">🐦</span> Mockingbird
+          <Typography variant="h5" fontWeight={800} color="primary">
+            🐦 Mockingbird
           </Typography>
         </Link>
 
@@ -166,8 +152,8 @@ export default function Navbar() {
         <Box
           sx={{
             display: { xs: 'none', md: 'flex' },
-            gap: 2,
-            alignItems: 'center'
+            alignItems: 'center',
+            gap: 4,
           }}
         >
           {currentNavLinks.map(({ href, label }) => (
@@ -176,15 +162,22 @@ export default function Navbar() {
               component={Link}
               href={href}
               sx={{
-                color:
-                  pathname === href
-                    ? theme.palette.primary.main
-                    : theme.palette.text.secondary,
-                fontWeight:
-                  pathname === href
-                    ? theme.typography.fontWeightBold
-                    : theme.typography.fontWeightRegular,
-                textTransform: 'none'
+                color: pathname === href
+                  ? theme.palette.primary.main
+                  : theme.palette.text.secondary,
+                fontWeight: pathname === href ? 700 : 400,
+                textTransform: 'none',
+                position: 'relative',
+                '&::after': {
+                  content: '""',
+                  position: 'absolute',
+                  bottom: -8,
+                  left: 0,
+                  width: '100%',
+                  height: '2px',
+                  backgroundColor: pathname === href ? theme.palette.primary.main : 'transparent',
+                  transition: 'background-color 0.3s ease',
+                },
               }}
             >
               {label}
@@ -205,9 +198,10 @@ export default function Navbar() {
                 href="/register"
                 variant="contained"
                 color="secondary"
+                disableElevation
                 sx={{ textTransform: 'none' }}
               >
-                Register
+                Get Started
               </Button>
             </>
           ) : (
