@@ -16,24 +16,31 @@ import {
   ListItemText,
   useMediaQuery,
   useTheme,
-  Divider
+  SvgIcon,
+  Divider,
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import { useState, useCallback } from 'react';
 import { useAuth } from '../app/hooks/AuthProvider';
+import HomeIcon from '@mui/icons-material/Home';
+import DashboardIcon from '@mui/icons-material/Dashboard';
+import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
+import HistoryIcon from '@mui/icons-material/History';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import InfoIcon from '@mui/icons-material/Info';
 
 const getNavLinks = (isLoggedIn: boolean) =>
   isLoggedIn
     ? [
-        { href: '/dashboard', label: 'Dashboard' },
-        { href: '/publish', label: 'Publish' },
-        { href: '/publish-history', label: 'History' },
-        { href: '/ai', label: 'AI Prompts' },
-        { href: '/about', label: 'About' },
+        { href: '/dashboard', label: 'Dashboard', icon: DashboardIcon },
+        { href: '/publish', label: 'Publish', icon: RocketLaunchIcon },
+        { href: '/publish-history', label: 'History', icon: HistoryIcon },
+        { href: '/ai', label: 'AI Prompts', icon: AutoAwesomeIcon },
+        { href: '/about', label: 'About', icon: InfoIcon },
       ]
     : [
-        { href: '/', label: 'Home' },
-        { href: '/about', label: 'About' }
+        { href: '/', label: 'Home', icon: HomeIcon },
+        { href: '/about', label: 'About', icon: InfoIcon }
       ];
 
 export default function Navbar() {
@@ -99,6 +106,7 @@ export default function Navbar() {
                 },
               }}
             >
+              <item.icon sx={{ mr: 2, color: pathname === item.href ? theme.palette.primary.main : theme.palette.text.secondary }} />
               <ListItemText primary={item.label} />
             </ListItemButton>
           </ListItem>
@@ -156,11 +164,12 @@ export default function Navbar() {
             gap: 4,
           }}
         >
-          {currentNavLinks.map(({ href, label }) => (
+          {currentNavLinks.map(({ href, label, icon: IconComponent }) => (
             <Button
               key={href}
               component={Link}
               href={href}
+              startIcon={<IconComponent />}
               sx={{
                 color: pathname === href
                   ? theme.palette.primary.main
@@ -178,6 +187,7 @@ export default function Navbar() {
                   backgroundColor: pathname === href ? theme.palette.primary.main : 'transparent',
                   transition: 'background-color 0.3s ease',
                 },
+                
               }}
             >
               {label}
