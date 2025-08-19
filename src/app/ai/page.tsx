@@ -18,11 +18,11 @@ import {
   IconButton,
   Tooltip,
   Divider,
-  Dialog, // Import Dialog
-  DialogActions, // Import DialogActions
-  DialogContent, // Import DialogContent
-  DialogContentText, // Import DialogContentText
-  DialogTitle, // Import DialogTitle
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -43,6 +43,7 @@ export default function AiPromptsComponent() {
   const [prompts, setPrompts] = useState<AiPrompt[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [addPromptDialogOpen, setAddPromptDialogOpen] = useState<boolean>(false);
   const [newPromptTitle, setNewPromptTitle] = useState<string>('');
   const [newPromptContent, setNewPromptContent] = useState<string>('');
   const [isSaving, setIsSaving] = useState<boolean>(false);
@@ -81,6 +82,17 @@ export default function AiPromptsComponent() {
     fetchPrompts();
   }, [fetchPrompts]);
 
+  const handleOpenAddDialog = () => {
+    setAddPromptDialogOpen(true);
+    setNewPromptTitle('');
+    setNewPromptContent('');
+    setError(null);
+  };
+
+  const handleCloseAddDialog = () => {
+    setAddPromptDialogOpen(false);
+  };
+
   const handleAddPrompt = async () => {
     if (newPromptTitle.trim() === '' || newPromptContent.trim() === '') {
       setError('Title and prompt content cannot be empty.');
@@ -102,8 +114,7 @@ export default function AiPromptsComponent() {
         throw new Error(errorData.error || 'Failed to add prompt.');
       }
 
-      setNewPromptTitle('');
-      setNewPromptContent('');
+      handleCloseAddDialog();
       fetchPrompts(); // Refresh the list
     } catch (err: unknown) {
       console.error('Error adding prompt:', err);
@@ -206,53 +217,31 @@ export default function AiPromptsComponent() {
         </Alert>
       )}
 
-      {/* Form to Add New Prompt */}
-      <Paper elevation={3} sx={{ p: 4, mb: 4 }}>
-        <Typography variant="h6" gutterBottom>
-          Add New Prompt
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          These saved AI prompts can be used to configure custom content for specific pages/accounts, where the original post is transformed using an AI model according to your prompt. For example, you can create a prompt to &quot;Summarize the content in 100 characters&quot; or &quot;Rewrite the post in a professional tone.&quot;
-        </Typography>
-        <TextField
-          label="Prompt Title"
-          fullWidth
-          value={newPromptTitle}
-          onChange={(e) => setNewPromptTitle(e.target.value)}
-          variant="outlined"
-          sx={{ mb: 2 }}
-        />
-        <TextField
-          label="Prompt Content"
-          multiline
-          rows={4}
-          fullWidth
-          value={newPromptContent}
-          onChange={(e) => setNewPromptContent(e.target.value)}
-          variant="outlined"
-          sx={{ mb: 2 }}
-        />
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
+        These saved AI prompts can be used to configure custom content for specific pages/accounts, where the original post is transformed using an AI model according to your prompt. For example, you can create a prompt to &quot;Summarize the content in 100 characters&quot; or &quot;Rewrite the post in a professional tone.&quot;
+      </Typography>
+
+      {/* "Add Prompt" Button - Top Left Position */}
+      <Box sx={{ display: 'flex', justifyContent: 'flex-start', mb: 4 }}>
         <Button
           variant="contained"
           color="primary"
-          onClick={handleAddPrompt}
-          disabled={isSaving}
-          startIcon={isSaving ? <CircularProgress size={20} color="inherit" /> : <AddIcon />}
+          onClick={handleOpenAddDialog}
+          startIcon={<AddIcon />}
+          sx={{ textTransform: 'none' }}
         >
-          {isSaving ? 'Saving...' : 'Add Prompt'}
+          Add Prompt
         </Button>
-      </Paper>
-      
-      <Divider sx={{ my: 4 }} />
+      </Box>
 
       {/* List of Existing Prompts */}
-      <Paper elevation={3} sx={{ p: 4 }}>
+      <Paper elevation={3} sx={{ p: 4, mb: 4 }}>
         <Typography variant="h6" gutterBottom>
           Your Saved Prompts
         </Typography>
         {prompts.length === 0 ? (
           <Typography variant="body1" color="text.secondary" sx={{ mt: 2 }}>
-            You haven&apos;t saved any prompts yet.
+            You haven&apos;t saved any prompts yet. Click the &quot;Add Prompt&quot; button to get started.
           </Typography>
         ) : (
           <List>
@@ -337,6 +326,55 @@ export default function AiPromptsComponent() {
         )}
       </Paper>
 
+      {/* Add Prompt Dialog */}
+      <Dialog open={addPromptDialogOpen} onClose={handleCloseAddDialog}>
+        <DialogTitle>Add New Prompt</DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ mb: 2 }}>
+            Enter a title and the content for your new AI prompt.
+          </DialogContentText>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Prompt Title"
+            type="text"
+            fullWidth
+            variant="outlined"
+            value={newPromptTitle}
+            onChange={(e) => setNewPromptTitle(e.target.value)}
+            sx={{ mb: 2 }}
+          />
+          <TextField
+            margin="dense"
+            label="Prompt Content"
+            type="text"
+            fullWidth
+            multiline
+            rows={4}
+            variant="outlined"
+            value={newPromptContent}
+            onChange={(e) => setNewPromptContent(e.target.value)}
+          />
+          {error && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {error}
+            </Alert>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseAddDialog} color="secondary">Cancel</Button>
+          <Button
+            onClick={handleAddPrompt}
+            variant="contained"
+            color="primary"
+            disabled={isSaving}
+            startIcon={isSaving ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
+          >
+            {isSaving ? 'Saving...' : 'Save Prompt'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+      
       {/* Confirmation Dialog */}
       <Dialog
         open={openConfirmDialog}
