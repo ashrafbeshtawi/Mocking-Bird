@@ -34,8 +34,8 @@ const getNavLinks = (isLoggedIn: boolean) =>
     ? [
         { href: '/dashboard', label: 'Dashboard', icon: DashboardIcon },
         { href: '/publish', label: 'Publish', icon: RocketLaunchIcon },
+        { href: '/ai', label: 'AI Tools', icon: AutoAwesomeIcon },
         { href: '/publish-history', label: 'History', icon: HistoryIcon },
-        { href: '/ai', label: 'AI Prompts', icon: AutoAwesomeIcon },
         { href: '/about', label: 'About', icon: InfoIcon },
       ]
     : [
