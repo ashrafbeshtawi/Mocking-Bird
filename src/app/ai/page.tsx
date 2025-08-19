@@ -185,7 +185,7 @@ export default function AiPromptsComponent() {
           Add New Prompt
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          These saved AI prompts can be used to configure **custom content for specific pages/accounts**, where the original post is transformed using an AI model according to your prompt. For example, you can create a prompt to &quot;Summarize the content in 100 characters&quot; or &quot;Rewrite the post in a professional tone.&quot;
+          These saved AI prompts can be used to configure custom content for specific pages/accounts, where the original post is transformed using an AI model according to your prompt. For example, you can create a prompt to &quot;Summarize the content in 100 characters&quot; or &quot;Rewrite the post in a professional tone.&quot;
         </Typography>
         <TextField
           label="Prompt Title"
