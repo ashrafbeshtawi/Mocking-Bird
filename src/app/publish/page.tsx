@@ -269,6 +269,8 @@ export default function PublishComponent() {
               sx={{ mb: 2 }}
               InputProps={{
                 style: { fontSize: '1.1rem' },
+                // 💡 Add textAlign property to align the text to the right
+                sx: { textAlign: 'right', direction: 'rtl' }
               }}
             />
             {isTwitterWarning && selectedXAccounts.length > 0 && (

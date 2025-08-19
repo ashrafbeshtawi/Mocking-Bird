@@ -1,66 +1,63 @@
-
 import React from 'react';
 import { Container, Box, Typography, Button, Paper, Stack } from '@mui/material';
 import Link from 'next/link';
-import FacebookIcon from '@mui/icons-material/Facebook';
-import TwitterIcon from '@mui/icons-material/X';
+import TwitterIcon from '@mui/icons-material/Twitter';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import SecurityIcon from '@mui/icons-material/Security';
+import Diversity3Icon from '@mui/icons-material/Diversity3'; // Team icon
+import RocketLaunchIcon from '@mui/icons-material/RocketLaunch'; // Mission icon
+import HistoryEduIcon from '@mui/icons-material/HistoryEdu'; // Story icon
 
 export default function AboutPage() {
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', display: 'flex', flexDirection: 'column' }}>
       <Container maxWidth="md" sx={{ textAlign: 'center', mt: 8, mb: 6 }}>
         <Typography variant="h2" component="h1" fontWeight={800} color="primary" gutterBottom>
-          🐦 Mockingbird
+          🐦 About Mockingbird
         </Typography>
         <Typography variant="h5" color="text.secondary" sx={{ mb: 4 }}>
-          Automate your social media cross-posting. Effortlessly share your Facebook posts to Twitter (X) and keep your audience engaged everywhere.
+          Our mission is to help content creators and businesses streamline their social media presence.
         </Typography>
       </Container>
 
       <Container maxWidth="lg" sx={{ mb: 8 }}>
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={4} justifyContent="center" alignItems="stretch">
           <Paper elevation={3} sx={{ p: 4, flex: 1, textAlign: 'center', borderRadius: 4 }}>
-            <FacebookIcon sx={{ fontSize: 48, color: 'primary.main', mb: 2 }} />
-            <TwitterIcon sx={{ fontSize: 48, color: 'primary.main', mb: 2, ml: 2 }} />
-            <Typography variant="h6" color="primary" fontWeight={700} gutterBottom>Automated Cross-Posting</Typography>
-            <Typography color="text.secondary">Connect your Facebook and Twitter accounts. Mockingbird automatically shares your posts across platforms, saving you time.</Typography>
+            <HistoryEduIcon sx={{ fontSize: 48, color: 'primary.main', mb: 2 }} />
+            <Typography variant="h6" color="primary" fontWeight={700} gutterBottom>Our Story</Typography>
+            <Typography color="text.secondary">Mockingbird was born out of a simple need: to make social media management less of a chore. We realized that manually cross-posting content was a time-consuming and repetitive task. Our goal was to build a tool that solves this problem with elegance and reliability.</Typography>
           </Paper>
           <Paper elevation={3} sx={{ p: 4, flex: 1, textAlign: 'center', borderRadius: 4 }}>
-            <BarChartIcon sx={{ fontSize: 48, color: 'secondary.main', mb: 2 }} />
-            <Typography variant="h6" color="secondary" fontWeight={700} gutterBottom>Publish History & Analytics</Typography>
-            <Typography color="text.secondary">Track your cross-posts and view engagement stats. Stay informed and optimize your social strategy.</Typography>
+            <RocketLaunchIcon sx={{ fontSize: 48, color: 'secondary.main', mb: 2 }} />
+            <Typography variant="h6" color="secondary" fontWeight={700} gutterBottom>Our Mission</Typography>
+            <Typography color="text.secondary">We are dedicated to providing a seamless and powerful tool for social media automation. We believe that technology should work for you, not against you, allowing you to focus on creating great content and engaging with your audience.</Typography>
           </Paper>
           <Paper elevation={3} sx={{ p: 4, flex: 1, textAlign: 'center', borderRadius: 4 }}>
-            <SecurityIcon sx={{ fontSize: 48, color: 'success.main', mb: 2 }} />
-            <Typography variant="h6" color="success.main" fontWeight={700} gutterBottom>Secure & Private</Typography>
-            <Typography color="text.secondary">Your data is protected with industry-standard security. You control your connections and privacy.</Typography>
+            <Diversity3Icon sx={{ fontSize: 48, color: 'success.main', mb: 2 }} />
+            <Typography variant="h6" color="success.main" fontWeight={700} gutterBottom>The Team</Typography>
+            <Typography color="text.secondary">We are a small, passionate team of developers and marketers committed to building useful products. We are constantly listening to our users and improving Mockingbird to meet their evolving needs.</Typography>
           </Paper>
         </Stack>
       </Container>
 
       <Container maxWidth="md" sx={{ mb: 8, textAlign: 'center' }}>
-        <Typography variant="h5" fontWeight={700} color="text.primary" gutterBottom>How It Works</Typography>
-        <Box component="ol" sx={{ textAlign: 'left', display: 'inline-block', mx: 'auto', color: 'text.secondary', fontSize: 18, lineHeight: 2 }}>
-          <li>Sign up and connect your Facebook and Twitter accounts.</li>
-          <li>Choose which Facebook pages and Twitter accounts to link.</li>
-          <li>Post on Facebook—Mockingbird automatically shares it to Twitter (X).</li>
-          <li>View your publish history and analytics in your dashboard.</li>
+        <Typography variant="h5" fontWeight={700} color="text.primary" gutterBottom>Our Core Values</Typography>
+        <Box sx={{ mt: 4 }}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={4} justifyContent="center" alignItems="center">
+            <Paper elevation={2} sx={{ p: 3, flex: 1, textAlign: 'center', bgcolor: 'white', borderRadius: 2 }}>
+              <SecurityIcon sx={{ fontSize: 32, color: 'success.main', mb: 1 }} />
+              <Typography variant="h6" fontWeight={600} gutterBottom>Privacy & Security</Typography>
+              <Typography color="text.secondary">We prioritize the security of your data and connections above all else. Your trust is our top priority.</Typography>
+            </Paper>
+            <Paper elevation={2} sx={{ p: 3, flex: 1, textAlign: 'center', bgcolor: 'white', borderRadius: 2 }}>
+              <BarChartIcon sx={{ fontSize: 32, color: 'secondary.main', mb: 1 }} />
+              <Typography variant="h6" fontWeight={600} gutterBottom>Simplicity</Typography>
+              <Typography color="text.secondary">Our tools are designed to be intuitive and easy to use, so you can get started in minutes, not hours.</Typography>
+            </Paper>
+          </Stack>
         </Box>
       </Container>
 
-      <Container maxWidth="sm" sx={{ mb: 8, textAlign: 'center' }}>
-        <Typography variant="h6" color="primary" fontWeight={700} gutterBottom>What Our Users Say</Typography>
-        <Paper elevation={2} sx={{ bgcolor: 'white', borderRadius: 2, boxShadow: 1, p: 3, mb: 2 }}>
-          <Typography variant="body1" fontStyle="italic" color="text.secondary">“Mockingbird saves me hours every week. My posts reach more people, and I never forget to update both platforms!”</Typography>
-          <Typography variant="caption" color="text.disabled" display="block" mt={1}>— Social Media Manager</Typography>
-        </Paper>
-        <Paper elevation={2} sx={{ bgcolor: 'white', borderRadius: 2, boxShadow: 1, p: 3 }}>
-          <Typography variant="body1" fontStyle="italic" color="text.secondary">“Setup was a breeze, and the analytics help me see what’s working. Highly recommend!”</Typography>
-          <Typography variant="caption" color="text.disabled" display="block" mt={1}>— Small Business Owner</Typography>
-        </Paper>
-      </Container>
 
       <Box component="footer" sx={{ bgcolor: 'primary.main', color: 'primary.contrastText', py: 4, textAlign: 'center', flexShrink: 0 }}>
         <Container maxWidth="md">
