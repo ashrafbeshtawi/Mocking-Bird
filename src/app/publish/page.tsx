@@ -136,12 +136,6 @@ export default function PublishComponent() {
       return;
     }
 
-    if (isTwitterWarning) {
-        setError({ message: `Your post exceeds the ${TWITTER_CHAR_LIMIT} character limit for X (Twitter). Please shorten your text or deselect X accounts.` });
-        setIsPublishing(false);
-        return;
-    }
-
     const postData = {
       text: postText,
       facebookPages: selectedFacebookPages,
@@ -275,7 +269,7 @@ export default function PublishComponent() {
             />
             {isTwitterWarning && selectedXAccounts.length > 0 && (
                 <Typography color="error" variant="caption" display="block" sx={{ mt: -1.5, mb: 1, ml: 1 }}>
-                    ⚠️ This post exceeds the {TWITTER_CHAR_LIMIT} character limit for X.
+                    ⚠️ This post exceeds the {TWITTER_CHAR_LIMIT} character limit for X, but we still can try to publish it.
                 </Typography>
             )}
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
