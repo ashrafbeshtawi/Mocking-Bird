@@ -18,6 +18,7 @@ import {
   Paper,
   Chip,
   Grid,
+  Pagination, // 👈 added
 } from '@mui/material';
 import TwitterIcon from '@mui/icons-material/Twitter';
 import FacebookIcon from '@mui/icons-material/Facebook';
@@ -34,21 +35,32 @@ interface PublishHistoryItem {
   created_at: string;
 }
 
+interface PaginatedResponse {
+  success: boolean;
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  history: PublishHistoryItem[];
+}
+
 export default function PublishHistoryComponent() {
   const theme = useTheme();
   const [history, setHistory] = useState<PublishHistoryItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState<number>(1);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const limit = 10; // items per page
 
-  const fetchPublishHistory = useCallback(async () => {
+  const fetchPublishHistory = useCallback(async (pageNumber: number) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/publish/publish-history');
+      const response = await fetch(`/api/publish/publish-history?page=${pageNumber}&limit=${limit}`);
 
       if (!response.ok) {
         if (response.status === 401) {
-          // Redirect to login if unauthorized
           window.location.href = '/login';
           return;
         }
@@ -56,8 +68,9 @@ export default function PublishHistoryComponent() {
         throw new Error(errorData.error || `Backend error: ${response.statusText}`);
       }
 
-      const result = await response.json();
+      const result: PaginatedResponse = await response.json();
       setHistory(result.history || []);
+      setTotalPages(result.totalPages || 1);
     } catch (err: unknown) {
       console.error('Error fetching publish history:', err);
       setError((err as Error)?.message || 'An unexpected error occurred while fetching publish history.');
@@ -67,8 +80,12 @@ export default function PublishHistoryComponent() {
   }, []);
 
   useEffect(() => {
-    fetchPublishHistory();
-  }, [fetchPublishHistory]);
+    fetchPublishHistory(page);
+  }, [fetchPublishHistory, page]);
+
+  const handlePageChange = (_event: React.ChangeEvent<unknown>, value: number) => {
+    setPage(value);
+  };
 
   if (loading) {
     return (
@@ -98,92 +115,105 @@ export default function PublishHistoryComponent() {
           </Typography>
         </Paper>
       ) : (
-        <TableContainer component={Paper} sx={{ boxShadow: theme.shadows[3] }}>
-          <Table aria-label="publish history table">
-            <TableHead>
-              <TableRow sx={{ backgroundColor: theme.palette.grey[100] }}>
-                <TableCell sx={{ fontWeight: 'bold' }}>Date</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Content</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', minWidth: 200 }}>Successful Platforms</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', minWidth: 200 }}>Failed Platforms</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {history.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell>
-                    <Typography variant="body2" color="text.secondary">
-                      {new Date(item.created_at).toLocaleString()}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                      {item.content.substring(0, 40) + '...'}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Grid container spacing={1}>
-                      {item.successful_facebook.map((name, index) => (
-                        <Grid key={`fb-success-${index}`}>
-                          <Chip
-                            icon={<FacebookIcon sx={{ fontSize: 16 }} />}
-                            label={name}
-                            color="success"
-                            variant="outlined"
-                            sx={{ mr: 1, mb: 1 }}
-                          />
-                        </Grid>
-                      ))}
-                      {item.successful_twitter.map((username, index) => (
-                        <Grid key={`x-success-${index}`}>
-                          <Chip
-                            icon={<TwitterIcon sx={{ fontSize: 16 }} />}
-                            label={`@${username}`}
-                            color="success"
-                            variant="outlined"
-                            sx={{ mb: 1 }}
-                          />
-                        </Grid>
-                      ))}
-                      {(item.successful_facebook.length === 0 && item.successful_twitter.length === 0) && (
-                         <Typography variant="body2" color="text.secondary" sx={{ml: 1}}>N/A</Typography>
-                      )}
-                    </Grid>
-                  </TableCell>
-                  <TableCell>
-                    <Grid container spacing={1}>
-                      {item.failed_facebook.map((name, index) => (
-                        <Grid key={`fb-failed-${index}`}>
-                          <Chip
-                            icon={<FacebookIcon sx={{ fontSize: 16 }} />}
-                            label={name}
-                            color="error"
-                            variant="outlined"
-                            sx={{ mr: 1, mb: 1 }}
-                          />
-                        </Grid>
-                      ))}
-                      {item.failed_twitter.map((username, index) => (
-                        <Grid key={`x-failed-${index}`}>
-                          <Chip
-                            icon={<TwitterIcon sx={{ fontSize: 16 }} />}
-                            label={`@${username}`}
-                            color="error"
-                            variant="outlined"
-                            sx={{ mb: 1 }}
-                          />
-                        </Grid>
-                      ))}
-                       {(item.failed_facebook.length === 0 && item.failed_twitter.length === 0) && (
-                         <Typography variant="body2" color="text.secondary" sx={{ml: 1}}>N/A</Typography>
-                      )}
-                    </Grid>
-                  </TableCell>
+        <>
+          <TableContainer component={Paper} sx={{ boxShadow: theme.shadows[3] }}>
+            <Table aria-label="publish history table">
+              <TableHead>
+                <TableRow sx={{ backgroundColor: theme.palette.grey[100] }}>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Date</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Content</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', minWidth: 200 }}>Successful Platforms</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', minWidth: 200 }}>Failed Platforms</TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
+              </TableHead>
+              <TableBody>
+                {history.map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell>
+                      <Typography variant="body2" color="text.secondary">
+                        {new Date(item.created_at).toLocaleString()}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                        {item.content.substring(0, 40) + '...'}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Grid container spacing={1}>
+                        {item.successful_facebook.map((name, index) => (
+                          <Grid key={`fb-success-${index}`}>
+                            <Chip
+                              icon={<FacebookIcon sx={{ fontSize: 16 }} />}
+                              label={name}
+                              color="success"
+                              variant="outlined"
+                              sx={{ mr: 1, mb: 1 }}
+                            />
+                          </Grid>
+                        ))}
+                        {item.successful_twitter.map((username, index) => (
+                          <Grid key={`x-success-${index}`}>
+                            <Chip
+                              icon={<TwitterIcon sx={{ fontSize: 16 }} />}
+                              label={`@${username}`}
+                              color="success"
+                              variant="outlined"
+                              sx={{ mb: 1 }}
+                            />
+                          </Grid>
+                        ))}
+                        {item.successful_facebook.length === 0 && item.successful_twitter.length === 0 && (
+                          <Typography variant="body2" color="text.secondary" sx={{ ml: 1 }}>N/A</Typography>
+                        )}
+                      </Grid>
+                    </TableCell>
+                    <TableCell>
+                      <Grid container spacing={1}>
+                        {item.failed_facebook.map((name, index) => (
+                          <Grid key={`fb-failed-${index}`}>
+                            <Chip
+                              icon={<FacebookIcon sx={{ fontSize: 16 }} />}
+                              label={name}
+                              color="error"
+                              variant="outlined"
+                              sx={{ mr: 1, mb: 1 }}
+                            />
+                          </Grid>
+                        ))}
+                        {item.failed_twitter.map((username, index) => (
+                          <Grid key={`x-failed-${index}`}>
+                            <Chip
+                              icon={<TwitterIcon sx={{ fontSize: 16 }} />}
+                              label={`@${username}`}
+                              color="error"
+                              variant="outlined"
+                              sx={{ mb: 1 }}
+                            />
+                          </Grid>
+                        ))}
+                        {item.failed_facebook.length === 0 && item.failed_twitter.length === 0 && (
+                          <Typography variant="body2" color="text.secondary" sx={{ ml: 1 }}>N/A</Typography>
+                        )}
+                      </Grid>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+
+          {/* Pagination Controls */}
+          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+            <Pagination
+              count={totalPages}
+              page={page}
+              onChange={handlePageChange}
+              color="primary"
+              shape="rounded"
+            />
+          </Box>
+        </>
       )}
     </Container>
   );

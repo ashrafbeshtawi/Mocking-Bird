@@ -26,20 +26,50 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid user ID format.' }, { status: 400 });
     }
 
-    // 3. Connect to the database
+    // 3. Extract pagination params
+    const { searchParams } = new URL(req.url);
+    const page = parseInt(searchParams.get('page') || '1', 10);
+    const limit = parseInt(searchParams.get('limit') || '10', 10);
+
+    // Prevent invalid inputs
+    const safePage = page > 0 ? page : 1;
+    const safeLimit = limit > 0 && limit <= 100 ? limit : 10; // cap to 100 max
+    const offset = (safePage - 1) * safeLimit;
+
+    // 4. Connect to the database
     const client = await pool.connect();
     console.log(`Connected to database for user ${parsedUserId} to retrieve publish history.`);
-    
+
     try {
-      // 4. Query the 'publish_history' table to get all records for the user
-      const { rows: history } = await client.query(
-        'SELECT id, content, successful_twitter, successful_facebook, failed_twitter, failed_facebook, created_at FROM publish_history WHERE user_id = $1 ORDER BY created_at DESC',
+      // Count total records for pagination metadata
+      const { rows: countRows } = await client.query(
+        'SELECT COUNT(*)::int AS total FROM publish_history WHERE user_id = $1',
         [parsedUserId]
       );
+      const total = countRows[0]?.total || 0;
+      const totalPages = Math.ceil(total / safeLimit);
 
-      // Return the retrieved history as a JSON response
-      return NextResponse.json({ success: true, history });
-      
+      // Fetch paginated history
+      const { rows: history } = await client.query(
+        `SELECT id, content, successful_twitter, successful_facebook, 
+                failed_twitter, failed_facebook, created_at 
+         FROM publish_history 
+         WHERE user_id = $1 
+         ORDER BY created_at DESC 
+         LIMIT $2 OFFSET $3`,
+        [parsedUserId, safeLimit, offset]
+      );
+
+      // Return paginated response
+      return NextResponse.json({
+        success: true,
+        page: safePage,
+        limit: safeLimit,
+        total,
+        totalPages,
+        history,
+      });
+
     } finally {
       client.release(); // Always release the client back to the pool
     }
