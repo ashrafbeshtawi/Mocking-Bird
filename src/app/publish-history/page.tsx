@@ -118,7 +118,7 @@ export default function PublishHistoryComponent() {
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                      {item.content}
+                      {item.content.substring(0, 40) + '...'}
                     </Typography>
                   </TableCell>
                   <TableCell>
