@@ -65,6 +65,11 @@ export default function AboutPage() {
       <Box component="footer" sx={{ bgcolor: 'primary.main', color: 'primary.contrastText', py: 4, textAlign: 'center', flexShrink: 0 }}>
         <Container maxWidth="md">
           <Typography variant="body2">© 2025 Mockingbird. All rights reserved.</Typography>
+          <Link href="/privacy" passHref>
+            <Typography variant="body2" sx={{ color: 'primary.contrastText', ml: 1, textDecoration: 'underline' }}>
+              Privacy Policy
+            </Typography>
+          </Link>
         </Container>
       </Box>
     </Box>

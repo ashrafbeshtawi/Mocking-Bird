@@ -37,12 +37,10 @@ const getNavLinks = (isLoggedIn: boolean) =>
         { href: '/publish-history', label: 'History', icon: HistoryIcon },
         { href: '/ai', label: 'AI Tools', icon: AutoAwesomeIcon },
         { href: '/about', label: 'About', icon: InfoIcon },
-        { href: '/privacy', label: 'Privacy Policy', icon: InfoIcon },
       ]
     : [
         { href: '/', label: 'Home', icon: HomeIcon },
         { href: '/about', label: 'About', icon: InfoIcon },
-        { href: '/privacy', label: 'Privacy Policy', icon: InfoIcon }
       ];
 
 export default function Navbar() {
