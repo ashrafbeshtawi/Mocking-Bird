@@ -21,60 +21,56 @@ const logger = {
 
 export async function POST(req: NextRequest) {
   const requestId = Math.random().toString(36).substr(2, 9);
-  logger.info(`Starting new publish request [${requestId}]`);
+  const publishReport: string[] = [];
+  const addReport = (message: string) => {
+    publishReport.push(`[${new Date().toISOString()}] ${message}`);
+    logger.info(message);
+  };
+
+  addReport(`Starting new publish request [${requestId}]`);
 
   const userId = req.headers.get('x-user-id');
   if (!userId) {
-    logger.error(`User ID not found in headers [${requestId}]`);
+    addReport(`ERROR: User ID not found in headers [${requestId}]`);
     return NextResponse.json({ error: 'User ID not found in headers' }, { status: 401 });
   }
 
-  logger.info(`Processing request for user: ${userId} [${requestId}]`);
+  addReport(`Processing request for user: ${userId} [${requestId}]`);
 
   try {
     const { text, facebookPages, xAccounts } = await req.json();
     
-    logger.info(`Request payload parsed [${requestId}]`, {
-      textLength: text?.length || 0,
-      facebookPagesCount: facebookPages?.length || 0,
-      xAccountsCount: xAccounts?.length || 0
-    });
+    addReport(`Request payload parsed [${requestId}]. Text length: ${text?.length || 0}, Facebook pages: ${facebookPages?.length || 0}, X accounts: ${xAccounts?.length || 0}`);
 
     // Validate input
     if (!text || typeof text !== 'string' || text.trim().length === 0) {
-      logger.warn(`Invalid text input [${requestId}]`, { text: text?.substring(0, 100) });
+      addReport(`WARN: Invalid text input [${requestId}]. Text: ${text?.substring(0, 100)}`);
       return NextResponse.json({ error: 'Post text is required and cannot be empty' }, { status: 400 });
     }
 
     if (!Array.isArray(facebookPages) || !Array.isArray(xAccounts)) {
-      logger.warn(`Invalid array inputs [${requestId}]`, { 
-        facebookPagesType: typeof facebookPages, 
-        xAccountsType: typeof xAccounts 
-      });
+      addReport(`WARN: Invalid array inputs [${requestId}]. Facebook pages type: ${typeof facebookPages}, X accounts type: ${typeof xAccounts}`);
       return NextResponse.json({ error: 'facebookPages and xAccounts must be arrays' }, { status: 400 });
     }
 
     if (facebookPages.length === 0 && xAccounts.length === 0) {
-      logger.warn(`No accounts selected [${requestId}]`);
+      addReport(`WARN: No accounts selected for publishing [${requestId}]`);
       return NextResponse.json({ error: 'At least one social media account must be selected' }, { status: 400 });
     }
 
     // Initialize publishers
-    logger.info(`Initializing publishers [${requestId}]`);
+    addReport(`Initializing publishers [${requestId}]`);
     const facebookPublisher = new FacebookPublisher(pool);
     const twitterPublisher = new TwitterPublisher(pool);
 
     // Fetch tokens from database
-    logger.info(`Fetching tokens from database [${requestId}]`);
+    addReport(`Fetching tokens from database for ${facebookPages.length} Facebook pages and ${xAccounts.length} X accounts [${requestId}]`);
     const [fbTokens, xTokens] = await Promise.all([
       facebookPublisher.getPageTokens(userId, facebookPages),
       twitterPublisher.getAccountTokens(userId, xAccounts)
     ]);
 
-    logger.info(`Tokens retrieved [${requestId}]`, {
-      facebookTokens: fbTokens.length,
-      twitterTokens: xTokens.length
-    });
+    addReport(`Tokens retrieved. Facebook tokens: ${fbTokens.length}, Twitter tokens: ${xTokens.length} [${requestId}]`);
 
     // Check for missing accounts
     const missingFbIds = facebookPublisher.validateMissingPages(facebookPages, fbTokens);
@@ -86,7 +82,7 @@ export async function POST(req: NextRequest) {
         ...missingXIds.map(id => `X Account ID: ${id}`),
       ];
 
-      logger.error(`Missing accounts detected [${requestId}]`, { missingAccounts });
+      addReport(`ERROR: Missing accounts detected [${requestId}]. Details: ${missingAccounts.join(', ')}`);
 
       return NextResponse.json({
         error: 'One or more selected accounts could not be found for the user.',
@@ -95,7 +91,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Publish to all platforms
-    logger.info(`Starting publishing process [${requestId}]`);
+    addReport(`Starting publishing process to ${fbTokens.length} Facebook pages and ${xTokens.length} X accounts [${requestId}]`);
     const [fbResults, xResults] = await Promise.all([
       facebookPublisher.publishToPages(text, fbTokens),
       twitterPublisher.publishToAccounts(text, xTokens, userId)
@@ -105,12 +101,13 @@ export async function POST(req: NextRequest) {
     const allSuccessful = [...fbResults.successful, ...xResults.successful];
     const allFailed = [...fbResults.failed, ...xResults.failed];
 
-    // 💡 START of updated logic to save to database with names
-    logger.info(`Saving publish result to database [${requestId}]`);
+    addReport(`Publishing complete. Successful posts: ${allSuccessful.length}, Failed posts: ${allFailed.length} [${requestId}]`);
+
+    // Save publish report to database
+    addReport(`Saving publish result to database [${requestId}]`);
     const client = await pool.connect();
     
     try {
-      // Look up names for successful posts
       const successfulFacebookNames = allSuccessful
         .filter(result => result.platform === 'facebook' && 'page_id' in result)
         .map(result => {
@@ -125,7 +122,6 @@ export async function POST(req: NextRequest) {
           return account ? account.username : (result as { account_id: string }).account_id;
         });
         
-      // Look up names for failed posts
       const failedFacebookNames = allFailed
         .filter(result => result.platform === 'facebook' && 'page_id' in result)
         .map(result => {
@@ -140,50 +136,71 @@ export async function POST(req: NextRequest) {
           return account ? account.username : (result as { account_id: string }).account_id;
         });
 
+      if (successfulFacebookNames.length > 0) {
+        addReport(`Successfully published to Facebook pages: ${successfulFacebookNames.join(', ')}`);
+      }
+      if (successfulTwitterUsernames.length > 0) {
+        addReport(`Successfully published to X accounts: ${successfulTwitterUsernames.join(', ')}`);
+      }
+      if (failedFacebookNames.length > 0) {
+        addReport(`Failed to publish to Facebook pages: ${failedFacebookNames.join(', ')}`);
+      }
+      if (failedTwitterUsernames.length > 0) {
+        addReport(`Failed to publish to X accounts: ${failedTwitterUsernames.join(', ')}`);
+      }
+
+      let publishStatus: 'success' | 'partial_success' | 'failed';
+      if (allSuccessful.length > 0 && allFailed.length === 0) {
+        publishStatus = 'success';
+      } else if (allSuccessful.length > 0 && allFailed.length > 0) {
+        publishStatus = 'partial_success';
+      } else {
+        publishStatus = 'failed';
+      }
+      addReport(`Overall publish status: ${publishStatus} [${requestId}]`);
+
       await client.query(
-        'INSERT INTO publish_history (user_id, content, successful_facebook, successful_twitter, failed_facebook, failed_twitter) VALUES ($1, $2, $3, $4, $5, $6)',
+        'INSERT INTO publish_history (user_id, content, publish_report, publish_status) VALUES ($1, $2, $3, $4)',
         [
           parseInt(userId),
           text,
-          successfulFacebookNames,
-          successfulTwitterUsernames,
-          failedFacebookNames,
-          failedTwitterUsernames
+          publishReport.join('\n'),
+          publishStatus
         ]
       );
       
-      logger.info(`Publish result saved to database successfully [${requestId}]`);
+      addReport(`Publish result saved to database successfully [${requestId}]`);
 
     } catch (dbError) {
-      logger.error(`Failed to save publish result to database [${requestId}]`, dbError);
+      addReport(`ERROR: Failed to save publish result to database [${requestId}]. Error: ${dbError instanceof Error ? dbError.message : String(dbError)}`);
+      // If saving to DB fails, we still want to return the appropriate HTTP response
+      // based on the actual publishing results, but log the DB error.
     } finally {
       client.release();
     }
-    // 💡 END of updated logic
     
     // Return appropriate response
     if (allFailed.length > 0) {
-      logger.warn(`Partial success - some posts failed [${requestId}]`, {
-        successfulPlatforms: allSuccessful.map(s => `${s.platform}:${s.platform === 'facebook' ? s.page_id : s.account_id}`),
-        failedPlatforms: allFailed.map(f => `${f.platform}:${f.platform === 'facebook' ? f.page_id : f.account_id}`)
-      });
+      addReport(`Partial success - some posts failed [${requestId}]`);
 
       return NextResponse.json({
         message: 'Some posts were published successfully, but others failed.',
         successful: allSuccessful,
         failed: allFailed,
+        publishReport: publishReport.join('\n')
       }, { status: 207 });
     }
 
-    logger.info(`All posts published successfully [${requestId}]`);
+    addReport(`All posts published successfully [${requestId}]`);
     return NextResponse.json({
       message: 'All posts published successfully.',
-      results: allSuccessful
+      results: allSuccessful,
+      publishReport: publishReport.join('\n')
     }, { status: 200 });
 
   } catch (err) {
-    logger.error(`Request processing failed [${requestId}]`, err);
     const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
+    addReport(`ERROR: Request processing failed [${requestId}]. Error: ${errorMessage}`);
+    return NextResponse.json({ error: errorMessage, publishReport: publishReport.join('\n') }, { status: 500 });
   }
 }

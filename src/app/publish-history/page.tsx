@@ -22,16 +22,15 @@ import {
 } from '@mui/material';
 import TwitterIcon from '@mui/icons-material/Twitter';
 import FacebookIcon from '@mui/icons-material/Facebook';
-import { fetchWithAuth } from '@/lib/fetch';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 
 // Interface for a single publish history record
 interface PublishHistoryItem {
   id: number;
   content: string;
-  successful_twitter: string[];
-  successful_facebook: string[];
-  failed_twitter: string[];
-  failed_facebook: string[];
+  publish_status: 'success' | 'partial_success' | 'failed';
   created_at: string;
 }
 
@@ -122,83 +121,67 @@ export default function PublishHistoryComponent() {
                 <TableRow sx={{ backgroundColor: theme.palette.grey[100] }}>
                   <TableCell sx={{ fontWeight: 'bold' }}>Date</TableCell>
                   <TableCell sx={{ fontWeight: 'bold' }}>Content</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', minWidth: 200 }}>Successful Platforms</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', minWidth: 200 }}>Failed Platforms</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {history.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell>
-                      <Typography variant="body2" color="text.secondary">
-                        {new Date(item.created_at).toLocaleString()}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                        {item.content.substring(0, 40) + '...'}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Grid container spacing={1}>
-                        {item.successful_facebook.map((name, index) => (
-                          <Grid key={`fb-success-${index}`}>
-                            <Chip
-                              icon={<FacebookIcon sx={{ fontSize: 16 }} />}
-                              label={name}
-                              color="success"
-                              variant="outlined"
-                              sx={{ mr: 1, mb: 1 }}
-                            />
-                          </Grid>
-                        ))}
-                        {item.successful_twitter.map((username, index) => (
-                          <Grid key={`x-success-${index}`}>
-                            <Chip
-                              icon={<TwitterIcon sx={{ fontSize: 16 }} />}
-                              label={`@${username}`}
-                              color="success"
-                              variant="outlined"
-                              sx={{ mb: 1 }}
-                            />
-                          </Grid>
-                        ))}
-                        {item.successful_facebook.length === 0 && item.successful_twitter.length === 0 && (
-                          <Typography variant="body2" color="text.secondary" sx={{ ml: 1 }}>N/A</Typography>
-                        )}
-                      </Grid>
-                    </TableCell>
-                    <TableCell>
-                      <Grid container spacing={1}>
-                        {item.failed_facebook.map((name, index) => (
-                          <Grid key={`fb-failed-${index}`}>
-                            <Chip
-                              icon={<FacebookIcon sx={{ fontSize: 16 }} />}
-                              label={name}
-                              color="error"
-                              variant="outlined"
-                              sx={{ mr: 1, mb: 1 }}
-                            />
-                          </Grid>
-                        ))}
-                        {item.failed_twitter.map((username, index) => (
-                          <Grid key={`x-failed-${index}`}>
-                            <Chip
-                              icon={<TwitterIcon sx={{ fontSize: 16 }} />}
-                              label={`@${username}`}
-                              color="error"
-                              variant="outlined"
-                              sx={{ mb: 1 }}
-                            />
-                          </Grid>
-                        ))}
-                        {item.failed_facebook.length === 0 && item.failed_twitter.length === 0 && (
-                          <Typography variant="body2" color="text.secondary" sx={{ ml: 1 }}>N/A</Typography>
-                        )}
-                      </Grid>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {history.map((item) => {
+                  let statusIcon;
+                  let statusColor: 'success' | 'error' | 'warning';
+                  let statusLabel: string;
+
+                  switch (item.publish_status) {
+                    case 'success':
+                      statusIcon = <CheckCircleOutlineIcon fontSize="small" />;
+                      statusColor = 'success';
+                      statusLabel = 'Success';
+                      break;
+                    case 'partial_success':
+                      statusIcon = <WarningAmberIcon fontSize="small" />;
+                      statusColor = 'warning';
+                      statusLabel = 'Partial Success';
+                      break;
+                    case 'failed':
+                      statusIcon = <ErrorOutlineIcon fontSize="small" />;
+                      statusColor = 'error';
+                      statusLabel = 'Failed';
+                      break;
+                    default:
+                      statusIcon = <WarningAmberIcon fontSize="small" />;
+                      statusColor = 'warning';
+                      statusLabel = 'Unknown';
+                  }
+
+                  return (
+                    <TableRow key={item.id}>
+                      <TableCell>
+                        <Typography variant="body2" color="text.secondary">
+                          {new Date(item.created_at).toLocaleString()}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                          {item.content.substring(0, 40) + (item.content.length > 40 ? '...' : '')}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          icon={statusIcon}
+                          label={statusLabel}
+                          color={statusColor}
+                          variant="outlined"
+                          sx={{ mr: 1, mb: 1 }}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <a href={`/api/publish/download-report?id=${item.id}`} download>
+                          <Chip label="Download Report" variant="outlined" color="primary" size="small" />
+                        </a>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </TableContainer>

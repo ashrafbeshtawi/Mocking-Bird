@@ -51,8 +51,7 @@ export async function GET(req: NextRequest) {
 
       // Fetch paginated history
       const { rows: history } = await client.query(
-        `SELECT id, content, successful_twitter, successful_facebook, 
-                failed_twitter, failed_facebook, created_at 
+        `SELECT id, content, publish_status, created_at 
          FROM publish_history 
          WHERE user_id = $1 
          ORDER BY created_at DESC 
