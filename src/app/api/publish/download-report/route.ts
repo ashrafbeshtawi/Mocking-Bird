@@ -76,7 +76,7 @@ export async function GET(req: NextRequest) {
         <pre>${publish_report}</pre>
     </div>
 </body>
-</html>
+</html> 
       `.trim();
 
       return new NextResponse(htmlContent, {
