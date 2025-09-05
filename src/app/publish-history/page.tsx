@@ -25,6 +25,7 @@ import FacebookIcon from '@mui/icons-material/Facebook';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import DownloadForOfflineIcon from '@mui/icons-material/DownloadForOffline';
 
 // Interface for a single publish history record
 interface PublishHistoryItem {
@@ -176,7 +177,13 @@ export default function PublishHistoryComponent() {
                       </TableCell>
                       <TableCell>
                         <a href={`/api/publish/download-report?id=${item.id}`} download>
-                          <Chip label="Download Report" variant="outlined" color="primary" size="small" />
+                          <Chip
+                            icon={<DownloadForOfflineIcon />}
+                            label="Download Report"
+                            variant="outlined"
+                            color="primary"
+                            size="small"
+                          />
                         </a>
                       </TableCell>
                     </TableRow>
