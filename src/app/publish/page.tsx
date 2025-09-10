@@ -17,9 +17,14 @@ import {
   Divider,
   useTheme,
   Grid,
+  IconButton, // Added for emoji button
+  Popover, // Added for emoji picker
+  Tabs, // Added for emoji categories
+  Tab, // Added for emoji categories
 } from '@mui/material';
 import TwitterIcon from '@mui/icons-material/Twitter';
 import FacebookIcon from '@mui/icons-material/Facebook';
+import SentimentSatisfiedAltIcon from '@mui/icons-material/SentimentSatisfiedAlt'; // Added for emoji icon
 import { fetchWithAuth } from '@/lib/fetch';
 
 // Define interfaces for connected pages and accounts
@@ -48,9 +53,80 @@ export default function PublishComponent() {
   const [selectedXAccounts, setSelectedXAccounts] = useState<string[]>([]);
   const [isPublishing, setIsPublishing] = useState<boolean>(false);
   const [publishResults, setPublishResults] = useState<{ successful: unknown[]; failed: unknown[] } | null>(null);
+  const [anchorEl, setAnchorEl] = useState<HTMLButtonElement | null>(null); // State for emoji popover anchor
+  const [emojiCategory, setEmojiCategory] = useState(0); // 0: History, 1: Smileys, ...
+  const [emojiHistory, setEmojiHistory] = useState<string[]>([]); // Stores last used emojis
+
+  // Load emoji history from localStorage on mount
+  useEffect(() => {
+    const stored = localStorage.getItem('emojiHistory');
+    if (stored) {
+      try {
+        setEmojiHistory(JSON.parse(stored));
+      } catch {}
+    }
+  }, []);
 
   const charCount = postText.length;
   const isTwitterWarning = charCount > TWITTER_CHAR_LIMIT && selectedXAccounts.length > 0;
+
+  const handleEmojiClick = (emoji: string) => {
+    setPostText((prevText) => prevText + emoji);
+    setEmojiHistory((prev) => {
+      const filtered = prev.filter((e) => e !== emoji);
+      const updated = [emoji, ...filtered].slice(0, 16);
+      localStorage.setItem('emojiHistory', JSON.stringify(updated));
+      return updated;
+    });
+  } // Do not close popover after selecting emoji
+
+  const handleClearEmojiHistory = () => {
+    setEmojiHistory([]);
+    localStorage.removeItem('emojiHistory');
+  };
+
+  const handlePopoverOpen = (event: React.MouseEvent<HTMLButtonElement>) => {
+    setAnchorEl(event.currentTarget);
+  }
+
+  const handlePopoverClose = () => {
+    setAnchorEl(null);
+  }
+
+  const handleCategoryChange = (_event: React.SyntheticEvent, newValue: number) => {
+    setEmojiCategory(newValue);
+  };
+
+  const open = Boolean(anchorEl);
+  const id = open ? 'emoji-popover' : undefined;
+
+  // Emoji categories (History first)
+  const emojiCategories = [
+    {
+      label: '⌛',
+      emojis: emojiHistory.length > 0 ? emojiHistory : [''],
+    },
+    {
+      label: '😀',
+      emojis: ['😀','😂','😊','😍','🤩','😎','🥳','😇','😉','😜','😭','😡','😱','😴','🤗','😏','😅','😬','🤔','😤','😢','😆','😃','😄','😁','😚','😘','😋','😌','😝','😺','😸','😹','😻','😼','😽','🙀','😿','😾'],
+    },
+    {
+      label: '🐶',
+      emojis: ['🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯','🦁','🐮','🐷','🐸','🐵','🦄','🐔','🐧','🐦','🐤','🐣','🐥','🦆','🦅','🦉','🦇','🐺','🐗','🐴','🐝','🐛','🦋','🐌','🐞','🐜','🦟','🦗','🕷','🦂'],
+    },
+    {
+      label: '🍏',
+      emojis: ['🍏','🍎','🍐','🍊','🍋','🍌','🍉','🍇','🍓','🫐','🍈','🍒','🍑','🥭','🍍','🥥','🥝','🍅','🍆','🥑','🥦','🥬','🥒','🌶','🫑','🌽','🥕','🧄','🧅','🥔','🍠','🥐','🍞','🥖','🥨','🥯','🥞','🧇','🧀','🍖','🍗','🥩','🥓','🍔','🍟','🍕','🌭','🥪','🌮','🌯','🥙','🧆','🥚','🍳','🥘','🍲','🥣','🥗','🍿','🧈','🧂','🥫'],
+    },
+    {
+      label: '⚽',
+      emojis: ['⚽','🏀','🏈','⚾','🎾','🏐','🏉','🥏','🎱','🏓','🏸','🥅','🏒','🏑','🏏','⛳','🏹','🎣','🤿','🥊','🥋','🎽','🛹','🛷','⛸','🥌','🎿','⛷','🏂','🪂','🏋️‍♂️','🏋️‍♀️','🤼‍♂️','🤼‍♀️','🤸‍♂️','🤸‍♀️','⛹️‍♂️','⛹️‍♀️','🤺','🤾‍♂️','🤾‍♀️','🏇','🏄‍♂️','🏄‍♀️','🏊‍♂️','🏊‍♀️','🤽‍♂️','🤽‍♀️','🚣‍♂️','🚣‍♀️','🧗‍♂️','🧗‍♀️','🚵‍♂️','🚵‍♀️','🚴‍♂️','🚴‍♀️'],
+    },
+    {
+      label: '💡',
+      emojis: ['👍', '⚠️', '📌','❤️','🔥','💯','✨','🚀','💡','👏','🎉','🙌','🙏','💪','⭐','🌟','💥','💫','🌀','💤','💢','💦','💨','🕳','💣','💎','🔔','🔑','🔒','🔓','🔨','🛡','🧭','🧱','🧲','🧪','🧫','🧬','🧯','🛒','🚪','🛏','🛋','🚽','🚿','🛁','🧴','🧷','🧹','🧺','🧻','🧼','🧽'],
+    },
+  ];
 
   const fetchConnectedPages = useCallback(async () => {
     try {
@@ -267,15 +343,59 @@ export default function PublishComponent() {
                 sx: { textAlign: 'right', direction: 'rtl' }
               }}
             />
-            {isTwitterWarning && selectedXAccounts.length > 0 && (
-                <Typography color="error" variant="caption" display="block" sx={{ mt: -1.5, mb: 1, ml: 1 }}>
-                    ⚠️ This post exceeds the {TWITTER_CHAR_LIMIT} character limit for X, but we still can try to publish it.
-                </Typography>
-            )}
-            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <IconButton aria-describedby={id} onClick={handlePopoverOpen} color="primary">
+                <SentimentSatisfiedAltIcon />
+              </IconButton>
+              <Popover
+                id={id}
+                open={open}
+                anchorEl={anchorEl}
+                onClose={handlePopoverClose}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+                transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+                disableRestoreFocus
+              >
+                <Box sx={{ width: 550 }}>
+                  <Tabs
+                    value={emojiCategory}
+                    onChange={handleCategoryChange}
+                    variant="scrollable"
+                    scrollButtons="auto"
+                    aria-label="emoji categories"
+                  >
+                    {emojiCategories.map((cat, idx) => (
+                      <Tab key={cat.label} label={cat.label} />
+                    ))}
+                  </Tabs>
+                  <Box sx={{ p: 1 }}>
+                    {emojiCategory === 0 && (
+                      <Button variant="outlined" color="error" size="small" onClick={handleClearEmojiHistory} sx={{ mb: 1 }}>
+                        Clear History
+                      </Button>
+                    )}
+                    <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: 0.5 }}>
+                      {emojiCategories[emojiCategory].emojis.map((emoji) => (
+                        emoji ? (
+                          <Button key={emoji} onClick={() => handleEmojiClick(emoji)} sx={{ minWidth: 'auto', p: 0.5 }}>
+                            {emoji}
+                          </Button>
+                        ) : null
+                      ))}
+                    </Box>
+                  </Box>
+                </Box>
+              </Popover>
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                {isTwitterWarning && selectedXAccounts.length > 0 && (
+                    <Typography color="error" variant="caption" display="block" sx={{ mr: 2 }}>
+                        ⚠️ This post exceeds the {TWITTER_CHAR_LIMIT} character limit for X, but we still can try to publish it.
+                    </Typography>
+                )}
                 <Typography variant="body2" color="text.secondary">
                     {charCount}/{TWITTER_CHAR_LIMIT}
                 </Typography>
+              </Box>
             </Box>
 
             <Divider sx={{ my: 3 }} />
