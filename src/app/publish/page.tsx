@@ -395,7 +395,7 @@ export default function PublishComponent() {
                 transformOrigin={{ vertical: 'top', horizontal: 'left' }}
                 disableRestoreFocus
               >
-                <Box sx={{ width: 550 }}>
+                <Box sx={{ width: 350 }}>
                   <Tabs
                     value={emojiCategory}
                     onChange={handleCategoryChange}
