@@ -1,6 +1,7 @@
 // /lib/publishers/facebook.ts
 import axios from 'axios';
 import { Pool } from 'pg';
+import FormData from 'form-data';
 
 // Simple logger utility
 const logger = {
@@ -35,6 +36,17 @@ export interface FacebookPublishError {
     code?: string;
     details?: unknown;
   };
+}
+
+export interface FacebookMediaFile {
+  buffer: Buffer;
+  filename: string;
+  mimetype: string;
+}
+
+export interface FacebookPublishOptions {
+  text?: string;
+  files?: FacebookMediaFile[];
 }
 
 export class FacebookPublisher {
@@ -72,15 +84,122 @@ export class FacebookPublisher {
     }
   }
 
+  private async uploadMediaToFacebook(
+    pageId: string, 
+    accessToken: string, 
+    file: FacebookMediaFile
+  ): Promise<string> {
+    logger.info(`Uploading media to Facebook page: ${pageId}`, { 
+      filename: file.filename, 
+      mimetype: file.mimetype,
+      size: file.buffer.length
+    });
+
+    const formData = new FormData();
+    formData.append('source', file.buffer, {
+      filename: file.filename,
+      contentType: file.mimetype,
+    });
+    formData.append('published', 'false'); // Upload unpublished first
+
+    try {
+      const response = await axios.post(
+        `https://graph.facebook.com/v19.0/${pageId}/photos`,
+        formData,
+        {
+          headers: {
+            ...formData.getHeaders(),
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
+
+      const mediaId = response.data.id;
+      logger.info(`Media uploaded successfully to Facebook page: ${pageId}`, { 
+        mediaId, 
+        filename: file.filename 
+      });
+      
+      return mediaId;
+    } catch (error) {
+      logger.error(`Failed to upload media to Facebook page: ${pageId}`, {
+        filename: file.filename,
+        error: axios.isAxiosError(error) ? {
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          data: error.response?.data,
+          message: error.message
+        } : error
+      });
+      throw error;
+    }
+  }
+
+  private async publishTextPost(
+    pageId: string, 
+    accessToken: string, 
+    text: string
+  ): Promise<unknown> {
+    const response = await axios.post(
+      `https://graph.facebook.com/v19.0/${pageId}/feed`,
+      { message: text },
+      { 
+        headers: { 
+          'Content-Type': 'application/json', 
+          Authorization: `Bearer ${accessToken}` 
+        } 
+      }
+    );
+    return response.data;
+  }
+private async publishMediaPost(
+    pageId: string, 
+    accessToken: string, 
+    text: string | undefined, 
+    mediaIds: string[]
+  ): Promise<unknown> {
+    logger.info(`Publishing media post to Facebook page: ${pageId}`, {
+      mediaCount: mediaIds.length,
+      mediaIds,
+      hasText: !!text
+    });
+
+    // This single block of code handles both single and multiple photo posts
+    const attachedMedia = mediaIds.map(id => ({ media_fbid: id }));
+    const postData: Record<string, unknown> = {
+      attached_media: attachedMedia,
+    };
+    if (text) {
+      postData.message = text;
+    }
+
+    logger.info(`Publishing post with ${mediaIds.length} photos`, postData);
+
+    const response = await axios.post(
+      `https://graph.facebook.com/v19.0/${pageId}/feed`,
+      postData,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
+    );
+    return response.data;
+  }
+
   async publishToPages(
-    text: string, 
+    options: FacebookPublishOptions,
     tokens: FacebookPageToken[]
   ): Promise<{
     successful: FacebookPublishResult[];
     failed: FacebookPublishError[];
   }> {
+    const { text, files = [] } = options;
+    
     logger.info('Starting Facebook publishing process', { 
-      textLength: text.length, 
+      textLength: text?.length || 0, 
+      fileCount: files.length,
       pageCount: tokens.length,
       pageIds: tokens.map(t => t.page_id)
     });
@@ -93,26 +212,51 @@ export class FacebookPublisher {
       logger.info(`Publishing to Facebook page: ${pageId}`);
       
       try {
-        const response = await axios.post(
-          `https://graph.facebook.com/v19.0/${token.page_id}/feed`,
-          { message: text },
-          { 
-            headers: { 
-              'Content-Type': 'application/json', 
-              Authorization: `Bearer ${token.page_access_token}` 
-            } 
+        let result: unknown;
+
+        if (files.length === 0) {
+          // Text-only post
+          if (!text) {
+            throw new Error('No content to publish (no text or files provided)');
           }
-        );
+          result = await this.publishTextPost(pageId, token.page_access_token, text);
+        } else {
+          // Posts with media
+          const mediaIds: string[] = [];
+          
+          // Upload all media files first
+          for (const file of files) {
+            const mediaId = await this.uploadMediaToFacebook(
+              pageId, 
+              token.page_access_token, 
+              file
+            );
+            mediaIds.push(mediaId);
+          }
+          
+          // Publish the post with uploaded media
+          result = await this.publishMediaPost(
+            pageId, 
+            token.page_access_token, 
+            text, 
+            mediaIds
+          );
+        }
         
+        interface FacebookPostResponse {
+          id?: string;
+          [key: string]: unknown;
+        }
+        const postResult = result as FacebookPostResponse;
         logger.info(`Successfully published to Facebook page: ${pageId}`, { 
-          postId: response.data?.id,
-          responseData: response.data 
+          postId: postResult.id,
+          resultData: result 
         });
         
         successful.push({ 
           platform: 'facebook', 
           page_id: token.page_id, 
-          result: response.data 
+          result 
         });
       } catch (error) {
         logger.error(`Failed to publish to Facebook page: ${pageId}`, {
@@ -133,7 +277,9 @@ export class FacebookPublisher {
                 code: error.response?.data?.error?.code?.toString(),
                 details: error.response?.data,
               }
-            : { message: 'Unknown error during Facebook publish' },
+            : { 
+                message: error instanceof Error ? error.message : 'Unknown error during Facebook publish' 
+              },
         });
       }
     });
@@ -148,6 +294,17 @@ export class FacebookPublisher {
     });
 
     return { successful, failed };
+  }
+
+  // Legacy method for backward compatibility
+  async publishTextToPages(
+    text: string, 
+    tokens: FacebookPageToken[]
+  ): Promise<{
+    successful: FacebookPublishResult[];
+    failed: FacebookPublishError[];
+  }> {
+    return this.publishToPages({ text }, tokens);
   }
 
   validateMissingPages(requestedIds: string[], foundTokens: FacebookPageToken[]): string[] {
