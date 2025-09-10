@@ -38,7 +38,11 @@ export async function POST(req: NextRequest) {
   addReport(`Processing request for user: ${userId} `);
 
   try {
-    const { text, facebookPages, xAccounts } = await req.json();
+          const formData = await req.formData();
+          const text = formData.get('text') as string || '';
+          const facebookPages = formData.getAll('facebookPages').map(String);
+          const xAccounts = formData.getAll('xAccounts').map(String);
+          const media = formData.getAll('media').filter((f) => typeof f !== 'string') as File[];
     
     addReport(`Request payload parsed . Text length: ${text?.length || 0}, Facebook pages: ${facebookPages?.length || 0}, X accounts: ${xAccounts?.length || 0}`);
 
