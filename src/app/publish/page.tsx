@@ -24,6 +24,7 @@ import {
 } from '@mui/material';
 import TwitterIcon from '@mui/icons-material/Twitter';
 import FacebookIcon from '@mui/icons-material/Facebook';
+import FileUploadIcon from '@mui/icons-material/FileUpload';
 import SentimentSatisfiedAltIcon from '@mui/icons-material/SentimentSatisfiedAlt'; // Added for emoji icon
 import { fetchWithAuth } from '@/lib/fetch';
 
@@ -53,6 +54,7 @@ export default function PublishComponent() {
   const [selectedXAccounts, setSelectedXAccounts] = useState<string[]>([]);
   const [isPublishing, setIsPublishing] = useState<boolean>(false);
   const [publishResults, setPublishResults] = useState<{ successful: unknown[]; failed: unknown[] } | null>(null);
+  const [mediaFiles, setMediaFiles] = useState<File[]>([]);
   const [anchorEl, setAnchorEl] = useState<HTMLButtonElement | null>(null); // State for emoji popover anchor
   const [emojiCategory, setEmojiCategory] = useState(0); // 0: History, 1: Smileys, ...
   const [emojiHistory, setEmojiHistory] = useState<string[]>([]); // Stores last used emojis
@@ -195,6 +197,22 @@ export default function PublishComponent() {
     );
   };
 
+  const handleMediaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      setMediaFiles((prev) => {
+        // Avoid duplicates by file name and size
+        const newFiles = e.target.files ? Array.from(e.target.files).filter(
+          (file) => !prev.some((f) => f.name === file.name && f.size === file.size)
+        ) : [];
+        return [...prev, ...newFiles];
+      });
+    }
+  };
+
+  const handleRemoveMedia = (index: number) => {
+    setMediaFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const handlePublish = async () => {
     setIsPublishing(true);
     setError(null);
@@ -206,23 +224,22 @@ export default function PublishComponent() {
       return;
     }
 
-    if (postText.trim() === '') {
-      setError({ message: 'Post text cannot be empty.' });
+    if (postText.trim() === '' && mediaFiles.length === 0) {
+      setError({ message: 'Post text or media cannot be empty.' });
       setIsPublishing(false);
       return;
     }
 
-    const postData = {
-      text: postText,
-      facebookPages: selectedFacebookPages,
-      xAccounts: selectedXAccounts,
-    };
+    const formData = new FormData();
+    formData.append('text', postText);
+    selectedFacebookPages.forEach((id) => formData.append('facebookPages', id));
+    selectedXAccounts.forEach((id) => formData.append('xAccounts', id));
+    mediaFiles.forEach((file) => formData.append('media', file));
 
     try {
       const response = await fetchWithAuth('/api/publish', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(postData),
+        body: formData,
       });
 
       const responseData = await response.json();
@@ -240,6 +257,7 @@ export default function PublishComponent() {
         setPublishResults(responseData);
         setError(null);
         setPostText('');
+        setMediaFiles([]);
         // This resets the selection after a successful publish
         setSelectedFacebookPages(facebookPages.map(page => page.page_id));
         setSelectedXAccounts(xAccounts.map(account => account.id));
@@ -339,12 +357,33 @@ export default function PublishComponent() {
               sx={{ mb: 2 }}
               InputProps={{
                 style: { fontSize: '1.1rem' },
-                // 💡 Add textAlign property to align the text to the right
                 sx: { textAlign: 'right', direction: 'rtl' }
               }}
             />
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <IconButton aria-describedby={id} onClick={handlePopoverOpen} color="primary">
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                {isTwitterWarning && selectedXAccounts.length > 0 && (
+                    <Typography color="error" variant="caption" display="block" sx={{ mr: 2 }}>
+                        ⚠️ This post exceeds the {TWITTER_CHAR_LIMIT} character limit for X, but we still can try to publish it.
+                    </Typography>
+                )}
+                <Typography variant="body2" color="text.secondary">
+                    {charCount}/{TWITTER_CHAR_LIMIT}
+                </Typography>
+              </Box>
+            </Box>
+            <Box sx={{ mb: 2 }}>
+              <Button component="label" color="primary">
+                <FileUploadIcon />
+                <input
+                  type="file"
+                  accept="image/*,video/*"
+                  multiple
+                  hidden
+                  onChange={handleMediaChange}
+                />
+              </Button>
+                            <IconButton aria-describedby={id} onClick={handlePopoverOpen} color="primary">
                 <SentimentSatisfiedAltIcon />
               </IconButton>
               <Popover
@@ -386,16 +425,28 @@ export default function PublishComponent() {
                   </Box>
                 </Box>
               </Popover>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                {isTwitterWarning && selectedXAccounts.length > 0 && (
-                    <Typography color="error" variant="caption" display="block" sx={{ mr: 2 }}>
-                        ⚠️ This post exceeds the {TWITTER_CHAR_LIMIT} character limit for X, but we still can try to publish it.
-                    </Typography>
-                )}
-                <Typography variant="body2" color="text.secondary">
-                    {charCount}/{TWITTER_CHAR_LIMIT}
-                </Typography>
-              </Box>
+              {mediaFiles.length > 0 && (
+                <Box sx={{ mt: 2, display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+                  {mediaFiles.map((file, idx) => {
+                    const url = URL.createObjectURL(file);
+                    const isImage = file.type.startsWith('image/');
+                    const isVideo = file.type.startsWith('video/');
+                    return (
+                      <Box key={idx} sx={{ position: 'relative', width: 120, height: 120 }}>
+                        {isImage && (
+                          <img src={url} alt={file.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8 }} />
+                        )}
+                        {isVideo && (
+                          <video src={url} controls style={{ width: '100%', height: '100%', borderRadius: 8 }} />
+                        )}
+                        <Button size="small" color="error" variant="contained" sx={{ position: 'absolute', top: 4, right: 4, minWidth: 0, p: 0.5 }} onClick={() => handleRemoveMedia(idx)}>
+                          ✕
+                        </Button>
+                      </Box>
+                    );
+                  })}
+                </Box>
+              )}
             </Box>
 
             <Divider sx={{ my: 3 }} />
