@@ -100,30 +100,36 @@ export class FacebookPublisher {
       filename: file.filename,
       contentType: file.mimetype,
     });
-    formData.append('published', 'false'); // Upload unpublished first
+
+    // Determine if this is a video or image
+    const isVideo = file.mimetype.startsWith('video/');
+    const endpoint = isVideo 
+      ? `https://graph.facebook.com/v19.0/${pageId}/videos`
+      : `https://graph.facebook.com/v19.0/${pageId}/photos`;
+
+    formData.append('published', 'false');
+
 
     try {
-      const response = await axios.post(
-        `https://graph.facebook.com/v19.0/${pageId}/photos`,
-        formData,
-        {
-          headers: {
-            ...formData.getHeaders(),
-            Authorization: `Bearer ${accessToken}`,
-          },
-        }
-      );
+      const response = await axios.post(endpoint, formData, {
+        headers: {
+          ...formData.getHeaders(),
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
 
       const mediaId = response.data.id;
-      logger.info(`Media uploaded successfully to Facebook page: ${pageId}`, { 
+      logger.info(`${isVideo ? 'Video' : 'Photo'} uploaded successfully to Facebook page: ${pageId}`, { 
         mediaId, 
         filename: file.filename 
       });
       
       return mediaId;
     } catch (error) {
-      logger.error(`Failed to upload media to Facebook page: ${pageId}`, {
+      logger.error(`Failed to upload ${isVideo ? 'video' : 'photo'} to Facebook page: ${pageId}`, {
         filename: file.filename,
+        mimetype: file.mimetype,
+        endpoint,
         error: axios.isAxiosError(error) ? {
           status: error.response?.status,
           statusText: error.response?.statusText,
@@ -188,113 +194,7 @@ private async publishMediaPost(
     return response.data;
   }
 
-  async publishToPages(
-    options: FacebookPublishOptions,
-    tokens: FacebookPageToken[]
-  ): Promise<{
-    successful: FacebookPublishResult[];
-    failed: FacebookPublishError[];
-  }> {
-    const { text, files = [] } = options;
-    
-    logger.info('Starting Facebook publishing process', { 
-      textLength: text?.length || 0, 
-      fileCount: files.length,
-      pageCount: tokens.length,
-      pageIds: tokens.map(t => t.page_id)
-    });
 
-    const successful: FacebookPublishResult[] = [];
-    const failed: FacebookPublishError[] = [];
-
-    const publishPromises = tokens.map(async (token) => {
-      const pageId = token.page_id;
-      logger.info(`Publishing to Facebook page: ${pageId}`);
-      
-      try {
-        let result: unknown;
-
-        if (files.length === 0) {
-          // Text-only post
-          if (!text) {
-            throw new Error('No content to publish (no text or files provided)');
-          }
-          result = await this.publishTextPost(pageId, token.page_access_token, text);
-        } else {
-          // Posts with media
-          const mediaIds: string[] = [];
-          
-          // Upload all media files first
-          for (const file of files) {
-            const mediaId = await this.uploadMediaToFacebook(
-              pageId, 
-              token.page_access_token, 
-              file
-            );
-            mediaIds.push(mediaId);
-          }
-          
-          // Publish the post with uploaded media
-          result = await this.publishMediaPost(
-            pageId, 
-            token.page_access_token, 
-            text, 
-            mediaIds
-          );
-        }
-        
-        interface FacebookPostResponse {
-          id?: string;
-          [key: string]: unknown;
-        }
-        const postResult = result as FacebookPostResponse;
-        logger.info(`Successfully published to Facebook page: ${pageId}`, { 
-          postId: postResult.id,
-          resultData: result 
-        });
-        
-        successful.push({ 
-          platform: 'facebook', 
-          page_id: token.page_id, 
-          result 
-        });
-      } catch (error) {
-        logger.error(`Failed to publish to Facebook page: ${pageId}`, {
-          error: axios.isAxiosError(error) ? {
-            status: error.response?.status,
-            statusText: error.response?.statusText,
-            data: error.response?.data,
-            message: error.message
-          } : error
-        });
-        
-        failed.push({
-          platform: 'facebook',
-          page_id: token.page_id,
-          error: axios.isAxiosError(error)
-            ? {
-                message: error.response?.data?.error?.message || error.message,
-                code: error.response?.data?.error?.code?.toString(),
-                details: error.response?.data,
-              }
-            : { 
-                message: error instanceof Error ? error.message : 'Unknown error during Facebook publish' 
-              },
-        });
-      }
-    });
-
-    await Promise.all(publishPromises);
-
-    logger.info('Facebook publishing completed', { 
-      successful: successful.length, 
-      failed: failed.length,
-      successfulPages: successful.map(s => s.page_id),
-      failedPages: failed.map(f => f.page_id)
-    });
-
-    return { successful, failed };
-  }
 
   // Legacy method for backward compatibility
   async publishTextToPages(
@@ -323,4 +223,169 @@ private async publishMediaPost(
     
     return missingIds;
   }
+
+async publishToPages(
+  options: FacebookPublishOptions,
+  tokens: FacebookPageToken[]
+): Promise<{
+  successful: FacebookPublishResult[];
+  failed: FacebookPublishError[];
+}> {
+  const { text, files = [] } = options;
+  
+  logger.info('Starting Facebook publishing process', { 
+    textLength: text?.length || 0, 
+    fileCount: files.length,
+    pageCount: tokens.length,
+    pageIds: tokens.map(t => t.page_id)
+  });
+
+  const successful: FacebookPublishResult[] = [];
+  const failed: FacebookPublishError[] = [];
+
+  const publishPromises = tokens.map(async (token) => {
+    const pageId = token.page_id;
+    logger.info(`Publishing to Facebook page: ${pageId}`);
+    
+    try {
+      let result: unknown;
+
+      if (files.length === 0) {
+        // Text-only post
+        if (!text) {
+          throw new Error('No content to publish (no text or files provided)');
+        }
+        result = await this.publishTextPost(pageId, token.page_access_token, text);
+      } else {
+        // Check if we have mixed media (photos + videos)
+        const videos = files.filter(f => f.mimetype.startsWith('video/'));
+        const photos = files.filter(f => f.mimetype.startsWith('image/'));
+        
+        if (videos.length > 0 && photos.length > 0) {
+          logger.warn(`Mixed media detected for page ${pageId}. Publishing videos and photos separately.`);
+          
+          // Upload and publish videos first
+          for (const video of videos) {
+            const videoId = await this.uploadMediaToFacebook(pageId, token.page_access_token, video);
+            await this.publishVideoPost(pageId, token.page_access_token, text, videoId);
+          }
+          
+          // Then handle photos if any
+          const photoIds: string[] = [];
+          for (const photo of photos) {
+            const photoId = await this.uploadMediaToFacebook(pageId, token.page_access_token, photo);
+            photoIds.push(photoId);
+          }
+          result = await this.publishMediaPost(pageId, token.page_access_token, text, photoIds);
+        } else if (videos.length > 0) {
+          // Video-only posts
+          if (videos.length === 1) {
+            const videoId = await this.uploadMediaToFacebook(pageId, token.page_access_token, videos[0]);
+            result = await this.publishVideoPost(pageId, token.page_access_token, text, videoId);
+          } else {
+            // Multiple videos - each needs to be posted separately
+            logger.info(`Publishing ${videos.length} videos separately for page ${pageId}`);
+            const videoResults = [];
+            for (const video of videos) {
+              const videoId = await this.uploadMediaToFacebook(pageId, token.page_access_token, video);
+              const postResult = await this.publishVideoPost(pageId, token.page_access_token, text, videoId);
+              videoResults.push(postResult);
+            }
+            result = { video_posts: videoResults };
+          }
+        } else {
+          // Photo-only posts (original logic)
+          const mediaIds: string[] = [];
+          for (const file of files) {
+            const mediaId = await this.uploadMediaToFacebook(pageId, token.page_access_token, file);
+            mediaIds.push(mediaId);
+          }
+          result = await this.publishMediaPost(pageId, token.page_access_token, text, mediaIds);
+        }
+      }
+      
+      interface FacebookPostResponse {
+        id?: string;
+        [key: string]: unknown;
+      }
+      const postResult = result as FacebookPostResponse;
+      logger.info(`Successfully published to Facebook page: ${pageId}`, { 
+        postId: postResult.id,
+        resultData: result 
+      });
+      
+      successful.push({ 
+        platform: 'facebook', 
+        page_id: token.page_id, 
+        result 
+      });
+    } catch (error) {
+      logger.error(`Failed to publish to Facebook page: ${pageId}`, {
+        error: axios.isAxiosError(error) ? {
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          data: error.response?.data,
+          message: error.message
+        } : error
+      });
+      
+      failed.push({
+        platform: 'facebook',
+        page_id: token.page_id,
+        error: axios.isAxiosError(error)
+          ? {
+              message: error.response?.data?.error?.message || error.message,
+              code: error.response?.data?.error?.code?.toString(),
+              details: error.response?.data,
+            }
+          : { 
+              message: error instanceof Error ? error.message : 'Unknown error during Facebook publish' 
+            },
+      });
+    }
+  });
+
+  await Promise.all(publishPromises);
+
+  logger.info('Facebook publishing completed', { 
+    successful: successful.length, 
+    failed: failed.length,
+    successfulPages: successful.map(s => s.page_id),
+    failedPages: failed.map(f => f.page_id)
+  });
+
+  return { successful, failed };
+}
+private async publishVideoPost(
+  pageId: string, 
+  accessToken: string, 
+  text: string | undefined, 
+  videoId: string
+): Promise<unknown> {
+  logger.info(`Publishing video post to Facebook page: ${pageId}`, {
+    videoId,
+    hasText: !!text
+  });
+
+  const postData: Record<string, unknown> = {
+    attached_media: [{ media_fbid: videoId }],
+  };
+  if (text) {
+    postData.message = text;
+  }
+  console.log(`videoId: ${videoId}`);
+
+  const response = await axios.post(
+    `https://graph.facebook.com/v19.0/${pageId}/feed`,
+    postData,
+    {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
+  
+  return response.data;
+}
 }
