@@ -327,9 +327,20 @@ export default function PublishComponent() {
                 <Box component="ul" sx={{ mt: 1, pl: 2 }}>
                   {publishResults.failed.map((item: unknown, index: number) => (
                     <Typography component="li" variant="body2" key={index}>
-                      {(item as { platform: string; page_id?: string; account_id?: string; error?: { message?: string; code?: string, details?: { error?: { error_user_msg?: string } } } }).platform === 'facebook'
+                      {(item as { platform: string; page_id?: string; account_id?: string }).platform === 'facebook'
                         ? `Facebook Page: ${(item as { page_id?: string }).page_id}`
-                        : `X Account: ${(item as { account_id?: string }).account_id}`} - {(item as { error?: { message?: string } }).error?.message || 'Unknown error'} (Code: {(item as { error?: { code?: string } }).error?.code || 'N/A'}){(item as { error?: { details?: { error?: { error_user_msg?: string } } } }).error?.details?.error?.error_user_msg ? ` - ${item.error.details.error.error_user_msg}` : ''})
+                        : `X Account: ${(item as { account_id?: string }).account_id}`}
+                      <br />
+                      <strong>Error:</strong> {(item as { error?: { message?: string } }).error?.message || 'Unknown error'}
+                      {((item as { error?: { code?: string } }).error?.code) && (
+                        <> <strong>Code:</strong> {(item as { error?: { code?: string } }).error?.code} </>
+                      )}
+                      {((item as { error?: { details?: { error?: { error_user_msg?: string } } } }).error?.details?.error?.error_user_msg) && (
+                        <>
+                          <br />
+                          <strong>Details:</strong> {(item as { error?: { details?: { error?: { error_user_msg?: string } } } }).error?.details?.error?.error_user_msg}
+                        </>
+                      )}
                     </Typography>
                   ))}
                 </Box>

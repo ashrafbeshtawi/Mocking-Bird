@@ -231,18 +231,181 @@ export async function POST(req: NextRequest) {
       addReport(`WARN: Media files provided but Twitter publisher doesn't support media uploads. Only text will be posted to X accounts.`);
     }
 
-    const publishPromises: Promise<any>[] = [];
+    // Helper to map Facebook/Twitter errors to FailedPublishResult
+    interface FacebookFailedItem {
+      platform: string;
+      page_id?: string;
+      error?: {
+        message?: string;
+        code?: string;
+        details?: {
+          error?: {
+            message?: string;
+            type?: string;
+            code?: number;
+            error_subcode?: number;
+            is_transient?: boolean;
+            error_user_title?: string;
+            error_user_msg?: string;
+            fbtrace_id?: string;
+          };
+        };
+      };
+    }
+
+    interface TwitterFailedItem {
+      platform: string;
+      account_id?: string;
+      error?: {
+        message?: string;
+        code?: string;
+        details?: {
+          detail?: string;
+        };
+      };
+    }
+
+    interface FacebookSuccessItem {
+      platform: string;
+      page_id?: string;
+      result?: {
+        id?: string;
+      };
+    }
+
+    interface TwitterSuccessItem {
+      platform: string;
+      account_id?: string;
+      result?: {
+        data?: {
+          id?: string;
+        };
+      };
+    }
+
+    function mapFacebookFailed(failed: FacebookFailedItem[]): FailedPublishResult[] {
+      return failed.map(item => ({
+        platform: item.platform,
+        page_id: item.page_id,
+        error: item.error
+          ? {
+              message: item.error.message,
+              code: item.error.code,
+              details: typeof item.error.details === 'object'
+                ? (
+                    item.error.details && item.error.details.error
+                      ? { error: item.error.details.error }
+                      : undefined
+                  )
+                : undefined
+            }
+          : undefined
+      }));
+    }
+
+    function mapTwitterFailed(failed: TwitterFailedItem[]): FailedPublishResult[] {
+      return failed.map(item => ({
+        platform: item.platform,
+        account_id: item.account_id,
+        error: item.error
+          ? {
+              message: item.error.message,
+              code: item.error.code,
+              details: typeof item.error.details === 'object'
+                ? (
+                    item.error.details && item.error.details.detail
+                      ? { error: { message: item.error.details.detail } }
+                      : undefined
+                  )
+                : undefined
+            }
+          : undefined
+      }));
+    }
+
+    function mapFacebookSuccess(successful: FacebookSuccessItem[]): SuccessfulPublishResult[] {
+      return successful.map(item => ({
+        platform: item.platform,
+        page_id: item.page_id,
+        post_id: item.result?.id
+      }));
+    }
+
+    function mapTwitterSuccess(successful: TwitterSuccessItem[]): SuccessfulPublishResult[] {
+      return successful.map(item => ({
+        platform: item.platform,
+        account_id: item.account_id,
+        tweet_id: item.result?.data?.id
+      }));
+    }
 
     // Add Facebook publishing if we have pages
+    const publishPromises: Promise<{ successful: SuccessfulPublishResult[]; failed: FailedPublishResult[] }>[] = [];
+
     if (fbTokens.length > 0) {
-      publishPromises.push(facebookPublisher.publishToPages(facebookOptions, fbTokens));
+      publishPromises.push(
+        facebookPublisher.publishToPages(facebookOptions, fbTokens).then(res => ({
+          successful: mapFacebookSuccess(
+            res.successful.map(item => ({
+              ...item,
+              result: item.result as { id?: string }
+            }))
+          ),
+          failed: mapFacebookFailed(
+            res.failed.map(item => ({
+              ...item,
+              error: item.error
+                ? {
+                    ...item.error,
+                    details: typeof item.error.details === 'object'
+                      ? item.error.details as {
+                          error?: {
+                            message?: string;
+                            type?: string;
+                            code?: number;
+                            error_subcode?: number;
+                            is_transient?: boolean;
+                            error_user_title?: string;
+                            error_user_msg?: string;
+                            fbtrace_id?: string;
+                          };
+                        }
+                      : undefined
+                  }
+                : undefined
+            }))
+          )
+        }))
+      );
     } else {
       publishPromises.push(Promise.resolve({ successful: [], failed: [] }));
     }
 
     // Add Twitter publishing if we have accounts
     if (xTokens.length > 0) {
-      publishPromises.push(twitterPublisher.publishToAccounts(text, xTokens, userId));
+      publishPromises.push(
+        twitterPublisher.publishToAccounts(text, xTokens, userId).then(res => ({
+          successful: mapTwitterSuccess(
+            res.successful.map(item => ({
+              ...item,
+              result: item.result as { data?: { id?: string } }
+            }))
+          ),
+          failed: mapTwitterFailed(
+            res.failed.map(item => ({
+              ...item,
+              error: item.error
+                ? {
+                    ...item.error,
+                    details: typeof item.error.details === 'object'
+                      ? item.error.details as { detail?: string }
+                      : undefined
+                  }
+                : undefined
+            }))
+          )
+        }))
+      );
     } else {
       publishPromises.push(Promise.resolve({ successful: [], failed: [] }));
     }
@@ -266,10 +429,12 @@ export async function POST(req: NextRequest) {
 
         if (item.platform === 'facebook' && item.error?.details?.error?.error_user_msg) {
           detailMessage += ` (${item.error.details.error.error_user_msg})`;
-        } else if (item.platform === 'x' && item.error?.details?.detail) {
-          detailMessage += ` (${item.error.details.detail})`;
         }
-        
+        // For Twitter/X, show error message if present
+        if (item.platform === 'x' && item.error?.details?.error?.message) {
+          detailMessage += ` (${item.error.details.error.message})`;
+        }
+
         if (item.error?.code) {
           detailMessage += ` (Code: ${item.error.code})`;
         }
