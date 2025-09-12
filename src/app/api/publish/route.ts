@@ -539,6 +539,14 @@ export async function POST(req: NextRequest) {
     }
 
     // Return appropriate response
+    if (allFailed.length === allSuccessful.length + allFailed.length && allFailed.length > 0) {
+      addReport(`Total failure - all posts failed`);
+      return NextResponse.json({
+        message: 'All posts failed to publish.',
+        ...responseData
+      }, { status: 500 });
+    }
+
     if (allFailed.length > 0) {
       addReport(`Partial success - some posts failed`);
 

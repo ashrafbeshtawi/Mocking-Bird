@@ -251,7 +251,7 @@ export default function PublishComponent() {
       } else if (!response.ok) {
         setError({ message: responseData.error || 'Failed to publish post.', details: responseData.details });
         setSuccess(null);
-        setPublishResults(null);
+        setPublishResults(responseData);
       } else { // Full success
         setSuccess('🎉 Your post has been published successfully!');
         setPublishResults(responseData);
@@ -288,66 +288,54 @@ export default function PublishComponent() {
         Publish to Social Media
       </Typography>
       <Paper elevation={3} sx={{ p: 4, mt: 3 }}>
-        {error && (
-          <Alert severity="error" sx={{ mb: 3 }}>
-            <AlertTitle>Error</AlertTitle>
-            {error.message}
-            {error.details && (
+      {(error || success) && (
+        <Alert severity={error ? "error" : "success"} sx={{ mb: 3 }}>
+          <AlertTitle>{error ? "Error" : "Success"}</AlertTitle>
+
+          {/* Success details */}
+          {publishResults?.successful && publishResults.successful.length > 0 && (
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="subtitle2">Successfully Published To:</Typography>
               <Box component="ul" sx={{ mt: 1, pl: 2 }}>
-                {error.details.map((detail, index) => (
+                {publishResults.successful.map((item: unknown, index: number) => (
                   <Typography component="li" variant="body2" key={index}>
-                    {String(detail)}
+                    {(item as { platform: string; page_id: string; account_id: string }).platform === 'facebook'
+                      ? `Facebook Page: ${(item as { page_id: string }).page_id}`
+                      : `X Account: ${(item as { account_id: string }).account_id}`}
                   </Typography>
                 ))}
               </Box>
-            )}
-          </Alert>
-        )}
-        {success && (
-          <Alert severity="success" sx={{ mb: 3 }}>
-            <AlertTitle>Success</AlertTitle>
-            {success}
-            {publishResults?.successful && publishResults.successful.length > 0 && (
-              <Box sx={{ mt: 2 }}>
-                <Typography variant="subtitle2">Successfully Published To:</Typography>
-                <Box component="ul" sx={{ mt: 1, pl: 2 }}>
-                  {publishResults.successful.map((item: unknown, index: number) => (
-                    <Typography component="li" variant="body2" key={index}>
-                      {(item as { platform: string; page_id: string; account_id: string }).platform === 'facebook'
-                        ? `Facebook Page: ${(item as { page_id: string }).page_id}`
-                        : `X Account: ${(item as { account_id: string }).account_id}`}
-                    </Typography>
-                  ))}
-                </Box>
+            </Box>
+          )}
+
+          {/* Failed details */}
+          {publishResults?.failed && publishResults.failed.length > 0 && (
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="subtitle2" color="error">Failed To Publish To:</Typography>
+              <Box component="ul" sx={{ mt: 1, pl: 2 }}>
+                {publishResults.failed.map((item: unknown, index: number) => (
+                  <Typography component="li" variant="body2" key={index}>
+                    {(item as { platform: string; page_id?: string; account_id?: string }).platform === 'facebook'
+                      ? `Facebook Page: ${(item as { page_id?: string }).page_id}`
+                      : `X Account: ${(item as { account_id?: string }).account_id}`}
+                    <br />
+                    <strong>Error:</strong> {(item as { error?: { message?: string } }).error?.message || 'Unknown error'}
+                    {((item as { error?: { code?: string } }).error?.code) && (
+                      <> <strong>Code:</strong> {(item as { error?: { code?: string } }).error?.code} </>
+                    )}
+                    {((item as { error?: { details?: { error?: { error_user_msg?: string } } } }).error?.details?.error?.error_user_msg) && (
+                      <>
+                        <br />
+                        <strong>Details:</strong> {(item as { error?: { details?: { error?: { error_user_msg?: string } } } }).error?.details?.error?.error_user_msg}
+                      </>
+                    )}
+                  </Typography>
+                ))}
               </Box>
-            )}
-            {publishResults?.failed && publishResults.failed.length > 0 && (
-              <Box sx={{ mt: 2 }}>
-                <Typography variant="subtitle2" color="error">Failed To Publish To:</Typography>
-                <Box component="ul" sx={{ mt: 1, pl: 2 }}>
-                  {publishResults.failed.map((item: unknown, index: number) => (
-                    <Typography component="li" variant="body2" key={index}>
-                      {(item as { platform: string; page_id?: string; account_id?: string }).platform === 'facebook'
-                        ? `Facebook Page: ${(item as { page_id?: string }).page_id}`
-                        : `X Account: ${(item as { account_id?: string }).account_id}`}
-                      <br />
-                      <strong>Error:</strong> {(item as { error?: { message?: string } }).error?.message || 'Unknown error'}
-                      {((item as { error?: { code?: string } }).error?.code) && (
-                        <> <strong>Code:</strong> {(item as { error?: { code?: string } }).error?.code} </>
-                      )}
-                      {((item as { error?: { details?: { error?: { error_user_msg?: string } } } }).error?.details?.error?.error_user_msg) && (
-                        <>
-                          <br />
-                          <strong>Details:</strong> {(item as { error?: { details?: { error?: { error_user_msg?: string } } } }).error?.details?.error?.error_user_msg}
-                        </>
-                      )}
-                    </Typography>
-                  ))}
-                </Box>
-              </Box>
-            )}
-          </Alert>
-        )}
+            </Box>
+          )}
+        </Alert>
+      )}
 
         {allConnectedAccounts.length === 0 ? (
           <Box sx={{ textAlign: 'center', my: 4 }}>
