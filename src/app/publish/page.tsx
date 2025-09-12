@@ -520,7 +520,7 @@ export default function PublishComponent() {
                 color="primary"
                 size="large"
                 onClick={handlePublish}
-                disabled={isPublishing || postText.trim() === '' || (selectedFacebookPages.length === 0 && selectedXAccounts.length === 0)}
+                disabled={isPublishing || postText.trim() === '' && mediaFiles.length === 0 || (selectedFacebookPages.length === 0 && selectedXAccounts.length === 0)}
                 startIcon={isPublishing ? <CircularProgress size={20} color="inherit" /> : null}
               >
                 {isPublishing ? 'Publishing...' : 'Publish Post'}
