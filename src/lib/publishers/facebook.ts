@@ -38,7 +38,7 @@ export interface FacebookPublishError {
   };
 }
 
-export interface FacebookMediaFile {
+export interface MediaFile {
   buffer: Buffer;
   filename: string;
   mimetype: string;
@@ -46,7 +46,7 @@ export interface FacebookMediaFile {
 
 export interface FacebookPublishOptions {
   text?: string;
-  files?: FacebookMediaFile[];
+  files?: MediaFile[];
 }
 
 export class FacebookPublisher {
@@ -87,7 +87,7 @@ export class FacebookPublisher {
   private async uploadMediaToFacebook(
     pageId: string, 
     accessToken: string, 
-    file: FacebookMediaFile,
+    file: MediaFile,
     publishNow = false,
     description?: string
   ): Promise<string> {

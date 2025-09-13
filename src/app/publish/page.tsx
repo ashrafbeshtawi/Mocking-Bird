@@ -291,6 +291,7 @@ export default function PublishComponent() {
       {(error || success) && (
         <Alert severity={error ? "error" : "success"} sx={{ mb: 3 }}>
           <AlertTitle>{error ? "Error" : "Success"}</AlertTitle>
+          {error ? error.message : success}
 
           {/* Success details */}
           {publishResults?.successful && publishResults.successful.length > 0 && (
