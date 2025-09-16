@@ -44,39 +44,39 @@ export async function GET(req: NextRequest) {
       const formattedDate = new Date(created_at).toLocaleString();
 
       const htmlContent = `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Publish Report - History ID: ${historyId}</title>
-    <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 20px; background-color: #f4f4f4; }
-        .container { background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); max-width: 800px; margin: auto; }
-        h1 { color: #0056b3; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 20px; }
-        h2 { color: #0056b3; margin-top: 25px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
-        p { margin-bottom: 10px; }
-        strong { color: #555; }
-        pre { background: #eef; padding: 15px; border-radius: 5px; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word; }
-        .status-success { color: green; font-weight: bold; }
-        .status-failed { color: red; font-weight: bold; }
-        .status-pending { color: orange; font-weight: bold; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>Publish Report - History ID: ${historyId}</h1>
-        <p><strong>Published At:</strong> ${formattedDate}</p>
-        <p><strong>Status:</strong> <span class="status-${publish_status.toLowerCase()}">${formattedStatus}</span></p>
+                            <!DOCTYPE html>
+                            <html lang="en">
+                            <head>
+                                <meta charset="UTF-8">
+                                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                                <title>Publish Report - History ID: ${historyId}</title>
+                                <style>
+                                    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 20px; background-color: #f4f4f4; }
+                                    .container { background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); max-width: 800px; margin: auto; }
+                                    h1 { color: #0056b3; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 20px; }
+                                    h2 { color: #0056b3; margin-top: 25px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+                                    p { margin-bottom: 10px; }
+                                    strong { color: #555; }
+                                    pre { background: #eef; padding: 15px; border-radius: 5px; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word; }
+                                    .status-success { color: green; font-weight: bold; }
+                                    .status-failed { color: red; font-weight: bold; }
+                                    .status-pending { color: orange; font-weight: bold; }
+                                </style>
+                            </head>
+                            <body>
+                                <div class="container">
+                                    <h1>Publish Report - History ID: ${historyId}</h1>
+                                    <p><strong>Published At:</strong> ${formattedDate}</p>
+                                    <p><strong>Status:</strong> <span class="status-${publish_status.toLowerCase()}">${formattedStatus}</span></p>
 
-        <h2>Content:</h2>
-        <pre>${content}</pre>
+                                    <h2>Content:</h2>
+                                    <pre>${content}</pre>
 
-        <h2>Publish Log:</h2>
-        <pre>${publish_report}</pre>
-    </div>
-</body>
-</html> 
+                                    <h2>Publish Log:</h2>
+                                    <pre>${publish_report}</pre>
+                                </div>
+                            </body>
+                            </html> 
       `.trim();
 
       return new NextResponse(htmlContent, {

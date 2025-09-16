@@ -3,66 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Pool } from 'pg';
 import { FacebookPublisher, MediaFile } from '@/lib/publishers/facebook';
 import { TwitterPublisher } from '@/lib/publishers/twitter';
-
-// Define the structure for a single failed publish result
-interface FailedPublishResult {
-  platform: string;
-  page_id?: string;
-  account_id?: string;
-  error?: {
-    message?: string;
-    code?: string;
-    details?: { // Added details based on user feedback
-      error?: {
-        message?: string;
-        type?: string;
-        code?: number;
-        error_subcode?: number;
-        is_transient?: boolean;
-        error_user_title?: string;
-        error_user_msg?: string;
-        fbtrace_id?: string;
-      };
-    };
-  };
-}
-
-// Define the structure for a single successful publish result
-// This is a guess, as the exact structure for successful results isn't provided.
-// It's assumed to have at least a platform and an identifier.
-interface SuccessfulPublishResult {
-  platform: string;
-  post_id?: string; // e.g., for Facebook post ID
-  tweet_id?: string; // e.g., for Twitter tweet ID
-  page_id?: string; // For Facebook pages
-  account_id?: string; // For X accounts
-}
-
-// Define the overall structure for publish results
-interface PublishResults {
-  successful: SuccessfulPublishResult[];
-  failed: FailedPublishResult[];
-}
-
-// Define the structure for media processing errors
-interface MediaProcessingError {
-  message: string;
-}
-
-// Define the structure for media processing details
-interface MediaProcessing {
-  totalFiles: number;
-  processedFiles: number;
-  errors: MediaProcessingError[];
-}
-
-// Define the structure for the response data
-interface PublishResponseData {
-  successful: SuccessfulPublishResult[];
-  failed: FailedPublishResult[];
-  publishReport: string;
-  mediaProcessing?: MediaProcessing;
-}
+import { FailedPublishResult, SuccessfulPublishResult, PublishResults, MediaProcessingError, MediaProcessing, PublishResponseData, FacebookFailedItem, TwitterFailedItem, FacebookSuccessItem, TwitterSuccessItem, ApiResponse } from '@/types/interfaces';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_STRING });
 
@@ -141,7 +82,7 @@ async function returnAndCreateReport({
     client.release();
   }
 
-  const responseBody: any = { publishReport: publishReport.join('\n') };
+  const responseBody: ApiResponse = { publishReport: publishReport.join('\n') };
 
   if (message) {
     responseBody.message = message;
@@ -359,57 +300,6 @@ export async function POST(req: NextRequest) {
 
     if (xAccounts.length > 0 && media.length > 0) {
       addReport(`WARN: Media files provided but Twitter publisher doesn't support media uploads. Only text will be posted to X accounts.`);
-    }
-
-    interface FacebookFailedItem {
-      platform: string;
-      page_id?: string;
-      error?: {
-        message?: string;
-        code?: string;
-        details?: {
-          error?: {
-            message?: string;
-            type?: string;
-            code?: number;
-            error_subcode?: number;
-            is_transient?: boolean;
-            error_user_title?: string;
-            error_user_msg?: string;
-            fbtrace_id?: string;
-          };
-        };
-      };
-    }
-
-    interface TwitterFailedItem {
-      platform: string;
-      account_id?: string;
-      error?: {
-        message?: string;
-        code?: string;
-        details?: {
-          detail?: string;
-        };
-      };
-    }
-
-    interface FacebookSuccessItem {
-      platform: string;
-      page_id?: string;
-      result?: {
-        id?: string;
-      };
-    }
-
-    interface TwitterSuccessItem {
-      platform: string;
-      account_id?: string;
-      result?: {
-        data?: {
-          id?: string;
-        };
-      };
     }
 
     function mapFacebookFailed(failed: FacebookFailedItem[]): FailedPublishResult[] {
