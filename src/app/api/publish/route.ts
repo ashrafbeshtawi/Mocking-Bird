@@ -1,9 +1,9 @@
 // /pages/api/publish.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { Pool } from 'pg';
-import { FacebookPublisher, MediaFile } from '@/lib/publishers/facebook';
+import { FacebookPublisher } from '@/lib/publishers/facebook';
 import { TwitterPublisher } from '@/lib/publishers/twitter';
-import { FailedPublishResult, SuccessfulPublishResult, PublishResults, MediaProcessingError, MediaProcessing, PublishResponseData, FacebookFailedItem, TwitterFailedItem, FacebookSuccessItem, TwitterSuccessItem, ApiResponse } from '@/types/interfaces';
+import { FailedPublishResult, SuccessfulPublishResult, PublishResults, MediaProcessingError, MediaProcessing, PublishResponseData, FacebookFailedItem, TwitterFailedItem, FacebookSuccessItem, TwitterSuccessItem, ApiResponse, MediaFile } from '@/types/interfaces';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_STRING });
 
@@ -298,10 +298,6 @@ export async function POST(req: NextRequest) {
       files: mediaFiles.length > 0 ? mediaFiles : undefined
     };
 
-    if (xAccounts.length > 0 && media.length > 0) {
-      addReport(`WARN: Media files provided but Twitter publisher doesn't support media uploads. Only text will be posted to X accounts.`);
-    }
-
     function mapFacebookFailed(failed: FacebookFailedItem[]): FailedPublishResult[] {
       return failed.map(item => ({
         platform: item.platform,
@@ -401,7 +397,7 @@ export async function POST(req: NextRequest) {
 
     if (xTokens.length > 0) {
       publishPromises.push(
-        twitterPublisher.publishToAccounts(text, xTokens, userId).then(res => ({
+        twitterPublisher.publishToAccounts(text, xTokens, userId, mediaFiles).then(res => ({
           successful: mapTwitterSuccess(
             res.successful.map(item => ({
               ...item,

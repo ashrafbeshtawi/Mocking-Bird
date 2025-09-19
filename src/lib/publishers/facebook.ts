@@ -2,6 +2,7 @@
 import axios from 'axios';
 import { Pool } from 'pg';
 import FormData from 'form-data';
+import { MediaFile } from '@/types/interfaces'; // Import MediaFile from interfaces
 
 // Simple logger utility
 const logger = {
@@ -36,12 +37,6 @@ export interface FacebookPublishError {
     code?: string;
     details?: unknown;
   };
-}
-
-export interface MediaFile {
-  buffer: Buffer;
-  filename: string;
-  mimetype: string;
 }
 
 export interface FacebookPublishOptions {

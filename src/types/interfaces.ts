@@ -120,3 +120,25 @@ export interface ApiResponse {
   mediaProcessing?: MediaProcessing;
   results?: SuccessfulPublishResult[];
 }
+
+export interface MediaFile {
+  buffer: Buffer;
+  filename: string;
+  mimetype: string;
+}
+
+export interface TwitterMediaUploadResult {
+  media_key: string;
+  media_id: string;
+  media_id_string: string;
+  size: number;
+  expires_after_secs: number;
+  image?: {
+    image_type: string;
+    w: number;
+    h: number;
+  };
+  video?: {
+    video_type: string;
+  };
+}
