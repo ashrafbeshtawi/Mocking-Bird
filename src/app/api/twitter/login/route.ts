@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
           response_type: 'code',
           client_id: process.env.X_CLIENT_ID!,
           redirect_uri: process.env.X_CALLBACK_URL!,
-          scope: 'tweet.read tweet.write users.read offline.access, media.write', // adjust scopes
+          scope: 'tweet.read tweet.write users.read offline.access media.write', // adjust scopes
           state: crypto.randomBytes(16).toString('hex'),
           code_challenge: codeChallenge,
           code_challenge_method: 'S256',
