@@ -147,7 +147,7 @@ export default function PublishComponent() {
 
   const fetchConnectedXAccounts = useCallback(async () => {
     try {
-      const response = await fetchWithAuth('/api/twitter/get-accounts');
+      const response = await fetchWithAuth('/api/twitter-v1.1/get-accounts');
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || 'Failed to fetch X accounts.');

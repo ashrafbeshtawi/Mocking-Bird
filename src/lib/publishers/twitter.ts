@@ -2,7 +2,6 @@ import axios from 'axios';
 import { Pool } from 'pg';
 import FormData from 'form-data'; // Required for media uploads
 import { MediaFile, TwitterMediaUploadResult } from '@/types/interfaces'; // Import MediaFile and TwitterMediaUploadResult
-import { exit } from 'process';
 
 const logger = {
   info: (message: string, data?: unknown) => console.log(`[TwitterPublisher] INFO: ${message}`, data ? JSON.stringify(data, null, 2) : ''),
@@ -125,96 +124,140 @@ export class TwitterPublisher {
   }
 
   private async uploadMedia(
-    file: MediaFile,
-    accessToken: string
-  ): Promise<string> {
-    logger.info(`Uploading media to Twitter: ${file.filename} (${file.mimetype})`);
+  file: MediaFile,
+  accessToken: string
+): Promise<string> {
+  logger.info(`Uploading media to Twitter v2: ${file.filename} (${file.mimetype})`);
 
-    // Determine media category based on file type
-    const getMediaCategory = (mimetype: string): string => {
-      if (mimetype.startsWith('image/')) return 'tweet_image';
-      if (mimetype.startsWith('video/')) return 'tweet_video';
-      if (mimetype === 'image/gif') return 'tweet_gif';
-      return 'tweet_image'; // default
-    };
+  const getMediaCategory = (mimetype: string): string => {
+    if (mimetype.startsWith("image/")) return "tweet_image";
+    if (mimetype.startsWith("video/")) return "tweet_image";
+    if (mimetype === "image/gif") return "tweet_image";
+    return "tweet_image";
+  };
 
-    const mediaCategory = getMediaCategory(file.mimetype);
-    logger.info(`Using media category: ${mediaCategory}`);
+  const mediaCategory = getMediaCategory(file.mimetype);
 
-    try {
-      // Method 1: Try multipart/form-data with raw binary (preferred)
-      const formData = new FormData();
-      formData.append('media', file.buffer, {
-        filename: file.filename,
-        contentType: file.mimetype,
-      });
+  // 🔹 If file < 5MB, use simple upload
+  if (file.buffer.length < 5 * 1024 * 1024) {
+    const formData = new FormData();
+    formData.append("media", file.buffer, {
+      filename: file.filename,
+      contentType: file.mimetype,
+    });
+    formData.append("media_category", mediaCategory);
 
-      const response = await axios.post<TwitterMediaUploadResult>(
-        `https://upload.twitter.com/1.1/media/upload.json?media_category=${mediaCategory}`,
-        formData,
+    const response = await axios.post(
+      "https://upload.twitter.com/2/media/upload",
+      formData,
+      {
+        headers: {
+          ...formData.getHeaders(),
+          Authorization: `Bearer ${accessToken}`,
+        },
+        timeout: 60000,
+        maxBodyLength: Infinity,
+        maxContentLength: Infinity,
+      }
+    );
+
+    logger.info("✅ Simple upload success:", response.data);
+    return response.data.media_id;
+  }
+
+  // 🔹 Large file → use chunked upload
+  logger.info("Using chunked upload (INIT/APPEND/FINALIZE)");
+
+  // 1️⃣ INIT
+  const initRes = await axios.post(
+    "https://upload.twitter.com/2/media/upload",
+    {
+      command: "INIT",
+      total_bytes: file.buffer.length,
+      media_type: file.mimetype,
+      media_category: mediaCategory,
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+    }
+  );
+
+  const mediaId = initRes.data.media_id;
+  logger.info(`INIT complete: media_id=${mediaId}`);
+
+  // 2️⃣ APPEND (5MB per chunk)
+  const chunkSize = 5 * 1024 * 1024;
+  let segmentIndex = 0;
+  for (let offset = 0; offset < file.buffer.length; offset += chunkSize) {
+    const chunk = file.buffer.subarray(offset, offset + chunkSize);
+
+    const formData = new FormData();
+    formData.append("command", "APPEND");
+    formData.append("media_id", mediaId);
+    formData.append("segment_index", segmentIndex.toString());
+    formData.append("media", chunk, {
+      filename: file.filename,
+      contentType: file.mimetype,
+    });
+
+    await axios.post("https://upload.twitter.com/2/media/upload", formData, {
+      headers: {
+        ...formData.getHeaders(),
+        Authorization: `Bearer ${accessToken}`,
+      },
+      maxBodyLength: Infinity,
+    });
+
+    logger.info(`APPEND segment ${segmentIndex} uploaded`);
+    segmentIndex++;
+  }
+
+  // 3️⃣ FINALIZE
+  const finalizeRes = await axios.post(
+    "https://upload.twitter.com/2/media/upload",
+    {
+      command: "FINALIZE",
+      media_id: mediaId,
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+    }
+  );
+
+  logger.info("FINALIZE response:", finalizeRes.data);
+
+  // 4️⃣ STATUS (for video transcoding)
+  if (mediaCategory === "tweet_video") {
+    let state = finalizeRes.data.processing_info?.state;
+    while (state === "pending" || state === "in_progress") {
+      logger.info(`Video processing: ${state}, waiting...`);
+      await new Promise((r) => setTimeout(r, 5000));
+
+      const statusRes = await axios.get(
+        "https://upload.twitter.com/2/media/upload",
         {
-          headers: {
-            ...formData.getHeaders(),
-            'Authorization': `Bearer ${accessToken}`,
-          },
-          timeout: 60000,
-          maxBodyLength: Infinity,
-          maxContentLength: Infinity,
+          params: { command: "STATUS", media_id: mediaId },
+          headers: { Authorization: `Bearer ${accessToken}` },
         }
       );
 
-      logger.info(`Media uploaded successfully:`, {
-        media_id_string: response.data.media_id_string,
-        media_key: response.data.media_key,
-        size: response.data.size,
-        expires_after_secs: response.data.expires_after_secs
-      });
-
-      return response.data.media_id_string;
-
-    } catch (error) {
-      if (axios.isAxiosError(error) && error.response?.status === 403) {
-        logger.warn('Multipart upload failed with 403, trying base64 method...');
-        
-        // Method 2: Fallback to base64 with application/x-www-form-urlencoded
-        try {
-          const base64Data = file.buffer.toString('base64');
-          
-          const response = await axios.post<TwitterMediaUploadResult>(
-            `https://upload.twitter.com/1.1/media/upload.json`,
-            new URLSearchParams({
-              media_data: base64Data,
-              media_category: mediaCategory
-            }).toString(),
-            {
-              headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Content-Type': 'application/x-www-form-urlencoded',
-              },
-              timeout: 60000,
-            }
-          );
-
-          logger.info('Base64 upload successful:', {
-            media_id_string: response.data.media_id_string,
-            media_key: response.data.media_key
-          });
-
-          return response.data.media_id_string;
-
-        } catch (base64Error) {
-          logger.error('Both multipart and base64 uploads failed:', { 
-            multipartError: error, 
-            base64Error 
-          });
-          throw base64Error;
-        }
+      state = statusRes.data.processing_info?.state;
+      if (state === "succeeded") break;
+      if (state === "failed") {
+        throw new Error("❌ Video processing failed");
       }
-      
-      logger.error(`Failed to upload media: ${file.filename}`, error);
-      throw error;
     }
+    logger.info("✅ Video processing finished!");
   }
+
+  return mediaId;
+}
 
   async publishToAccounts(
     text: string,

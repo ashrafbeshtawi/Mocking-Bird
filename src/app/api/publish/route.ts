@@ -2,8 +2,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Pool } from 'pg';
 import { FacebookPublisher } from '@/lib/publishers/facebook';
-import { TwitterPublisher } from '@/lib/publishers/twitter';
-import { FailedPublishResult, SuccessfulPublishResult, PublishResults, MediaProcessingError, MediaProcessing, PublishResponseData, FacebookFailedItem, TwitterFailedItem, FacebookSuccessItem, TwitterSuccessItem, ApiResponse, MediaFile } from '@/types/interfaces';
+import { TwitterPublisherV1 } from '@/lib/publishers/twitterv1.1';
+import { FailedPublishResult, SuccessfulPublishResult, PublishResponseData, FacebookFailedItem, TwitterFailedItem, FacebookSuccessItem, TwitterSuccessItem, ApiResponse, MediaFile } from '@/types/interfaces';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_STRING });
 
@@ -134,17 +134,17 @@ export async function POST(req: NextRequest) {
     const mediaProcessingErrors: string[] = [];
 
     if (media && media.length > 0) {
-      addReport(`Processing ${media.length} media files for Facebook`);
+      addReport(`Processing ${media.length} media files`);
       
       for (let i = 0; i < media.length; i++) {
         const file = media[i];
         try {
           if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
-            mediaProcessingErrors.push(`File ${file.name}: Unsupported file type ${file.type}. Facebook only supports images and videos.`);
+            mediaProcessingErrors.push(`File ${file.name}: Unsupported file type ${file.type}. Only images and videos are supported.`);
             continue;
           }
 
-          const maxSize = file.type.startsWith('image/') ? 4 * 1024 * 1024 : 1024 * 1024 * 1024;
+          const maxSize = file.type.startsWith('image/') ? 15 * 1024 * 1024 : 512 * 1024 * 1024;
           if (file.size > maxSize) {
             mediaProcessingErrors.push(`File ${file.name}: File too large (${(file.size / 1024 / 1024).toFixed(2)}MB). Maximum size is ${maxSize / 1024 / 1024}MB.`);
             continue;
@@ -195,8 +195,8 @@ export async function POST(req: NextRequest) {
     }
 
     if (!text || typeof text !== 'string' || text.trim().length === 0) {
-      if (mediaFiles.length === 0 || facebookPages.length === 0) {
-        addReport(`WARN: Invalid text input and no media files for Facebook. Text: ${text?.substring(0, 100)}`);
+      if (mediaFiles.length === 0 || (facebookPages.length === 0 && xAccounts.length === 0)) {
+        addReport(`WARN: Invalid text input and no media files. Text: ${text?.substring(0, 100)}`);
         return await returnAndCreateReport({
           userId,
           publishReport,
@@ -239,8 +239,8 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    if (facebookPages.length > 0 && media.length > 0 && mediaFiles.length === 0 && mediaProcessingErrors.length > 0) {
-      addReport(`ERROR: All media files failed processing and Facebook pages selected`);
+    if ((facebookPages.length > 0 || xAccounts.length > 0) && media.length > 0 && mediaFiles.length === 0 && mediaProcessingErrors.length > 0) {
+      addReport(`ERROR: All media files failed processing`);
       return await returnAndCreateReport({
         userId,
         publishReport,
@@ -262,7 +262,7 @@ export async function POST(req: NextRequest) {
 
     addReport(`Initializing publishers`);
     const facebookPublisher = new FacebookPublisher(pool);
-    const twitterPublisher = new TwitterPublisher(pool);
+    const twitterPublisher = new TwitterPublisherV1(pool);
 
     addReport(`Fetching tokens from database for ${facebookPages.length} Facebook pages and ${xAccounts.length} X accounts`);
     const [fbTokens, xTokens] = await Promise.all([
@@ -326,13 +326,7 @@ export async function POST(req: NextRequest) {
           ? {
               message: item.error.message,
               code: item.error.code,
-              details: typeof item.error.details === 'object'
-                ? (
-                    item.error.details && item.error.details.detail
-                      ? { error: { message: item.error.details.detail } }
-                      : undefined
-                  )
-                : undefined
+              details: item.error.details
             }
           : undefined
       }));
@@ -350,7 +344,7 @@ export async function POST(req: NextRequest) {
       return successful.map(item => ({
         platform: item.platform,
         account_id: item.account_id,
-        tweet_id: item.result?.data?.id
+        tweet_id: item.result?.id_str || item.result?.id
       }));
     }
 
@@ -397,7 +391,7 @@ export async function POST(req: NextRequest) {
 
     if (xTokens.length > 0) {
       publishPromises.push(
-        twitterPublisher.publishToAccounts(text, xTokens, userId, mediaFiles).then(res => ({
+        twitterPublisher.publishToAccounts(text, xTokens, mediaFiles).then(res => ({
           successful: mapTwitterSuccess(
             res.successful.map(item => ({
               ...item,
@@ -409,10 +403,17 @@ export async function POST(req: NextRequest) {
               ...item,
               error: item.error
                 ? {
-                    ...item.error,
-                    details: typeof item.error.details === 'object'
-                      ? item.error.details as { detail?: string }
-                      : undefined
+                    message: item.error.message,
+                    code: item.error.code,
+                    details: (() => {
+                      if (item.error && item.error.details) {
+                        const twitterDetails = item.error.details as { errors?: { message?: string; code?: number }[] };
+                        return twitterDetails.errors && twitterDetails.errors.length > 0
+                          ? { errors: twitterDetails.errors }
+                          : undefined;
+                      }
+                      return undefined;
+                    })()
                   }
                 : undefined
             }))
@@ -442,8 +443,8 @@ export async function POST(req: NextRequest) {
         if (item.platform === 'facebook' && item.error?.details?.error?.error_user_msg) {
           detailMessage += ` (${item.error.details.error.error_user_msg})`;
         }
-        if (item.platform === 'x' && item.error?.details?.error?.message) {
-          detailMessage += ` (${item.error.details.error.message})`;
+        if (item.platform === 'x' && item.error?.details?.errors?.[0]?.message) {
+          detailMessage += ` (${item.error.details.errors[0].message})`;
         }
 
         if (item.error?.code) {

@@ -7,10 +7,7 @@ export async function middleware(req: NextRequest) {
   const token = req.cookies.get('jwt')?.value;
 
   if (!token) {
-    return new NextResponse(JSON.stringify({ error: 'Unauthorized: No token provided' }), {
-      status: 401,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return NextResponse.redirect(new URL('/error?statusCode=401&message=Unauthorized: No token provided', req.url));
   }
 
   try {
@@ -23,10 +20,7 @@ export async function middleware(req: NextRequest) {
     // 4. Extract user ID from payload
     const userId = payload.userId;
     if (typeof userId !== 'string' && typeof userId !== 'number') {
-      return new NextResponse(JSON.stringify({ error: 'Unauthorized: Invalid user ID in token payload' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return NextResponse.redirect(new URL('/error?statusCode=401&message=Unauthorized: Invalid user ID in token payload', req.url));
     }
 
     // 5. Forward request with user ID in headers
@@ -42,29 +36,20 @@ export async function middleware(req: NextRequest) {
 
     // Specific JOSE error handling
     if (err instanceof JWTExpired) {
-      return new NextResponse(JSON.stringify({ error: 'Unauthorized: Token expired' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return NextResponse.redirect(new URL('/error?statusCode=401&message=Unauthorized: Token expired', req.url));
     }
     if (err instanceof errors.JWSSignatureVerificationFailed) {
-      return new NextResponse(JSON.stringify({ error: 'Unauthorized: Invalid token signature' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return NextResponse.redirect(new URL('/error?statusCode=401&message=Unauthorized: Invalid token signature', req.url));
     }
 
     // Fallback for any other JWT issues
-    return new NextResponse(JSON.stringify({ error: 'Unauthorized: Invalid token' }), {
-      status: 401,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return NextResponse.redirect(new URL('/error?statusCode=401&message=Unauthorized: Invalid token', req.url));
   }
 }
 
 // Only protect API routes except the listed exceptions
 export const config = {
   matcher: [
-    '/api((?!/login|/register|/twitter/login|/twitter/callback).*)',
+    '/api((?!/login|/register|/twitter/login|/twitter/callback|/twitter-v1.1/auth/callback).*)',
   ],
 };

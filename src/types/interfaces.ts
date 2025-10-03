@@ -7,7 +7,7 @@ export interface FailedPublishResult {
     message?: string;
     code?: string;
     details?: { // Added details based on user feedback
-      error?: {
+      error?: { // Facebook specific
         message?: string;
         type?: string;
         code?: number;
@@ -17,6 +17,7 @@ export interface FailedPublishResult {
         error_user_msg?: string;
         fbtrace_id?: string;
       };
+      errors?: Array<{ message?: string; code?: number }>; // Twitter specific
     };
   };
 }
@@ -87,7 +88,7 @@ export interface TwitterFailedItem {
     message?: string;
     code?: string;
     details?: {
-      detail?: string;
+      errors?: Array<{ message?: string; code?: number }>;
     };
   };
 }
@@ -104,6 +105,8 @@ export interface TwitterSuccessItem {
   platform: string;
   account_id?: string;
   result?: {
+    id?: string;
+    id_str?: string;
     data?: {
       id?: string;
     };

@@ -28,6 +28,8 @@ import TwitterIcon from '@mui/icons-material/Twitter';
 import FacebookIcon from '@mui/icons-material/Facebook'; // Using MUI icon for Facebook
 import DeleteIcon from '@mui/icons-material/Delete'; // Import DeleteIcon
 import {fetchWithAuth} from '@/lib/fetch'; // Custom fetch function for auth
+import Cookies from "js-cookie";
+
 // Extend Window interface for Facebook SDK to ensure TypeScript recognizes FB object
 declare global {
   interface Window {
@@ -75,7 +77,7 @@ export default function FacebookConnectPage() {
   // Function to fetch connected X accounts from backend
   const fetchConnectedXAccounts = useCallback(async () => {
     try {
-      const response = await fetchWithAuth('/api/twitter/get-accounts');
+      const response = await fetchWithAuth('/api/twitter-v1.1/get-accounts');
       if (!response.ok) {
         if (response.status === 401) {
           window.location.href = '/login';
@@ -205,7 +207,7 @@ export default function FacebookConnectPage() {
     setDeletingPageId(pageToDelete.id);
     setError(null);
     setSuccess(null);
-    const URL =  pageToDelete.platform === 'facebook' ? '/api/facebook/delete-page' : '/api/twitter/delete-account'; // Adjust URL based on platform
+    const URL =  pageToDelete.platform === 'facebook' ? '/api/facebook/delete-page' : '/api/twitter-v1.1/delete-account'; // Adjust URL based on platform
 
     try {
       const response = await fetch(URL, {
@@ -279,14 +281,20 @@ export default function FacebookConnectPage() {
     );
   }, [savePageToBackend]); // Dependency: `savePageToBackend` function
 
-  const handleAddTwitterAccount = useCallback(() => {
+  const handleAddTwitterAccount = useCallback( async () => {
     setTwitterLoading(true);
-    fetchWithAuth('/api/twitter/login')
-    // Simulate an async operation
-    setTimeout(() => {
-      setTwitterLoading(false);
-      alert('Twitter connection not yet implemented.');
-    }, 1500);
+    const response = await fetch('/api/twitter-v1.1/auth').finally(() => setTwitterLoading(false));
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to initiate authentication');
+    }
+    Cookies.set('twitter_oauth_secret', data.oauthTokenSecret, { expires: 5 / 1440 }); // 5 minutes
+    Cookies.set('temp_jwt', Cookies.get('jwt') || '', { expires: 5 / 1440 }); // 5 minutes
+
+    // Redirect to Twitter authorization page
+    window.location.href = data.authUrl;
+    console.log('Redirecting to Twitter auth URL:', data);
   }, []);
 
   return (
@@ -316,9 +324,7 @@ export default function FacebookConnectPage() {
         <Button
           variant="contained"
           size="large"
-          rel="noopener noreferrer"
-          href={'/api/twitter/login'}
-          target='_blank'
+          onClick={handleAddTwitterAccount}
           disabled={twitterLoading}
           startIcon={twitterLoading ? <CircularProgress size={20} color="inherit" /> : <TwitterIcon />}
           sx={{
