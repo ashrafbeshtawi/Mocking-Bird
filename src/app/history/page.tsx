@@ -17,15 +17,14 @@ import {
   TableRow,
   Paper,
   Chip,
-  Grid,
-  Pagination, // 👈 added
+  Pagination,
+  IconButton, // Added IconButton
 } from '@mui/material';
-import TwitterIcon from '@mui/icons-material/Twitter';
-import FacebookIcon from '@mui/icons-material/Facebook';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import DownloadForOfflineIcon from '@mui/icons-material/DownloadForOffline';
+import VisibilityIcon from '@mui/icons-material/Visibility'; // Added VisibilityIcon
 
 // Interface for a single publish history record
 interface PublishHistoryItem {
@@ -177,13 +176,14 @@ export default function PublishHistoryComponent() {
                       </TableCell>
                       <TableCell>
                         <a href={`/api/publish/download-report?id=${item.id}`} download>
-                          <Chip
-                            icon={<DownloadForOfflineIcon />}
-                            label="Download Report"
-                            variant="outlined"
-                            color="primary"
-                            size="small"
-                          />
+                          <IconButton color="primary" aria-label="download report">
+                            <DownloadForOfflineIcon />
+                          </IconButton>
+                        </a>
+                        <a href={`/history/report?id=${item.id}`} style={{ marginLeft: '8px' }}>
+                          <IconButton color="secondary" aria-label="view report">
+                            <VisibilityIcon />
+                          </IconButton>
                         </a>
                       </TableCell>
                     </TableRow>
