@@ -18,6 +18,8 @@ import {
   useTheme,
   SvgIcon,
   Divider,
+  Menu,
+  MenuItem,
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import { useState, useCallback } from 'react';
@@ -28,14 +30,31 @@ import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
 import HistoryIcon from '@mui/icons-material/History';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import InfoIcon from '@mui/icons-material/Info';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import SettingsIcon from '@mui/icons-material/Settings';
+import ChatIcon from '@mui/icons-material/Chat';
 
-const getNavLinks = (isLoggedIn: boolean) =>
+interface NavLink {
+  href?: string;
+  label: string;
+  icon?: typeof SvgIcon;
+  children?: { href: string; label: string; icon?: typeof SvgIcon }[];
+}
+
+const getNavLinks = (isLoggedIn: boolean): NavLink[] =>
   isLoggedIn
     ? [
         { href: '/dashboard', label: 'Dashboard', icon: DashboardIcon },
         { href: '/publish', label: 'Publish', icon: RocketLaunchIcon },
         { href: '/history', label: 'History', icon: HistoryIcon },
-        { href: '/ai', label: 'AI Tools', icon: AutoAwesomeIcon },
+        {
+          label: 'AI Tools',
+          icon: AutoAwesomeIcon,
+          children: [
+            { href: '/ai/openai-config', label: 'OpenAI Config', icon: SettingsIcon },
+            { href: '/ai/prompts', label: 'AI Prompts', icon: ChatIcon },
+          ],
+        },
         { href: '/about', label: 'About', icon: InfoIcon },
       ]
     : [
@@ -49,6 +68,7 @@ export default function Navbar() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
 
   const { isLoggedIn, setIsLoggedIn } = useAuth();
 
@@ -56,6 +76,22 @@ export default function Navbar() {
     () => setDrawerOpen((prev) => !prev),
     []
   );
+
+  const handleMenuOpen = useCallback((event: React.MouseEvent<HTMLElement>) => {
+    setAnchorEl(event.currentTarget);
+  }, []);
+
+  const handleMenuClose = useCallback(() => {
+    setAnchorEl(null);
+  }, []);
+
+  const handleMenuMouseEnter = useCallback((event: React.MouseEvent<HTMLElement>) => {
+    setAnchorEl(event.currentTarget);
+  }, []);
+
+  const handleMenuMouseLeave = useCallback(() => {
+    setAnchorEl(null);
+  }, []);
 
   const handleLogout = useCallback(async () => {
     try {
@@ -90,26 +126,60 @@ export default function Navbar() {
     >
       <List>
         {currentNavLinks.map((item) => (
-          <ListItem key={item.href} disablePadding>
-            <ListItemButton
-              component={Link}
-              href={item.href}
-              selected={pathname === item.href}
-              sx={{
-                '&.Mui-selected': {
-                  color: theme.palette.primary.main,
-                  fontWeight: theme.typography.fontWeightBold,
-                  backgroundColor: theme.palette.action.selected,
-                },
-                '&:hover': {
-                  backgroundColor: theme.palette.action.hover,
-                },
-              }}
-            >
-              <item.icon sx={{ mr: 2, color: pathname === item.href ? theme.palette.primary.main : theme.palette.text.secondary }} />
-              <ListItemText primary={item.label} />
-            </ListItemButton>
-          </ListItem>
+          item.href ? (
+            <ListItem key={item.href} disablePadding>
+              <ListItemButton
+                component={Link}
+                href={item.href}
+                selected={pathname === item.href}
+                sx={{
+                  '&.Mui-selected': {
+                    color: theme.palette.primary.main,
+                    fontWeight: theme.typography.fontWeightBold,
+                    backgroundColor: theme.palette.action.selected,
+                  },
+                  '&:hover': {
+                    backgroundColor: theme.palette.action.hover,
+                  },
+                }}
+              >
+                {item.icon && <item.icon sx={{ mr: 2, color: pathname === item.href ? theme.palette.primary.main : theme.palette.text.secondary }} />}
+                <ListItemText primary={item.label} />
+              </ListItemButton>
+            </ListItem>
+          ) : (
+            <Box key={item.label}>
+              <ListItem disablePadding>
+                <ListItemButton>
+                  {item.icon && <item.icon sx={{ mr: 2, color: theme.palette.text.secondary }} />}
+                  <ListItemText primary={item.label} />
+                </ListItemButton>
+              </ListItem>
+              <List component="div" disablePadding sx={{ pl: 4 }}>
+                {item.children?.map((child) => (
+                  <ListItem key={child.href} disablePadding>
+                    <ListItemButton
+                      component={Link}
+                      href={child.href}
+                      selected={pathname === child.href}
+                      sx={{
+                        '&.Mui-selected': {
+                          color: theme.palette.primary.main,
+                          fontWeight: theme.typography.fontWeightBold,
+                          backgroundColor: theme.palette.action.selected,
+                        },
+                        '&:hover': {
+                          backgroundColor: theme.palette.action.hover,
+                        },
+                      }}
+                    >
+                      <ListItemText primary={child.label} />
+                    </ListItemButton>
+                  </ListItem>
+                ))}
+              </List>
+            </Box>
+          )
         ))}
         <Divider />
         {!isLoggedIn ? (
@@ -164,34 +234,120 @@ export default function Navbar() {
             gap: 4,
           }}
         >
-          {currentNavLinks.map(({ href, label, icon: IconComponent }) => (
-            <Button
-              key={href}
-              component={Link}
-              href={href}
-              startIcon={<IconComponent />}
-              sx={{
-                color: pathname === href
-                  ? theme.palette.primary.main
-                  : theme.palette.text.secondary,
-                fontWeight: pathname === href ? 700 : 400,
-                textTransform: 'none',
-                position: 'relative',
-                '&::after': {
-                  content: '""',
-                  position: 'absolute',
-                  bottom: -8,
-                  left: 0,
-                  width: '100%',
-                  height: '2px',
-                  backgroundColor: pathname === href ? theme.palette.primary.main : 'transparent',
-                  transition: 'background-color 0.3s ease',
-                },
-                
-              }}
-            >
-              {label}
-            </Button>
+          {currentNavLinks.map((item) => (
+            item.href ? (
+              <Button
+                key={item.href}
+                component={Link}
+                href={item.href}
+                startIcon={item.icon && <item.icon />}
+                sx={{
+                  color: pathname === item.href
+                    ? theme.palette.primary.main
+                    : theme.palette.text.secondary,
+                  fontWeight: pathname === item.href ? 700 : 400,
+                  textTransform: 'none',
+                  position: 'relative',
+                  '&::after': {
+                    content: '""',
+                    position: 'absolute',
+                    bottom: -8,
+                    left: 0,
+                    width: '100%',
+                    height: '2px',
+                    backgroundColor: pathname === item.href ? theme.palette.primary.main : 'transparent',
+                    transition: 'background-color 0.3s ease',
+                  },
+                }}
+              >
+                {item.label}
+              </Button>
+            ) : (
+              <Box 
+                key={item.label}
+                onMouseEnter={handleMenuMouseEnter}
+                onMouseLeave={handleMenuMouseLeave}
+              >
+                <Button
+                  startIcon={item.icon && <item.icon />}
+                  endIcon={<KeyboardArrowDownIcon />}
+                  sx={{
+                    color: item.children?.some(child => pathname === child.href)
+                      ? theme.palette.primary.main
+                      : theme.palette.text.secondary,
+                    fontWeight: item.children?.some(child => pathname === child.href) ? 700 : 400,
+                    textTransform: 'none',
+                  }}
+                >
+                  {item.label}
+                </Button>
+                <Menu
+                  anchorEl={anchorEl}
+                  open={Boolean(anchorEl)}
+                  onClose={handleMenuClose}
+                  MenuListProps={{
+                    onMouseLeave: handleMenuMouseLeave,
+                  }}
+                  anchorOrigin={{
+                    vertical: 'bottom',
+                    horizontal: 'left',
+                  }}
+                  transformOrigin={{
+                    vertical: 'top',
+                    horizontal: 'left',
+                  }}
+                  sx={{
+                    '& .MuiPaper-root': {
+                      mt: 1,
+                      minWidth: 200,
+                      borderRadius: 2,
+                      boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                    },
+                  }}
+                >
+                  {item.children?.map((child) => (
+                    <MenuItem
+                      key={child.href}
+                      component={Link}
+                      href={child.href}
+                      onClick={handleMenuClose}
+                      selected={pathname === child.href}
+                      sx={{
+                        py: 1.5,
+                        px: 2,
+                        gap: 2,
+                        '&.Mui-selected': {
+                          backgroundColor: theme.palette.primary.main + '15',
+                          color: theme.palette.primary.main,
+                          fontWeight: theme.typography.fontWeightBold,
+                          '&:hover': {
+                            backgroundColor: theme.palette.primary.main + '25',
+                          },
+                        },
+                        '&:hover': {
+                          backgroundColor: theme.palette.action.hover,
+                        },
+                        transition: 'all 0.2s ease',
+                      }}
+                    >
+                      {child.icon && (
+                        <child.icon 
+                          sx={{ 
+                            fontSize: 20,
+                            color: pathname === child.href 
+                              ? theme.palette.primary.main 
+                              : theme.palette.text.secondary 
+                          }} 
+                        />
+                      )}
+                      <Typography variant="body2" sx={{ fontWeight: pathname === child.href ? 600 : 400 }}>
+                        {child.label}
+                      </Typography>
+                    </MenuItem>
+                  ))}
+                </Menu>
+              </Box>
+            )
           ))}
 
           {!isLoggedIn ? (

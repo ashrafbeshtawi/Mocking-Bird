@@ -21,3 +21,8 @@ CREATE TRIGGER set_updated_at_timestamp
 BEFORE UPDATE ON connected_x_accounts_v1_1
 FOR EACH ROW
 EXECUTE PROCEDURE set_timestamp();
+
+
+ALTER TABLE connected_x_accounts_v1_1
+ADD CONSTRAINT connected_x_accounts_v1_1_user_x_user_unique
+UNIQUE (user_id, x_user_id);
