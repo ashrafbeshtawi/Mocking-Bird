@@ -217,7 +217,7 @@ export default function AiPromptsPage() {
       )}
 
         <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
-          These saved AI prompts can be used to configure custom content for specific pages/accounts, where the original post is transformed using an AI model according to your prompt. For example, you can create a prompt to "Summarize the content in 100 characters" or "Rewrite the post in a professional tone."
+          These saved AI prompts can be used to configure custom content for specific pages/accounts, where the original post is transformed using an AI model according to your prompt. For example, you can create a prompt to &quot;Summarize the content in 100 characters&quot; or &quot;Rewrite the post in a professional tone.&quot;
         </Typography>
 
       {/* "Add Prompt" Button - Top Left Position */}
@@ -240,7 +240,7 @@ export default function AiPromptsPage() {
         </Typography>
         {prompts.length === 0 ? (
           <Typography variant="body1" color="text.secondary" sx={{ mt: 2 }}>
-            You haven't saved any prompts yet. Click the "Add Prompt" button to get started.
+            You haven&apos;t saved any prompts yet. Click the &quot;Add Prompt&quot; button to get started.
           </Typography>
         ) : (
           <List>
@@ -384,7 +384,7 @@ export default function AiPromptsPage() {
         <DialogTitle id="alert-dialog-title">{"Confirm Deletion"}</DialogTitle>
         <DialogContent>
           <DialogContentText id="alert-dialog-description">
-            Are you sure you want to delete the prompt "{promptToDeleteTitle}"? This action cannot be undone.
+            Are you sure you want to delete the prompt &quot;{promptToDeleteTitle}&quot;? This action cannot be undone.
           </DialogContentText>
         </DialogContent>
         <DialogActions>
