@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { oauth } from '@/lib/twitter-auth/twitter-client';
 
 export async function GET(req: NextRequest) {
-  const callbackUrl = `http://localhost:3000/api/twitter-v1.1/auth/callback`;
-  
+  const url = new URL(req.url);
+  const callbackUrl = url.origin + `/api/twitter-v1.1/auth/callback`;
+
   const requestData = {
     url: 'https://api.twitter.com/oauth/request_token',
     method: 'POST',
@@ -23,7 +24,7 @@ export async function GET(req: NextRequest) {
     const oauthTokenSecret = params.get('oauth_token_secret');
 
     if (!oauthToken || !oauthTokenSecret) {
-        return NextResponse.redirect(new URL('/error?statusCode=401&message=Something went wrong with the Twitter authentication', req.url));
+        return NextResponse.json({ error: 'Something went wrong with the Twitter authentication' }, { status: 401 });
     }
 
     // Store token secret temporarily (use Redis/DB in production)
