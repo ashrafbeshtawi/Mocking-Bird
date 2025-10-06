@@ -20,6 +20,7 @@ import {
   Divider,
   Menu,
   MenuItem,
+  Collapse, // Import Collapse
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import { useState, useCallback } from 'react';
@@ -33,6 +34,8 @@ import InfoIcon from '@mui/icons-material/Info';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import SettingsIcon from '@mui/icons-material/Settings';
 import ChatIcon from '@mui/icons-material/Chat';
+import ExpandLess from '@mui/icons-material/ExpandLess'; // Import ExpandLess
+import ExpandMore from '@mui/icons-material/ExpandMore'; // Import ExpandMore
 
 interface NavLink {
   href?: string;
@@ -69,8 +72,13 @@ export default function Navbar() {
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [openSubMenu, setOpenSubMenu] = useState<string | null>(null); // State for mobile sub-menu
 
   const { isLoggedIn, setIsLoggedIn } = useAuth();
+
+  const handleSubMenuClick = useCallback((label: string) => {
+    setOpenSubMenu((prev) => (prev === label ? null : label));
+  }, []);
 
   const handleDrawerToggle = useCallback(
     () => setDrawerOpen((prev) => !prev),
@@ -115,7 +123,6 @@ export default function Navbar() {
 
   const drawer = (
     <Box
-      onClick={handleDrawerToggle}
       sx={{
         width: 250,
         bgcolor: theme.palette.background.paper,
@@ -132,6 +139,7 @@ export default function Navbar() {
                 component={Link}
                 href={item.href}
                 selected={pathname === item.href}
+                onClick={handleDrawerToggle} // Close drawer on click for leaf items
                 sx={{
                   '&.Mui-selected': {
                     color: theme.palette.primary.main,
@@ -149,35 +157,38 @@ export default function Navbar() {
             </ListItem>
           ) : (
             <Box key={item.label}>
-              <ListItem disablePadding>
-                <ListItemButton>
-                  {item.icon && <item.icon sx={{ mr: 2, color: theme.palette.text.secondary }} />}
-                  <ListItemText primary={item.label} />
-                </ListItemButton>
-              </ListItem>
-              <List component="div" disablePadding sx={{ pl: 4 }}>
-                {item.children?.map((child) => (
-                  <ListItem key={child.href} disablePadding>
-                    <ListItemButton
-                      component={Link}
-                      href={child.href}
-                      selected={pathname === child.href}
-                      sx={{
-                        '&.Mui-selected': {
-                          color: theme.palette.primary.main,
-                          fontWeight: theme.typography.fontWeightBold,
-                          backgroundColor: theme.palette.action.selected,
-                        },
-                        '&:hover': {
-                          backgroundColor: theme.palette.action.hover,
-                        },
-                      }}
-                    >
-                      <ListItemText primary={child.label} />
-                    </ListItemButton>
-                  </ListItem>
-                ))}
-              </List>
+              <ListItemButton onClick={() => handleSubMenuClick(item.label)}>
+                {item.icon && <item.icon sx={{ mr: 2, color: theme.palette.text.secondary }} />}
+                <ListItemText primary={item.label} />
+                {openSubMenu === item.label ? <ExpandLess /> : <ExpandMore />}
+              </ListItemButton>
+              <Collapse in={openSubMenu === item.label} timeout="auto" unmountOnExit>
+                <List component="div" disablePadding sx={{ pl: 4 }}>
+                  {item.children?.map((child) => (
+                    <ListItem key={child.href} disablePadding>
+                      <ListItemButton
+                        component={Link}
+                        href={child.href}
+                        selected={pathname === child.href}
+                        onClick={handleDrawerToggle} // Close drawer on click for sub-menu items
+                        sx={{
+                          '&.Mui-selected': {
+                            color: theme.palette.primary.main,
+                            fontWeight: theme.typography.fontWeightBold,
+                            backgroundColor: theme.palette.action.selected,
+                          },
+                          '&:hover': {
+                            backgroundColor: theme.palette.action.hover,
+                          },
+                        }}
+                      >
+                        {child.icon && <child.icon sx={{ mr: 2, color: pathname === child.href ? theme.palette.primary.main : theme.palette.text.secondary }} />}
+                        <ListItemText primary={child.label} />
+                      </ListItemButton>
+                    </ListItem>
+                  ))}
+                </List>
+              </Collapse>
             </Box>
           )
         ))}
@@ -185,12 +196,12 @@ export default function Navbar() {
         {!isLoggedIn ? (
           <>
             <ListItem disablePadding>
-              <ListItemButton component={Link} href="/login">
+              <ListItemButton component={Link} href="/login" onClick={handleDrawerToggle}>
                 <ListItemText primary="Login" />
               </ListItemButton>
             </ListItem>
             <ListItem disablePadding>
-              <ListItemButton component={Link} href="/register">
+              <ListItemButton component={Link} href="/register" onClick={handleDrawerToggle}>
                 <ListItemText primary="Register" />
               </ListItemButton>
             </ListItem>
