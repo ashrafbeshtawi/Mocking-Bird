@@ -1,12 +1,8 @@
 import { NextResponse } from 'next/server';
-import { Pool } from 'pg';
+import pool from '@/lib/db';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { serialize } from 'cookie';
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_STRING,
-});
 
 export async function POST(req: Request) {
   const { username, password } = await req.json();

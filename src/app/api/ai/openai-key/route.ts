@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Pool } from 'pg';
-
-const pool = new Pool({ connectionString: process.env.DATABASE_STRING });
+import pool from '@/lib/db';
 
 // Utility to get and validate user ID from headers
 const getUserId = (req: NextRequest): number | null => {

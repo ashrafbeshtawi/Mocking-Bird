@@ -1,10 +1,8 @@
 // app/api/twitter/callback/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
-import { Pool } from 'pg';
+import pool from '@/lib/db';
 import { verifyAuthToken } from '@/lib/auth-utils';
-
-const pool = new Pool({ connectionString: process.env.DATABASE_STRING });
 
 export async function GET(req: NextRequest) {
   try {

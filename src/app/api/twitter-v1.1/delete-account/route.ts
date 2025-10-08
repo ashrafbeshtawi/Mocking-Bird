@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Pool } from 'pg';
+import pool from '@/lib/db';
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_STRING, // Assuming DATABASE_URL is used consistently
-});
 
 export async function DELETE(req: NextRequest) {
   const userId = req.headers.get('x-user-id');

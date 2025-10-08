@@ -1,11 +1,9 @@
 // /pages/api/publish.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { Pool } from 'pg';
+import pool from '@/lib/db';
 import { FacebookPublisher } from '@/lib/publishers/facebook';
 import { TwitterPublisherV1 } from '@/lib/publishers/twitterv1.1';
 import { FailedPublishResult, SuccessfulPublishResult, PublishResponseData, FacebookFailedItem, TwitterFailedItem, FacebookSuccessItem, TwitterSuccessItem, ApiResponse, MediaFile } from '@/types/interfaces';
-
-const pool = new Pool({ connectionString: process.env.DATABASE_STRING });
 
 // Simple logger utility
 const logger = {

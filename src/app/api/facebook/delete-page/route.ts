@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Pool } from 'pg';
-
-// Initialize PostgreSQL connection pool
-const pool = new Pool({
-  connectionString: process.env.DATABASE_STRING, // Ensure this env variable is set
-});
+import pool from '@/lib/db';
 
 export async function DELETE(req: NextRequest) {
   try {

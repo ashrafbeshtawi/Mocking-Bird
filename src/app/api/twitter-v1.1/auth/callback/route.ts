@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { oauth } from '@/lib/twitter-auth/twitter-client';
 import { verifyAuthToken } from '@/lib/auth-utils';
-import { Pool } from 'pg';
-
-const pool = new Pool({ connectionString: process.env.DATABASE_STRING });
+import pool from '@/lib/db';
 
 
 export async function GET(req: NextRequest) {

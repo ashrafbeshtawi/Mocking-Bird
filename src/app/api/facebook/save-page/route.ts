@@ -1,12 +1,7 @@
 // app/api/save-page/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
-import { Pool } from 'pg';
-
-// Initialize PostgreSQL connection pool
-const pool = new Pool({
-  connectionString: process.env.DATABASE_STRING,
-});
+import pool from '@/lib/db';
 
 // Define the expected structure of the request body
 type RequestBody = {
