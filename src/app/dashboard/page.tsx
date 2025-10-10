@@ -256,7 +256,7 @@ export default function FacebookConnectPage() {
       },
       {
         // 🚨 Define the required permissions (scopes) for your app
-        scope: 'pages_show_list,pages_read_engagement,pages_manage_posts,pages_manage_engagement,pages_read_user_content,instagram_basic,instagram_content_publish',
+        scope: 'pages_show_list,pages_read_engagement,pages_manage_posts,pages_manage_engagement,pages_read_user_content,instagram_basic,instagram_content_publish,business_management',
       }
     );
   }, [savePageToBackend]); // Dependency: `savePageToBackend` function
