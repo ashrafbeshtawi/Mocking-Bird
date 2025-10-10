@@ -38,23 +38,6 @@ declare global {
   }
 }
 
-// Interfaces for Facebook Graph API responses
-interface Page {
-  id: string;
-  name: string;
-  access_token: string;
-}
-
-interface PagesResponse {
-  data: Page[];
-  paging?: { // Paging is optional as it might not always be present
-    cursors: {
-      before: string;
-      after: string;
-    };
-  };
-}
-
 // Interface for connected pages from our backend
 interface ConnectedPage {
   page_id: string;
@@ -273,9 +256,6 @@ export default function FacebookConnectPage() {
       },
       {
         // 🚨 Define the required permissions (scopes) for your app
-        // 'pages_show_list': To list the pages the user manages
-        // 'pages_read_engagement': To read content and engagement data from pages
-        // 'pages_manage_posts': To create, edit, and delete page posts
         scope: 'pages_show_list,pages_read_engagement,pages_manage_posts,pages_manage_engagement,pages_read_user_content,instagram_basic,instagram_content_publish',
       }
     );
