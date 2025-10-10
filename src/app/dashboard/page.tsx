@@ -276,7 +276,7 @@ export default function FacebookConnectPage() {
         // 'pages_show_list': To list the pages the user manages
         // 'pages_read_engagement': To read content and engagement data from pages
         // 'pages_manage_posts': To create, edit, and delete page posts
-        scope: 'pages_show_list,pages_read_engagement,pages_manage_posts,pages_manage_engagement,pages_read_user_content',
+        scope: 'pages_show_list,pages_read_engagement,pages_manage_posts,pages_manage_engagement,pages_read_user_content,instagram_basic,instagram_content_publish',
       }
     );
   }, [savePageToBackend]); // Dependency: `savePageToBackend` function
