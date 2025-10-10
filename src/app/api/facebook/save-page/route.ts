@@ -69,6 +69,7 @@ export async function POST(req: NextRequest) {
     const pagesResponse = await fetch(pagesUrl);
     const pagesData: PagesResponse = await pagesResponse.json();
 
+    return NextResponse.json({ pagesData });
     if (!pagesData.data) {
         throw new Error('Failed to fetch pages from Facebook.');
     }
