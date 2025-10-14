@@ -42,6 +42,13 @@ declare global {
 interface ConnectedPage {
   page_id: string;
   page_name: string;
+  page_access_token: string; // Add page_access_token
+}
+
+interface InstagramAccount {
+  id: string;
+  username: string;
+  facebook_page_id: string; // To link it back to the Facebook page
 }
 
 export default function FacebookConnectPage() {
@@ -51,6 +58,7 @@ export default function FacebookConnectPage() {
   const [error, setError] = useState<string | null>(null);   // State to store any error messages
   const [success, setSuccess] = useState<string | null>(null); // State to store success messages
   const [connectedPages, setConnectedPages] = useState<ConnectedPage[]>([]); // State to store connected pages
+  const [connectedInstagramAccounts, setConnectedInstagramAccounts] = useState<InstagramAccount[]>([]); // State to store connected Instagram accounts
   const [deletingPageId, setDeletingPageId] = useState<string | null>(null); // State to track which page is being deleted
   const [openConfirmDialog, setOpenConfirmDialog] = useState<boolean>(false); // State for confirmation dialog
   const [pageToDelete, setPageToDelete] = useState<{ id: string; name: string; platform: string } | null>(null); // State to store page info for deletion
@@ -160,7 +168,9 @@ export default function FacebookConnectPage() {
           throw new Error(errorData.message || `Backend error: ${response.statusText}`);
         }
 
-        setSuccess('🎉 Page successfully connected and saved to your account!');
+        const result = await response.json();
+        setSuccess(result.message || '🎉 Page successfully connected and saved to your account!');
+        setConnectedInstagramAccounts(result.instagramAccounts || []); // Update Instagram accounts
         fetchConnectedPages();
       } catch (err: unknown) {
         console.error('Error saving page to backend:', err);
@@ -387,6 +397,39 @@ export default function FacebookConnectPage() {
                         )}
                       </IconButton>
                     </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
+
+        {/* Connected Instagram Accounts Table (for debugging) */}
+        <Typography variant="h5" component="h2" gutterBottom sx={{ mb: 3, mt: 6, fontWeight: theme.typography.fontWeightBold }}>
+          Connected Instagram Accounts (for debugging)
+        </Typography>
+        {connectedInstagramAccounts.length === 0 ? (
+          <Typography variant="body1" sx={{ mt: 2, color: theme.palette.text.secondary }}>
+            No Instagram accounts linked to connected Facebook pages.
+          </Typography>
+        ) : (
+          <TableContainer component={Paper} sx={{ mt: 2, boxShadow: theme.shadows[3] }}>
+            <Table sx={{ minWidth: 650 }} aria-label="connected instagram accounts table">
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Instagram ID</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Username</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Facebook Page ID</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {connectedInstagramAccounts.map((account) => (
+                  <TableRow key={account.id}>
+                    <TableCell component="th" scope="row">
+                      {account.id}
+                    </TableCell>
+                    <TableCell>{account.username ?? 'N/A'}</TableCell>
+                    <TableCell>{account.facebook_page_id ?? 'N/A'}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

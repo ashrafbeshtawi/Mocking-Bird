@@ -84,25 +84,73 @@ export async function POST(req: NextRequest) {
       for (const page of pagesData.data) {
         const longLivedPageToken = page.access_token;
         
+        let facebookPageDbId: number;
+
         const { rows } = await client.query(
-          'SELECT * FROM connected_facebook_pages WHERE user_id = $1 AND page_id = $2',
+          'SELECT id FROM connected_facebook_pages WHERE user_id = $1 AND page_id = $2',
           [parsedUserId, page.id]
         );
 
         if (rows.length > 0) {
           // 5. If the page exists for this user, update its token
           await client.query(
-            'UPDATE connected_facebook_pages SET page_access_token = $1, created_at = CURRENT_TIMESTAMP WHERE user_id = $2 AND page_id = $3',
+            'UPDATE connected_facebook_pages SET page_access_token = $1, created_at = CURRENT_TIMESTAMP WHERE user_id = $2 AND page_id = $3 RETURNING id',
             [longLivedPageToken, parsedUserId, page.id]
           );
+          facebookPageDbId = rows[0].id;
           console.log(`Page ${page.id} updated for user ${parsedUserId}.`);
         } else {
           // 6. If the page does not exist, insert a new record
-          await client.query(
-            'INSERT INTO connected_facebook_pages (user_id, page_id, page_name, page_access_token) VALUES ($1, $2, $3, $4)',
+          const insertResult = await client.query(
+            'INSERT INTO connected_facebook_pages (user_id, page_id, page_name, page_access_token) VALUES ($1, $2, $3, $4) RETURNING id',
             [parsedUserId, page.id, page.name, longLivedPageToken]
           );
+          facebookPageDbId = insertResult.rows[0].id;
           console.log(`Page ${page.id} inserted for user ${parsedUserId}.`);
+        }
+
+        // Fetch Instagram accounts for this Facebook page
+        try {
+          const instagramResponse = await fetch(
+            `https://graph.facebook.com/v19.0/${page.id}?fields=instagram_business_account&access_token=${page.access_token}`
+          );
+          const instagramData = await instagramResponse.json();
+
+          if (instagramData.instagram_business_account) {
+            const igAccountResponse = await fetch(
+              `https://graph.facebook.com/v19.0/${instagramData.instagram_business_account.id}?fields=username,name&access_token=${page.access_token}`
+            );
+            const igAccountData = await igAccountResponse.json();
+
+            if (igAccountData.username) {
+              const instagramAccountId = instagramData.instagram_business_account.id;
+              const instagramUsername = igAccountData.username;
+              const instagramDisplayName = igAccountData.name;
+
+              const { rows: igRows } = await client.query(
+                'SELECT * FROM connected_instagram_accounts WHERE instagram_account_id = $1 AND facebook_page_id = $2',
+                [instagramAccountId, facebookPageDbId]
+              );
+
+              if (igRows.length > 0) {
+                // Update existing Instagram account
+                await client.query(
+                  'UPDATE connected_instagram_accounts SET username = $1, display_name = $2 WHERE instagram_account_id = $3 AND facebook_page_id = $4',
+                  [instagramUsername, instagramDisplayName, instagramAccountId, facebookPageDbId]
+                );
+                console.log(`Instagram account ${instagramAccountId} updated for Facebook page DB ID ${facebookPageDbId}.`);
+              } else {
+                // Insert new Instagram account
+                await client.query(
+                  'INSERT INTO connected_instagram_accounts (instagram_account_id, username, display_name, facebook_page_id) VALUES ($1, $2, $3, $4)',
+                  [instagramAccountId, instagramUsername, instagramDisplayName, facebookPageDbId]
+                );
+                console.log(`Instagram account ${instagramAccountId} inserted for Facebook page DB ID ${facebookPageDbId}.`);
+              }
+            }
+          }
+        } catch (igError) {
+          console.error(`[SavePage API Error] Error fetching or saving Instagram for page ${page.name}:`, igError);
         }
       }
 
@@ -117,7 +165,10 @@ export async function POST(req: NextRequest) {
       client.release(); // Always release the client back to the pool
     }
 
-    return NextResponse.json({ success: true, message: 'Facebook pages saved successfully!' });
+    return NextResponse.json({ 
+      success: true, 
+      message: 'Facebook pages and linked Instagram accounts saved successfully!'
+    });
   } catch (error) {
     console.error('[SavePage API Error]', error);
     return NextResponse.json({ error: 'Internal Server Error.' }, { status: 500 });
