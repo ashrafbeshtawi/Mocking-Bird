@@ -47,8 +47,9 @@ interface ConnectedPage {
 
 interface InstagramAccount {
   id: string;
-  username: string;
-  facebook_page_id: string; // To link it back to the Facebook page
+  name: string;
+  displayName: string;
+  facebookPageId: string; // To link it back to the Facebook page
 }
 
 export default function FacebookConnectPage() {
@@ -59,9 +60,10 @@ export default function FacebookConnectPage() {
   const [success, setSuccess] = useState<string | null>(null); // State to store success messages
   const [connectedPages, setConnectedPages] = useState<ConnectedPage[]>([]); // State to store connected pages
   const [connectedInstagramAccounts, setConnectedInstagramAccounts] = useState<InstagramAccount[]>([]); // State to store connected Instagram accounts
-  const [deletingPageId, setDeletingPageId] = useState<string | null>(null); // State to track which page is being deleted
+  const [deletingAccountId, setDeletingAccountId] = useState<string | null>(null); // State to track which account is being deleted
   const [openConfirmDialog, setOpenConfirmDialog] = useState<boolean>(false); // State for confirmation dialog
   const [pageToDelete, setPageToDelete] = useState<{ id: string; name: string; platform: string } | null>(null); // State to store page info for deletion
+  const [accountToDelete, setAccountToDelete] = useState<{ id: string; name: string; platform: string } | null>(null); // State to store account info for deletion
   const [twitterLoading, setTwitterLoading] = useState<boolean>(false); // State to manage loading for Twitter connect
   const [connectedXAccounts, setConnectedXAccounts] = useState<{ id: string; name: string }[]>([]); // State for connected X accounts
 
@@ -82,6 +84,26 @@ export default function FacebookConnectPage() {
     } catch (err: unknown) {
       console.error('Error fetching connected X accounts:', err);
       // Optionally set an error state for X accounts
+    }
+  }, []);
+
+  // Function to fetch connected Instagram accounts from backend
+  const fetchConnectedInstagramAccounts = useCallback(async () => {
+    try {
+      const response = await fetchWithAuth('/api/instagram');
+      if (!response.ok) {
+        if (response.status === 401) {
+          window.location.href = '/login';
+          return;
+        }
+        const errorData = await response.json();
+        throw new Error(errorData.message || `Backend error: ${response.statusText}`);
+      }
+      const result = await response.json();
+      setConnectedInstagramAccounts(result.accounts || []);
+    } catch (err: unknown) {
+      console.error('Error fetching connected Instagram accounts:', err);
+      // Optionally set an error state for Instagram accounts
     }
   }, []);
 
@@ -135,10 +157,11 @@ export default function FacebookConnectPage() {
       document.body.appendChild(js);
     }
 
-    // Fetch connected pages when the component mounts
+    // Fetch connected accounts when the component mounts
     fetchConnectedPages();
     fetchConnectedXAccounts();
-  }, [fetchConnectedPages, fetchConnectedXAccounts]); // Dependency array includes fetchConnectedPages and fetchConnectedXAccounts
+    fetchConnectedInstagramAccounts();
+  }, [fetchConnectedPages, fetchConnectedXAccounts, fetchConnectedInstagramAccounts]); // Dependency array includes all fetch functions
 
 
   /**
@@ -170,8 +193,9 @@ export default function FacebookConnectPage() {
 
         const result = await response.json();
         setSuccess(result.message || '🎉 Page successfully connected and saved to your account!');
-        setConnectedInstagramAccounts(result.instagramAccounts || []); // Update Instagram accounts
+        // No need to update connectedInstagramAccounts here as fetchConnectedInstagramAccounts will do it
         fetchConnectedPages();
+        fetchConnectedInstagramAccounts(); // Fetch Instagram accounts after saving a Facebook page
       } catch (err: unknown) {
         console.error('Error saving page to backend:', err);
         setError((err as Error)?.message || 'An unexpected error occurred while saving the page data.');
@@ -179,35 +203,53 @@ export default function FacebookConnectPage() {
         setLoading(false);
       }
     },
-    [fetchConnectedPages]
+    [fetchConnectedPages, fetchConnectedInstagramAccounts]
   );
 
   /**
-   * Opens the confirmation dialog for deleting a Facebook Page.
+   * Opens the confirmation dialog for deleting an account.
    */
-  const handleDeletePageClick = useCallback((pageId: string, pageName: string, platform: string) => {
-    setPageToDelete({ id: pageId, name: pageName, platform });
+  const handleDeleteAccountClick = useCallback((id: string, name: string, platform: string) => {
+    setAccountToDelete({ id, name, platform });
     setOpenConfirmDialog(true);
   }, []);
 
   /**
-   * Handles the actual deletion of a Facebook Page from the backend after confirmation.
+   * Handles the actual deletion of an account from the backend after confirmation.
    */
-  const confirmDeletePage = useCallback(async () => {
-    if (!pageToDelete) return;
+  const confirmDeleteAccount = useCallback(async () => {
+    if (!accountToDelete) return;
 
     setOpenConfirmDialog(false);
-    setDeletingPageId(pageToDelete.id);
+    setDeletingAccountId(accountToDelete.id);
     setError(null);
     setSuccess(null);
-    const URL =  pageToDelete.platform === 'facebook' ? '/api/facebook/delete-page' : '/api/twitter-v1.1/delete-account'; // Adjust URL based on platform
+
+    let URL = '';
+    let body = {};
+
+    if (accountToDelete.platform === 'facebook') {
+      URL = '/api/facebook/delete-page';
+      body = { page_id: accountToDelete.id };
+    } else if (accountToDelete.platform === 'twitter') {
+      URL = '/api/twitter-v1.1/delete-account';
+      body = { page_id: accountToDelete.id }; // Twitter API expects page_id
+    } else if (accountToDelete.platform === 'instagram') {
+      URL = '/api/instagram';
+      body = { instagram_account_id: accountToDelete.id }; // Instagram API expects instagram_account_id
+    } else {
+      setError('Unsupported platform for deletion.');
+      setDeletingAccountId(null);
+      setAccountToDelete(null);
+      return;
+    }
 
     try {
       const response = await fetch(URL, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include', // 🔑 send cookie automatically
-        body: JSON.stringify({ page_id: pageToDelete.id }),
+        body: JSON.stringify(body),
       });
 
       if (!response.ok) {
@@ -219,24 +261,25 @@ export default function FacebookConnectPage() {
         throw new Error(errorData.message || `Backend error: ${response.statusText}`);
       }
 
-      setSuccess('🗑️ page deleted successfully!');
+      setSuccess('🗑️ Account disconnected successfully!');
       fetchConnectedPages();
       fetchConnectedXAccounts();
+      fetchConnectedInstagramAccounts();
     } catch (err: unknown) {
-      console.error('Error deleting page:', err);
-      setError((err as Error)?.message || 'An unexpected error occurred while deleting the page.');
+      console.error('Error deleting account:', err);
+      setError((err as Error)?.message || 'An unexpected error occurred while deleting the account.');
     } finally {
-      setDeletingPageId(null);
-      setPageToDelete(null);
+      setDeletingAccountId(null);
+      setAccountToDelete(null);
     }
-  }, [pageToDelete, fetchConnectedPages, fetchConnectedXAccounts]);
+  }, [accountToDelete, fetchConnectedPages, fetchConnectedXAccounts, fetchConnectedInstagramAccounts]);
 
   /**
    * Closes the confirmation dialog without deleting.
    */
   const handleCloseConfirmDialog = useCallback(() => {
     setOpenConfirmDialog(false);
-    setPageToDelete(null);
+    setAccountToDelete(null);
   }, []);
 
 
@@ -386,11 +429,11 @@ export default function FacebookConnectPage() {
                     <TableCell>
                       <IconButton
                         aria-label="delete"
-                        onClick={() => handleDeletePageClick(page.page_id, page.page_name ?? 'N/A', 'facebook')}
+                        onClick={() => handleDeleteAccountClick(page.page_id, page.page_name ?? 'N/A', 'facebook')}
                         color="error"
-                        disabled={deletingPageId === page.page_id}
+                        disabled={deletingAccountId === page.page_id}
                       >
-                        {deletingPageId === page.page_id ? (
+                        {deletingAccountId === page.page_id ? (
                           <CircularProgress size={20} color="inherit" />
                         ) : (
                           <DeleteIcon />
@@ -404,9 +447,9 @@ export default function FacebookConnectPage() {
           </TableContainer>
         )}
 
-        {/* Connected Instagram Accounts Table (for debugging) */}
+        {/* Connected Instagram Accounts Table */}
         <Typography variant="h5" component="h2" gutterBottom sx={{ mb: 3, mt: 6, fontWeight: theme.typography.fontWeightBold }}>
-          Connected Instagram Accounts (for debugging)
+          Connected Instagram Accounts
         </Typography>
         {connectedInstagramAccounts.length === 0 ? (
           <Typography variant="body1" sx={{ mt: 2, color: theme.palette.text.secondary }}>
@@ -419,7 +462,8 @@ export default function FacebookConnectPage() {
                 <TableRow>
                   <TableCell sx={{ fontWeight: 'bold' }}>Instagram ID</TableCell>
                   <TableCell sx={{ fontWeight: 'bold' }}>Username</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Facebook Page ID</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Display Name</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -428,8 +472,22 @@ export default function FacebookConnectPage() {
                     <TableCell component="th" scope="row">
                       {account.id}
                     </TableCell>
-                    <TableCell>{account.username ?? 'N/A'}</TableCell>
-                    <TableCell>{account.facebook_page_id ?? 'N/A'}</TableCell>
+                    <TableCell>{account.name ?? 'N/A'}</TableCell>
+                    <TableCell>{account.displayName ?? 'N/A'}</TableCell>
+                    <TableCell>
+                      <IconButton
+                        aria-label="delete"
+                        onClick={() => handleDeleteAccountClick(account.id, account.name ?? 'N/A', 'instagram')}
+                        color="error"
+                        disabled={deletingAccountId === account.id}
+                      >
+                        {deletingAccountId === account.id ? (
+                          <CircularProgress size={20} color="inherit" />
+                        ) : (
+                          <DeleteIcon />
+                        )}
+                      </IconButton>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -443,7 +501,7 @@ export default function FacebookConnectPage() {
         </Typography>
         {connectedXAccounts.length === 0 ? (
           <Typography variant="body1" sx={{ mt: 2, color: theme.palette.text.secondary }}>
-            No X accounts connected yet. Click &apos;Add Twitter Account&apos; to connect one.
+            No X accounts connected yet. Click 'Add Twitter Account' to connect one.
           </Typography>
         ) : (
           <TableContainer component={Paper} sx={{ mt: 2, boxShadow: theme.shadows[3] }}>
@@ -452,6 +510,7 @@ export default function FacebookConnectPage() {
                 <TableRow>
                   <TableCell sx={{ fontWeight: 'bold' }}>Account ID</TableCell>
                   <TableCell sx={{ fontWeight: 'bold' }}>Username</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -464,11 +523,11 @@ export default function FacebookConnectPage() {
                     <TableCell>
                       <IconButton
                         aria-label="delete"
-                        onClick={() => handleDeletePageClick(account.id, account.name ?? 'N/A', 'twitter')}
+                        onClick={() => handleDeleteAccountClick(account.id, account.name ?? 'N/A', 'twitter')}
                         color="error"
-                        disabled={deletingPageId === account.id}
+                        disabled={deletingAccountId === account.id}
                       >
-                        {deletingPageId === account.id ? (
+                        {deletingAccountId === account.id ? (
                           <CircularProgress size={20} color="inherit" />
                         ) : (
                           <DeleteIcon />
@@ -493,14 +552,14 @@ export default function FacebookConnectPage() {
         <DialogTitle id="alert-dialog-title">{"Confirm Deletion"}</DialogTitle>
         <DialogContent>
           <DialogContentText id="alert-dialog-description">
-            Are you sure you want to delete the page {pageToDelete?.name} (ID: {pageToDelete?.id})? This action cannot be undone.
+            Are you sure you want to delete the {accountToDelete?.platform} account "{accountToDelete?.name}" (ID: {accountToDelete?.id})? This action cannot be undone.
           </DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseConfirmDialog} color="primary">
             Cancel
           </Button>
-          <Button onClick={confirmDeletePage} color="error" autoFocus>
+          <Button onClick={confirmDeleteAccount} color="error" autoFocus>
             Delete
           </Button>
         </DialogActions>
