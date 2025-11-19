@@ -24,6 +24,7 @@ import {
 } from '@mui/material';
 import TwitterIcon from '@mui/icons-material/Twitter';
 import FacebookIcon from '@mui/icons-material/Facebook';
+import InstagramIcon from '@mui/icons-material/Instagram'; // Added for Instagram icon
 import FileUploadIcon from '@mui/icons-material/FileUpload';
 import SentimentSatisfiedAltIcon from '@mui/icons-material/SentimentSatisfiedAlt'; // Added for emoji icon
 import { fetchWithAuth } from '@/lib/fetch';
@@ -39,6 +40,13 @@ interface ConnectedXAccount {
   name: string;
 }
 
+interface InstagramAccount {
+  id: string;
+  username: string;
+  displayName: string;
+  facebookPageId: string; // To link it back to the Facebook page
+}
+
 // Twitter character limit
 const TWITTER_CHAR_LIMIT = 280;
 
@@ -46,12 +54,14 @@ export default function PublishComponent() {
   const theme = useTheme();
   const [facebookPages, setFacebookPages] = useState<ConnectedPage[]>([]);
   const [xAccounts, setXAccounts] = useState<ConnectedXAccount[]>([]);
+  const [instagramAccounts, setInstagramAccounts] = useState<InstagramAccount[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<{ message: string; details?: unknown[] } | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [postText, setPostText] = useState<string>('');
   const [selectedFacebookPages, setSelectedFacebookPages] = useState<string[]>([]);
   const [selectedXAccounts, setSelectedXAccounts] = useState<string[]>([]);
+  const [selectedInstagramAccounts, setSelectedInstagramAccounts] = useState<Record<string, { publish: boolean; story: boolean }>>({});
   const [isPublishing, setIsPublishing] = useState<boolean>(false);
   const [publishResults, setPublishResults] = useState<{ successful: unknown[]; failed: unknown[] } | null>(null);
   const [mediaFiles, setMediaFiles] = useState<File[]>([]);
@@ -160,9 +170,22 @@ export default function PublishComponent() {
     }
   }, []);
 
-  // 💡 Add this new useEffect hook
-  // It runs whenever facebookPages or xAccounts arrays are populated.
-  // It automatically selects all IDs from the fetched data.
+  const fetchConnectedInstagramAccounts = useCallback(async () => {
+    try {
+      const response = await fetchWithAuth('/api/instagram');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to fetch Instagram accounts.');
+      }
+      const result = await response.json();
+      setInstagramAccounts(result.accounts);
+    } catch (err: unknown) {
+      console.error('Error fetching Instagram accounts:', err);
+      setError({ message: (err as Error)?.message || 'An unexpected error occurred while fetching Instagram accounts.' });
+    }
+  }, []);
+
+  // Effect to manage initial selection and refresh on data change
   useEffect(() => {
     if (facebookPages.length > 0) {
       setSelectedFacebookPages(facebookPages.map(page => page.page_id));
@@ -170,18 +193,25 @@ export default function PublishComponent() {
     if (xAccounts.length > 0) {
       setSelectedXAccounts(xAccounts.map(account => account.id));
     }
-  }, [facebookPages, xAccounts]);
+    if (instagramAccounts.length > 0) {
+      const initialInstagramSelection: Record<string, { publish: boolean; story: boolean }> = {};
+      instagramAccounts.forEach(account => {
+        initialInstagramSelection[account.id] = { publish: false, story: false };
+      });
+      setSelectedInstagramAccounts(initialInstagramSelection);
+    }
+  }, [facebookPages, xAccounts, instagramAccounts]);
 
   // Initial data fetch on component mount
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       setError(null);
-      await Promise.all([fetchConnectedPages(), fetchConnectedXAccounts()]);
+      await Promise.all([fetchConnectedPages(), fetchConnectedXAccounts(), fetchConnectedInstagramAccounts()]);
       setLoading(false);
     };
     fetchData();
-  }, [fetchConnectedPages, fetchConnectedXAccounts]);
+  }, [fetchConnectedPages, fetchConnectedXAccounts, fetchConnectedInstagramAccounts]);
 
   // Handle checkbox change for Facebook pages
   const handleFacebookChange = (pageId: string) => {
@@ -195,6 +225,20 @@ export default function PublishComponent() {
     setSelectedXAccounts((prev) =>
       prev.includes(accountId) ? prev.filter((id) => id !== accountId) : [...prev, accountId]
     );
+  };
+
+  // Handle checkbox change for Instagram accounts
+  const handleInstagramChange = (accountId: string, type: 'publish' | 'story') => {
+    setSelectedInstagramAccounts((prev) => {
+      const accountState = prev[accountId] || { publish: false, story: false };
+      return {
+        ...prev,
+        [accountId]: {
+          ...accountState,
+          [type]: !accountState[type],
+        },
+      };
+    });
   };
 
   const handleMediaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -234,6 +278,23 @@ export default function PublishComponent() {
     formData.append('text', postText);
     selectedFacebookPages.forEach((id) => formData.append('facebookPages', id));
     selectedXAccounts.forEach((id) => formData.append('xAccounts', id));
+    
+    // Add selected Instagram accounts and their publish types
+    const instagramPublishAccounts: string[] = [];
+    const instagramStoryAccounts: string[] = [];
+
+    Object.entries(selectedInstagramAccounts).forEach(([accountId, types]) => {
+      if (types.publish) {
+        instagramPublishAccounts.push(accountId);
+      }
+      if (types.story) {
+        instagramStoryAccounts.push(accountId);
+      }
+    });
+
+    instagramPublishAccounts.forEach((id) => formData.append('instagramPublishAccounts', id));
+    instagramStoryAccounts.forEach((id) => formData.append('instagramStoryAccounts', id));
+    
     mediaFiles.forEach((file) => formData.append('media', file));
 
     try {
@@ -261,6 +322,12 @@ export default function PublishComponent() {
         // This resets the selection after a successful publish
         setSelectedFacebookPages(facebookPages.map(page => page.page_id));
         setSelectedXAccounts(xAccounts.map(account => account.id));
+        
+        const resetInstagramSelection: Record<string, { publish: boolean; story: boolean }> = {};
+        instagramAccounts.forEach(account => {
+          resetInstagramSelection[account.id] = { publish: false, story: false };
+        });
+        setSelectedInstagramAccounts(resetInstagramSelection);
       }
     } catch (err: unknown) {
       console.error('Publishing error:', err);
@@ -300,9 +367,11 @@ export default function PublishComponent() {
               <Box component="ul" sx={{ mt: 1, pl: 2 }}>
                 {publishResults.successful.map((item: unknown, index: number) => (
                   <Typography component="li" variant="body2" key={index}>
-                    {(item as { platform: string; page_id: string; account_id: string }).platform === 'facebook'
+                    {(item as { platform: string; page_id?: string; account_id?: string; instagram_account_id?: string }).platform === 'facebook'
                       ? `Facebook Page: ${(item as { page_id: string }).page_id}`
-                      : `X Account: ${(item as { account_id: string }).account_id}`}
+                      : (item as { platform: string; instagram_account_id?: string }).platform === 'instagram'
+                        ? `Instagram Account: ${(item as { instagram_account_id: string }).instagram_account_id}`
+                        : `X Account: ${(item as { account_id: string }).account_id}`}
                   </Typography>
                 ))}
               </Box>
@@ -316,9 +385,11 @@ export default function PublishComponent() {
               <Box component="ul" sx={{ mt: 1, pl: 2 }}>
                 {publishResults.failed.map((item: unknown, index: number) => (
                   <Typography component="li" variant="body2" key={index}>
-                    {(item as { platform: string; page_id?: string; account_id?: string }).platform === 'facebook'
+                    {(item as { platform: string; page_id?: string; account_id?: string; instagram_account_id?: string }).platform === 'facebook'
                       ? `Facebook Page: ${(item as { page_id?: string }).page_id}`
-                      : `X Account: ${(item as { account_id?: string }).account_id}`}
+                      : (item as { platform: string; instagram_account_id?: string }).platform === 'instagram'
+                        ? `Instagram Account: ${(item as { instagram_account_id?: string }).instagram_account_id}`
+                        : `X Account: ${(item as { account_id?: string }).account_id}`}
                     <br />
                     <strong>Error:</strong> {(item as { error?: { message?: string } }).error?.message || 'Unknown error'}
                     {((item as { error?: { code?: string } }).error?.code) && (
@@ -338,10 +409,11 @@ export default function PublishComponent() {
         </Alert>
       )}
 
-        {allConnectedAccounts.length === 0 ? (
+        {/* Check if any accounts are connected before rendering the form */}
+        {allConnectedAccounts.length === 0 && instagramAccounts.length === 0 ? (
           <Box sx={{ textAlign: 'center', my: 4 }}>
             <Typography variant="h6" color="text.secondary">
-              No accounts are connected. Please connect your Facebook Pages and X accounts first.
+              No accounts are connected. Please connect your Facebook Pages, Instagram, and X accounts first.
             </Typography>
           </Box>
         ) : (
@@ -455,7 +527,7 @@ export default function PublishComponent() {
               Select Accounts to Publish to
             </Typography>
             <Grid container spacing={2}>
-              <Grid>
+              <Grid> {/* Facebook Pages */}
                 <Typography variant="subtitle1" component="h3" sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                   <FacebookIcon color="primary" sx={{ mr: 1 }} />
                   Facebook Pages
@@ -484,7 +556,7 @@ export default function PublishComponent() {
                 </Paper>
               </Grid>
 
-              <Grid>
+              <Grid> {/* X Accounts */}
                 <Typography variant="subtitle1" component="h3" sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                   <TwitterIcon sx={{ color: '#000', mr: 1 }} />
                   X Accounts
@@ -512,6 +584,60 @@ export default function PublishComponent() {
                   </FormGroup>
                 </Paper>
               </Grid>
+
+              <Grid> {/* Instagram Accounts */}
+                <Typography variant="subtitle1" component="h3" sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                  <InstagramIcon sx={{ color: '#E4405F', mr: 1 }} /> {/* Instagram icon with brand color */}
+                  {/* Using a generic icon for now, as MUI doesn't have a direct Instagram icon by default. */}
+                  {/* Removed img tag, using text as label */}
+                  Instagram Accounts
+                </Typography>
+                <Paper variant="outlined" sx={{ p: 2, maxHeight: 200, overflow: 'auto' }}>
+                  <FormGroup>
+                    {instagramAccounts.length > 0 ? (
+                      instagramAccounts.map((account) => {
+                        const isMediaSelected = mediaFiles.length > 0;
+                        const publishChecked = selectedInstagramAccounts[account.id]?.publish || false;
+                        const storyChecked = selectedInstagramAccounts[account.id]?.story || false;
+
+                        return (
+                          <Box key={account.id} sx={{ mb: 1 }}>
+                            <Typography variant="body2" component="div" sx={{ fontWeight: 'bold' }}>
+                              {account.username} ({account.displayName})
+                            </Typography>
+                            <Box sx={{ display: 'flex', pl: 2 }}>
+                              <FormControlLabel
+                                control={
+                                  <Checkbox
+                                    checked={publishChecked}
+                                    onChange={() => handleInstagramChange(account.id, 'publish')}
+                                    disabled={!isMediaSelected}
+                                  />
+                                }
+                                label="Post"
+                              />
+                              <FormControlLabel
+                                control={
+                                  <Checkbox
+                                    checked={storyChecked}
+                                    onChange={() => handleInstagramChange(account.id, 'story')}
+                                    disabled={!isMediaSelected}
+                                  />
+                                }
+                                label="Story"
+                              />
+                            </Box>
+                          </Box>
+                        );
+                      })
+                    ) : (
+                      <Typography variant="body2" color="text.secondary">
+                        No Instagram accounts found.
+                      </Typography>
+                    )}
+                  </FormGroup>
+                </Paper>
+              </Grid>
             </Grid>
 
             <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
@@ -520,7 +646,11 @@ export default function PublishComponent() {
                 color="primary"
                 size="large"
                 onClick={handlePublish}
-                disabled={isPublishing || postText.trim() === '' && mediaFiles.length === 0 || (selectedFacebookPages.length === 0 && selectedXAccounts.length === 0)}
+                disabled={
+                  isPublishing ||
+                  (postText.trim() === '' && mediaFiles.length === 0) ||
+                  (selectedFacebookPages.length === 0 && selectedXAccounts.length === 0 && Object.values(selectedInstagramAccounts).every(s => !s.publish && !s.story))
+                }
                 startIcon={isPublishing ? <CircularProgress size={20} color="inherit" /> : null}
               >
                 {isPublishing ? 'Publishing...' : 'Publish Post'}
