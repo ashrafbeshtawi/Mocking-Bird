@@ -501,7 +501,7 @@ export default function FacebookConnectPage() {
         </Typography>
         {connectedXAccounts.length === 0 ? (
           <Typography variant="body1" sx={{ mt: 2, color: theme.palette.text.secondary }}>
-            No X accounts connected yet. Click 'Add Twitter Account' to connect one.
+            No X accounts connected yet. Click Add Twitter Account to connect one.
           </Typography>
         ) : (
           <TableContainer component={Paper} sx={{ mt: 2, boxShadow: theme.shadows[3] }}>
@@ -552,7 +552,7 @@ export default function FacebookConnectPage() {
         <DialogTitle id="alert-dialog-title">{"Confirm Deletion"}</DialogTitle>
         <DialogContent>
           <DialogContentText id="alert-dialog-description">
-            Are you sure you want to delete the {accountToDelete?.platform} account "{accountToDelete?.name}" (ID: {accountToDelete?.id})? This action cannot be undone.
+            Are you sure you want to delete the {accountToDelete?.platform} account {accountToDelete?.name} (ID: {accountToDelete?.id})? This action cannot be undone.
           </DialogContentText>
         </DialogContent>
         <DialogActions>
