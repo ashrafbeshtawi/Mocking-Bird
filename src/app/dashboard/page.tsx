@@ -1,569 +1,435 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
+import Cookies from 'js-cookie';
 import {
-  Container,
   Box,
-  Typography,
   Button,
   CircularProgress,
   Alert,
   AlertTitle,
-  useTheme,
+  Container,
+  Typography,
+  Paper,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
-  Paper,
-  IconButton, // Import IconButton
-  Dialog, // Import Dialog
-  DialogActions, // Import DialogActions
-  DialogContent, // Import DialogContent
-  DialogContentText, // Import DialogContentText
-  DialogTitle, // Import DialogTitle
+  IconButton,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+  useTheme,
+  Tooltip,
 } from '@mui/material';
-import TwitterIcon from '@mui/icons-material/Twitter';
-import FacebookIcon from '@mui/icons-material/Facebook'; // Using MUI icon for Facebook
-import DeleteIcon from '@mui/icons-material/Delete'; // Import DeleteIcon
-import {fetchWithAuth} from '@/lib/fetch'; // Custom fetch function for auth
-import Cookies from "js-cookie";
+import {
+  Facebook as FacebookIcon,
+  Twitter as TwitterIcon,
+  Delete as DeleteIcon,
+} from '@mui/icons-material';
 
-// Extend Window interface for Facebook SDK to ensure TypeScript recognizes FB object
-declare global {
-  interface Window {
-    fbAsyncInit: () => void;
-    FB: typeof FB;
-  }
-}
+// --- Types ---
 
-// Interface for connected pages from our backend
-interface ConnectedPage {
-  page_id: string;
-  page_name: string;
-  page_access_token: string; // Add page_access_token
-}
+type Platform = 'facebook' | 'instagram' | 'twitter';
 
-interface InstagramAccount {
+interface AccountData {
   id: string;
-  name: string;
-  displayName: string;
-  facebookPageId: string; // To link it back to the Facebook page
+  name: string; // Normalized name (page_name, username, etc.)
+  details?: string; // Extra info like Display Name
+  platform: Platform;
 }
 
-export default function FacebookConnectPage() {
-  const theme = useTheme(); // Access the current Material UI theme for consistent styling
-  const [loading, setLoading] = useState<boolean>(false); // State to manage loading indicators for Facebook login/save
-  const [fetchingPages, setFetchingPages] = useState<boolean>(true); // State to manage loading for fetching connected pages
-  const [error, setError] = useState<string | null>(null);   // State to store any error messages
-  const [success, setSuccess] = useState<string | null>(null); // State to store success messages
-  const [connectedPages, setConnectedPages] = useState<ConnectedPage[]>([]); // State to store connected pages
-  const [connectedInstagramAccounts, setConnectedInstagramAccounts] = useState<InstagramAccount[]>([]); // State to store connected Instagram accounts
-  const [deletingAccountId, setDeletingAccountId] = useState<string | null>(null); // State to track which account is being deleted
-  const [openConfirmDialog, setOpenConfirmDialog] = useState<boolean>(false); // State for confirmation dialog
-  const [pageToDelete, setPageToDelete] = useState<{ id: string; name: string; platform: string } | null>(null); // State to store page info for deletion
-  const [accountToDelete, setAccountToDelete] = useState<{ id: string; name: string; platform: string } | null>(null); // State to store account info for deletion
-  const [twitterLoading, setTwitterLoading] = useState<boolean>(false); // State to manage loading for Twitter connect
-  const [connectedXAccounts, setConnectedXAccounts] = useState<{ id: string; name: string }[]>([]); // State for connected X accounts
+interface ApiConfig {
+  deleteUrl: string;
+  idParamName: string;
+}
 
-  // Function to fetch connected X accounts from backend
-  const fetchConnectedXAccounts = useCallback(async () => {
-    try {
-      const response = await fetchWithAuth('/api/twitter-v1.1/get-accounts');
-      if (!response.ok) {
-        if (response.status === 401) {
-          window.location.href = '/login';
-          return;
-        }
-        const errorData = await response.json();
-        throw new Error(errorData.message || `Backend error: ${response.statusText}`);
-      }
-      const result = await response.json();
-      setConnectedXAccounts(result.accounts || []);
-    } catch (err: unknown) {
-      console.error('Error fetching connected X accounts:', err);
-      // Optionally set an error state for X accounts
-    }
-  }, []);
+// --- Constants ---
 
-  // Function to fetch connected Instagram accounts from backend
-  const fetchConnectedInstagramAccounts = useCallback(async () => {
-    try {
-      const response = await fetchWithAuth('/api/instagram');
-      if (!response.ok) {
-        if (response.status === 401) {
-          window.location.href = '/login';
-          return;
-        }
-        const errorData = await response.json();
-        throw new Error(errorData.message || `Backend error: ${response.statusText}`);
-      }
-      const result = await response.json();
-      setConnectedInstagramAccounts(result.accounts || []);
-    } catch (err: unknown) {
-      console.error('Error fetching connected Instagram accounts:', err);
-      // Optionally set an error state for Instagram accounts
-    }
-  }, []);
+const FB_APP_ID = '1471736117322956';
+const API_CONFIG: Record<Platform, ApiConfig> = {
+  facebook: { deleteUrl: '/api/facebook/delete-page', idParamName: 'page_id' },
+  instagram: { deleteUrl: '/api/instagram', idParamName: 'instagram_account_id' },
+  twitter: { deleteUrl: '/api/twitter-v1.1/delete-account', idParamName: 'page_id' },
+};
 
-  // Function to fetch connected pages from our backend
-  const fetchConnectedPages = useCallback(async () => {
-    setFetchingPages(true);
-    setError(null);
-    try {
-      const response = await fetch('/api/facebook/get-pages', { credentials: 'include' });
+// --- Helper: Reusable Table Component ---
 
-      if (!response.ok) {
-        if (response.status === 401) {
-          window.location.href = '/login'; // redirect on unauthorized
-          return;
-        }
-        const errorData = await response.json();
-        throw new Error(errorData.message || `Backend error: ${response.statusText}`);
-      }
+interface AccountsTableProps {
+  title: string;
+  data: AccountData[];
+  emptyMessage: string;
+  loadingId: string | null;
+  onDelete: (account: AccountData) => void;
+}
 
-      const result = await response.json();
-      setConnectedPages(result.pages);
-    } catch (err: unknown) {
-      console.error('Error fetching connected pages:', err);
-      setError((err as Error)?.message || 'An unexpected error occurred while fetching connected pages.');
-    } finally {
-      setFetchingPages(false);
-    }
-  }, []);
+const AccountsTable: React.FC<AccountsTableProps> = ({
+  title,
+  data,
+  emptyMessage,
+  loadingId,
+  onDelete,
+}) => {
+  const theme = useTheme();
 
-  // Effect to load the Facebook SDK script once the component mounts
-  useEffect(() => {
-    // This function is called once the Facebook SDK is loaded
-    window.fbAsyncInit = function () {
-      window.FB.init({
-        appId: '1471736117322956', // 🔑 Your Facebook App ID goes here
-        cookie: true, // Enable cookies to allow the server to access the session
-        xfbml: true, // Parse social plugins on this page
-        version: 'v19.0', // Specify the Graph API version to use
-      });
-      // Optionally, check login status immediately after init if desired
-      // window.FB.getLoginStatus(function(response) {
-      //   console.log('FB Login Status:', response);
-      // });
-    };
-
-    // Dynamically inject the Facebook SDK script if it's not already present
-    if (!document.getElementById('facebook-jssdk')) {
-      const js = document.createElement('script');
-      js.id = 'facebook-jssdk';
-      js.src = 'https://connect.facebook.net/en_US/sdk.js'; // Official SDK URL
-      document.body.appendChild(js);
-    }
-
-    // Fetch connected accounts when the component mounts
-    fetchConnectedPages();
-    fetchConnectedXAccounts();
-    fetchConnectedInstagramAccounts();
-  }, [fetchConnectedPages, fetchConnectedXAccounts, fetchConnectedInstagramAccounts]); // Dependency array includes all fetch functions
-
-
-  /**
-   * Saves the obtained Facebook Page ID and Access Token to your backend.
-   * This function sends the data along with the user's JWT for authentication.
-   */
-  const savePageToBackend = useCallback(
-    async (userAccessToken : string) => {
-      setLoading(true);
-      setError(null);
-      setSuccess(null);
-
-      try {
-        const response = await fetch('/api/facebook/save-page', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include', // 🔑 send cookie automatically
-          body: JSON.stringify({ shortLivedUserToken: userAccessToken }),
-        });
-
-        if (!response.ok) {
-          if (response.status === 401) {
-            window.location.href = '/login';
-            return;
-          }
-          const errorData = await response.json();
-          throw new Error(errorData.message || `Backend error: ${response.statusText}`);
-        }
-
-        const result = await response.json();
-        setSuccess(result.message || '🎉 Page successfully connected and saved to your account!');
-        // No need to update connectedInstagramAccounts here as fetchConnectedInstagramAccounts will do it
-        fetchConnectedPages();
-        fetchConnectedInstagramAccounts(); // Fetch Instagram accounts after saving a Facebook page
-      } catch (err: unknown) {
-        console.error('Error saving page to backend:', err);
-        setError((err as Error)?.message || 'An unexpected error occurred while saving the page data.');
-      } finally {
-        setLoading(false);
-      }
-    },
-    [fetchConnectedPages, fetchConnectedInstagramAccounts]
+  return (
+    <>
+      <Typography
+        variant="h5"
+        component="h2"
+        sx={{ mb: 2, mt: 6, fontWeight: 'bold' }}
+      >
+        {title}
+      </Typography>
+      
+      {data.length === 0 ? (
+        <Typography variant="body1" color="text.secondary">
+          {emptyMessage}
+        </Typography>
+      ) : (
+        <TableContainer component={Paper} elevation={3}>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 'bold' }}>ID</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Name/Handle</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Details</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', width: 100 }}>Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {data.map((account) => (
+                <TableRow key={`${account.platform}-${account.id}`}>
+                  <TableCell>{account.id}</TableCell>
+                  <TableCell>{account.name}</TableCell>
+                  <TableCell>{account.details || '-'}</TableCell>
+                  <TableCell>
+                    <Tooltip title="Disconnect Account">
+                      <span>
+                        <IconButton
+                          onClick={() => onDelete(account)}
+                          color="error"
+                          disabled={loadingId === account.id}
+                        >
+                          {loadingId === account.id ? (
+                            <CircularProgress size={20} color="inherit" />
+                          ) : (
+                            <DeleteIcon />
+                          )}
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
+    </>
   );
+};
 
-  /**
-   * Opens the confirmation dialog for deleting an account.
-   */
-  const handleDeleteAccountClick = useCallback((id: string, name: string, platform: string) => {
-    setAccountToDelete({ id, name, platform });
-    setOpenConfirmDialog(true);
+// --- Custom Hook: Logic & State Management ---
+
+const useSocialMediaAccounts = () => {
+  const [loading, setLoading] = useState({
+    global: true,
+    fbConnect: false,
+    twitterConnect: false,
+    deletingId: null as string | null,
+  });
+  
+  const [status, setStatus] = useState({ error: null as string | null, success: null as string | null });
+  const [accounts, setAccounts] = useState({
+    facebook: [] as AccountData[],
+    instagram: [] as AccountData[],
+    twitter: [] as AccountData[],
+  });
+
+  // Helper for API calls
+  const fetchApi = useCallback(async (url: string, options?: RequestInit) => {
+    const res = await fetch(url, { ...options, credentials: 'include' });
+    if (res.status === 401) {
+      window.location.href = '/login';
+      throw new Error('Unauthorized');
+    }
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || res.statusText);
+    return data;
   }, []);
 
-  /**
-   * Handles the actual deletion of an account from the backend after confirmation.
-   */
-  const confirmDeleteAccount = useCallback(async () => {
-    if (!accountToDelete) return;
-
-    setOpenConfirmDialog(false);
-    setDeletingAccountId(accountToDelete.id);
-    setError(null);
-    setSuccess(null);
-
-    let URL = '';
-    let body = {};
-
-    if (accountToDelete.platform === 'facebook') {
-      URL = '/api/facebook/delete-page';
-      body = { page_id: accountToDelete.id };
-    } else if (accountToDelete.platform === 'twitter') {
-      URL = '/api/twitter-v1.1/delete-account';
-      body = { page_id: accountToDelete.id }; // Twitter API expects page_id
-    } else if (accountToDelete.platform === 'instagram') {
-      URL = '/api/instagram';
-      body = { instagram_account_id: accountToDelete.id }; // Instagram API expects instagram_account_id
-    } else {
-      setError('Unsupported platform for deletion.');
-      setDeletingAccountId(null);
-      setAccountToDelete(null);
-      return;
-    }
-
+  const fetchAllAccounts = useCallback(async () => {
     try {
-      const response = await fetch(URL, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include', // 🔑 send cookie automatically
-        body: JSON.stringify(body),
-      });
+      // Parallel fetching for speed
+      const [fbRes, instaRes, twitterRes] = await Promise.allSettled([
+        fetchApi('/api/facebook/get-pages'),
+        fetchApi('/api/instagram'),
+        fetchApi('/api/twitter-v1.1/get-accounts'),
+      ]);
 
-      if (!response.ok) {
-        if (response.status === 401) {
-          window.location.href = '/login';
-          return;
-        }
-        const errorData = await response.json();
-        throw new Error(errorData.message || `Backend error: ${response.statusText}`);
+      const newAccounts = {
+        facebook: [] as AccountData[],
+        instagram: [] as AccountData[],
+        twitter: [] as AccountData[],
+      };
+
+      if (fbRes.status === 'fulfilled') {
+        newAccounts.facebook = fbRes.value.pages.map((p: any) => ({
+          id: p.page_id,
+          name: p.page_name,
+          platform: 'facebook',
+        }));
       }
 
-      setSuccess('🗑️ Account disconnected successfully!');
-      fetchConnectedPages();
-      fetchConnectedXAccounts();
-      fetchConnectedInstagramAccounts();
-    } catch (err: unknown) {
-      console.error('Error deleting account:', err);
-      setError((err as Error)?.message || 'An unexpected error occurred while deleting the account.');
+      if (instaRes.status === 'fulfilled') {
+        newAccounts.instagram = instaRes.value.accounts.map((a: any) => ({
+          id: a.id,
+          name: a.name,
+          details: a.displayName,
+          platform: 'instagram',
+        }));
+      }
+
+      if (twitterRes.status === 'fulfilled') {
+        newAccounts.twitter = twitterRes.value.accounts.map((a: any) => ({
+          id: a.id,
+          name: a.name,
+          platform: 'twitter',
+        }));
+      }
+
+      setAccounts(newAccounts);
+    } catch (err) {
+      console.error(err);
     } finally {
-      setDeletingAccountId(null);
-      setAccountToDelete(null);
+      setLoading((prev) => ({ ...prev, global: false }));
     }
-  }, [accountToDelete, fetchConnectedPages, fetchConnectedXAccounts, fetchConnectedInstagramAccounts]);
+  }, [fetchApi]);
 
-  /**
-   * Closes the confirmation dialog without deleting.
-   */
-  const handleCloseConfirmDialog = useCallback(() => {
-    setOpenConfirmDialog(false);
-    setAccountToDelete(null);
-  }, []);
+  // Initial Load & FB SDK Setup
+  useEffect(() => {
+    fetchAllAccounts();
 
+    // Load Facebook SDK
+    if (typeof window !== 'undefined') {
+      window.fbAsyncInit = function () {
+        window.FB.init({
+          appId: FB_APP_ID,
+          cookie: true,
+          xfbml: true,
+          version: 'v19.0',
+        });
+      };
 
-  /**
-   * Handles the click event for the "Add Facebook Page" button.
-   * Initiates the Facebook login process with specified permissions.
-   */
-  const handleAddFacebookPage = useCallback(() => {
-    setLoading(true); // Indicate loading state for Facebook login
-    setError(null);
-    setSuccess(null);
+      if (!document.getElementById('facebook-jssdk')) {
+        const js = document.createElement('script');
+        js.id = 'facebook-jssdk';
+        js.src = 'https://connect.facebook.net/en_US/sdk.js';
+        document.body.appendChild(js);
+      }
+    }
+  }, [fetchAllAccounts]);
+
+  const handleFbLogin = () => {
+    setLoading((prev) => ({ ...prev, fbConnect: true }));
+    setStatus({ error: null, success: null });
 
     window.FB.login(
-      (response: facebook.StatusResponse) => {
-        // Check if login was successful and an authResponse (including accessToken) is present
-        if (response.authResponse && response.authResponse.accessToken) {
-          const accessToken = response.authResponse.accessToken;
-          console.log('✅ User access token obtained from Facebook:', accessToken);
-          // If successful, proceed to fetch pages
-          savePageToBackend(accessToken);
+      async (response: any) => {
+        if (response.authResponse?.accessToken) {
+          try {
+            const res = await fetchApi('/api/facebook/save-page', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ shortLivedUserToken: response.authResponse.accessToken }),
+            });
+            setStatus({ error: null, success: res.message || 'Facebook Page connected!' });
+            fetchAllAccounts();
+          } catch (err: any) {
+            setStatus({ error: err.message, success: null });
+          }
         } else {
-          // Login failed or was cancelled by the user
-          setLoading(false); // End loading state
-          setError('Facebook login was cancelled or failed. Please try again.');
-          console.warn('❌ Facebook login failed or cancelled.', response);
+          setStatus({ error: 'Facebook login cancelled.', success: null });
         }
+        setLoading((prev) => ({ ...prev, fbConnect: false }));
       },
-      {
-        // 🚨 Define the required permissions (scopes) for your app
-        scope: 'pages_show_list,pages_read_engagement,pages_manage_posts,pages_manage_engagement,pages_read_user_content,instagram_basic,instagram_content_publish,business_management',
-      }
+      { scope: 'pages_show_list,pages_read_engagement,pages_manage_posts,pages_manage_engagement,pages_read_user_content,instagram_basic,instagram_content_publish,business_management' }
     );
-  }, [savePageToBackend]); // Dependency: `savePageToBackend` function
+  };
 
-  const handleAddTwitterAccount = useCallback( async () => {
-    setTwitterLoading(true);
-    const response = await fetch('/api/twitter-v1.1/auth').finally(() => setTwitterLoading(false));
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.error || 'Failed to initiate authentication');
+  const handleTwitterAuth = async () => {
+    setLoading((prev) => ({ ...prev, twitterConnect: true }));
+    try {
+      const data = await fetchApi('/api/twitter-v1.1/auth');
+      Cookies.set('twitter_oauth_secret', data.oauthTokenSecret, { expires: 5 / 1440 });
+      Cookies.set('temp_jwt', Cookies.get('jwt') || '', { expires: 5 / 1440 });
+      window.location.href = data.authUrl;
+    } catch (err: any) {
+      setStatus({ error: err.message, success: null });
+    } finally {
+      setLoading((prev) => ({ ...prev, twitterConnect: false }));
     }
-    Cookies.set('twitter_oauth_secret', data.oauthTokenSecret, { expires: 5 / 1440 }); // 5 minutes
-    Cookies.set('temp_jwt', Cookies.get('jwt') || '', { expires: 5 / 1440 }); // 5 minutes
+  };
 
-    // Redirect to Twitter authorization page
-    window.location.href = data.authUrl;
-    console.log('Redirecting to Twitter auth URL:', data);
-  }, []);
+  const deleteAccount = async (account: AccountData) => {
+    setLoading((prev) => ({ ...prev, deletingId: account.id }));
+    setStatus({ error: null, success: null });
+
+    const config = API_CONFIG[account.platform];
+
+    try {
+      await fetchApi(config.deleteUrl, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [config.idParamName]: account.id }),
+      });
+      setStatus({ error: null, success: 'Account disconnected successfully.' });
+      await fetchAllAccounts();
+    } catch (err: any) {
+      setStatus({ error: err.message, success: null });
+    } finally {
+      setLoading((prev) => ({ ...prev, deletingId: null }));
+    }
+  };
+
+  return {
+    accounts,
+    loading,
+    status,
+    handleFbLogin,
+    handleTwitterAuth,
+    deleteAccount,
+  };
+};
+
+// --- Main Component ---
+
+export default function FacebookConnectPage() {
+  const { accounts, loading, status, handleFbLogin, handleTwitterAuth, deleteAccount } = useSocialMediaAccounts();
+  
+  // Dialog State
+  const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; account: AccountData | null }>({
+    open: false,
+    account: null,
+  });
+
+  const promptDelete = (account: AccountData) => {
+    setConfirmDialog({ open: true, account });
+  };
+
+  const confirmDelete = () => {
+    if (confirmDialog.account) {
+      deleteAccount(confirmDialog.account);
+    }
+    setConfirmDialog({ open: false, account: null });
+  };
 
   return (
     <Box sx={{ flexGrow: 1, p: 3 }}>
-      <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start', mb: 4 }}>
-        {/* Add Facebook Page Button */}
+      {/* Action Buttons */}
+      <Box sx={{ display: 'flex', gap: 2, mb: 4 }}>
         <Button
           variant="contained"
-          color="primary"
-          size="large"
-          onClick={handleAddFacebookPage}
-          disabled={loading}
-          startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <FacebookIcon />}
-          sx={{
-            backgroundColor: '#1877f2',
-            '&:hover': {
-              backgroundColor: '#155eaf',
-            },
-            '&.Mui-disabled': {
-                backgroundColor: theme.palette.action.disabledBackground,
-                color: theme.palette.action.disabled,
-            }
-          }}
+          onClick={handleFbLogin}
+          disabled={loading.fbConnect}
+          startIcon={loading.fbConnect ? <CircularProgress size={20} color="inherit" /> : <FacebookIcon />}
+          sx={{ bgcolor: '#1877f2', '&:hover': { bgcolor: '#155eaf' } }}
         >
-          {loading ? 'Connecting...' : 'Add Facebook Page'}
+          {loading.fbConnect ? 'Connecting...' : 'Add Facebook Page'}
         </Button>
+
         <Button
           variant="contained"
-          size="large"
-          onClick={handleAddTwitterAccount}
-          disabled={twitterLoading}
-          startIcon={twitterLoading ? <CircularProgress size={20} color="inherit" /> : <TwitterIcon />}
-          sx={{
-            backgroundColor: '#000',
-            '&:hover': {
-              backgroundColor: '#222',
-            },
-            '&.Mui-disabled': {
-                backgroundColor: theme.palette.action.disabledBackground,
-                color: theme.palette.action.disabled,
-            },
-            color: '#fff',
-            textTransform: 'none',
-            fontWeight: 600,
-            boxShadow: '0 2px 4px 0 rgba(0,0,0,0.15)',
-          }}
+          onClick={handleTwitterAuth}
+          disabled={loading.twitterConnect}
+          startIcon={loading.twitterConnect ? <CircularProgress size={20} color="inherit" /> : <TwitterIcon />}
+          sx={{ bgcolor: '#000', '&:hover': { bgcolor: '#222' }, color: '#fff' }}
         >
           Add Twitter Account
         </Button>
       </Box>
 
-      <Container maxWidth="md" sx={{ mt: 4, textAlign: 'center' }}>
-        <Typography variant="h5" component="h2" gutterBottom sx={{ mb: 3, fontWeight: theme.typography.fontWeightBold }}>
-          Connected Facebook Pages
-        </Typography>
-
-        {error && (
+      <Container maxWidth="md">
+        {/* Status Messages */}
+        {status.error && (
           <Alert severity="error" sx={{ mb: 3 }}>
             <AlertTitle>Error</AlertTitle>
-            {error}
+            {status.error}
           </Alert>
         )}
-
-        {success && (
+        {status.success && (
           <Alert severity="success" sx={{ mb: 3 }}>
             <AlertTitle>Success</AlertTitle>
-            {success}
+            {status.success}
           </Alert>
         )}
 
-        {fetchingPages ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+        {/* Content */}
+        {loading.global ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 8 }}>
             <CircularProgress />
           </Box>
-        ) : connectedPages.length === 0 ? (
-          <Typography variant="body1" sx={{ mt: 4, color: theme.palette.text.secondary }}>
-            No Facebook pages connected yet. Click &apos;Add Facebook Page&apos; to connect one.
-          </Typography>
         ) : (
-          <TableContainer component={Paper} sx={{ mt: 4, boxShadow: theme.shadows[3] }}>
-            <Table sx={{ minWidth: 650 }} aria-label="connected facebook pages table">
-              <TableHead>
-                <TableRow>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Page ID</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Page Name</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {connectedPages.map((page) => (
-                  <TableRow
-                    key={page.page_id}
-                    sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
-                  >
-                    <TableCell component="th" scope="row">
-                      {page.page_id}
-                    </TableCell>
-                    <TableCell>{page.page_name ??'N/A'}</TableCell>
-                    <TableCell>
-                      <IconButton
-                        aria-label="delete"
-                        onClick={() => handleDeleteAccountClick(page.page_id, page.page_name ?? 'N/A', 'facebook')}
-                        color="error"
-                        disabled={deletingAccountId === page.page_id}
-                      >
-                        {deletingAccountId === page.page_id ? (
-                          <CircularProgress size={20} color="inherit" />
-                        ) : (
-                          <DeleteIcon />
-                        )}
-                      </IconButton>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        )}
+          <>
+            <AccountsTable
+              title="Connected Facebook Pages"
+              data={accounts.facebook}
+              emptyMessage="No Facebook pages connected yet."
+              loadingId={loading.deletingId}
+              onDelete={promptDelete}
+            />
 
-        {/* Connected Instagram Accounts Table */}
-        <Typography variant="h5" component="h2" gutterBottom sx={{ mb: 3, mt: 6, fontWeight: theme.typography.fontWeightBold }}>
-          Connected Instagram Accounts
-        </Typography>
-        {connectedInstagramAccounts.length === 0 ? (
-          <Typography variant="body1" sx={{ mt: 2, color: theme.palette.text.secondary }}>
-            No Instagram accounts linked to connected Facebook pages.
-          </Typography>
-        ) : (
-          <TableContainer component={Paper} sx={{ mt: 2, boxShadow: theme.shadows[3] }}>
-            <Table sx={{ minWidth: 650 }} aria-label="connected instagram accounts table">
-              <TableHead>
-                <TableRow>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Instagram ID</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Username</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Display Name</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {connectedInstagramAccounts.map((account) => (
-                  <TableRow key={account.id}>
-                    <TableCell component="th" scope="row">
-                      {account.id}
-                    </TableCell>
-                    <TableCell>{account.name ?? 'N/A'}</TableCell>
-                    <TableCell>{account.displayName ?? 'N/A'}</TableCell>
-                    <TableCell>
-                      <IconButton
-                        aria-label="delete"
-                        onClick={() => handleDeleteAccountClick(account.id, account.name ?? 'N/A', 'instagram')}
-                        color="error"
-                        disabled={deletingAccountId === account.id}
-                      >
-                        {deletingAccountId === account.id ? (
-                          <CircularProgress size={20} color="inherit" />
-                        ) : (
-                          <DeleteIcon />
-                        )}
-                      </IconButton>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        )}
+            <AccountsTable
+              title="Connected Instagram Accounts"
+              data={accounts.instagram}
+              emptyMessage="No Instagram accounts linked."
+              loadingId={loading.deletingId}
+              onDelete={promptDelete}
+            />
 
-        {/* Connected X (Twitter) Accounts Table */}
-        <Typography variant="h5" component="h2" gutterBottom sx={{ mb: 3, mt: 6, fontWeight: theme.typography.fontWeightBold }}>
-          Connected X Accounts
-        </Typography>
-        {connectedXAccounts.length === 0 ? (
-          <Typography variant="body1" sx={{ mt: 2, color: theme.palette.text.secondary }}>
-            No X accounts connected yet. Click Add Twitter Account to connect one.
-          </Typography>
-        ) : (
-          <TableContainer component={Paper} sx={{ mt: 2, boxShadow: theme.shadows[3] }}>
-            <Table sx={{ minWidth: 650 }} aria-label="connected x accounts table">
-              <TableHead>
-                <TableRow>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Account ID</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Username</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {connectedXAccounts.map((account) => (
-                  <TableRow key={account.id}>
-                    <TableCell component="th" scope="row">
-                      {account.id}
-                    </TableCell>
-                    <TableCell>{account.name ?? 'N/A'}</TableCell>
-                    <TableCell>
-                      <IconButton
-                        aria-label="delete"
-                        onClick={() => handleDeleteAccountClick(account.id, account.name ?? 'N/A', 'twitter')}
-                        color="error"
-                        disabled={deletingAccountId === account.id}
-                      >
-                        {deletingAccountId === account.id ? (
-                          <CircularProgress size={20} color="inherit" />
-                        ) : (
-                          <DeleteIcon />
-                        )}
-                      </IconButton>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
+            <AccountsTable
+              title="Connected X (Twitter) Accounts"
+              data={accounts.twitter}
+              emptyMessage="No X accounts connected yet."
+              loadingId={loading.deletingId}
+              onDelete={promptDelete}
+            />
+          </>
         )}
       </Container>
 
       {/* Confirmation Dialog */}
       <Dialog
-        open={openConfirmDialog}
-        onClose={handleCloseConfirmDialog}
-        aria-labelledby="alert-dialog-title"
-        aria-describedby="alert-dialog-description"
+        open={confirmDialog.open}
+        onClose={() => setConfirmDialog({ open: false, account: null })}
       >
-        <DialogTitle id="alert-dialog-title">{"Confirm Deletion"}</DialogTitle>
+        <DialogTitle>Confirm Disconnect</DialogTitle>
         <DialogContent>
-          <DialogContentText id="alert-dialog-description">
-            Are you sure you want to delete the {accountToDelete?.platform} account {accountToDelete?.name} (ID: {accountToDelete?.id})? This action cannot be undone.
+          <DialogContentText>
+            Are you sure you want to disconnect <strong>{confirmDialog.account?.name}</strong>? 
+            This action cannot be undone.
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseConfirmDialog} color="primary">
-            Cancel
-          </Button>
-          <Button onClick={confirmDeleteAccount} color="error" autoFocus>
-            Delete
+          <Button onClick={() => setConfirmDialog({ open: false, account: null })}>Cancel</Button>
+          <Button onClick={confirmDelete} color="error" autoFocus>
+            Disconnect
           </Button>
         </DialogActions>
       </Dialog>
     </Box>
   );
+}
+
+// --- Global Type Augmentation ---
+declare global {
+  interface Window {
+    fbAsyncInit: () => void;
+    FB: any;
+  }
 }
