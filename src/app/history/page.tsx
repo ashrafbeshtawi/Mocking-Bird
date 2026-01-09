@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Container,
   Box,
@@ -18,13 +19,13 @@ import {
   Paper,
   Chip,
   Pagination,
-  IconButton, // Added IconButton
+  IconButton,
 } from '@mui/material';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import DownloadForOfflineIcon from '@mui/icons-material/DownloadForOffline';
-import VisibilityIcon from '@mui/icons-material/Visibility'; // Added VisibilityIcon
+import VisibilityIcon from '@mui/icons-material/Visibility';
 
 // Interface for a single publish history record
 interface PublishHistoryItem {
@@ -45,10 +46,16 @@ interface PaginatedResponse {
 
 export default function PublishHistoryComponent() {
   const theme = useTheme();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Read initial page from URL, default to 1
+  const initialPage = parseInt(searchParams.get('page') || '1', 10);
+
   const [history, setHistory] = useState<PublishHistoryItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [page, setPage] = useState<number>(1);
+  const [page, setPage] = useState<number>(initialPage);
   const [totalPages, setTotalPages] = useState<number>(1);
   const limit = 10; // items per page
 
@@ -84,6 +91,8 @@ export default function PublishHistoryComponent() {
 
   const handlePageChange = (_event: React.ChangeEvent<unknown>, value: number) => {
     setPage(value);
+    // Update URL without full navigation to preserve state
+    router.push(`/history?page=${value}`, { scroll: false });
   };
 
   if (loading) {
@@ -180,7 +189,7 @@ export default function PublishHistoryComponent() {
                             <DownloadForOfflineIcon />
                           </IconButton>
                         </a>
-                        <a href={`/history/report?id=${item.id}`} style={{ marginLeft: '8px' }}>
+                        <a href={`/history/report?id=${item.id}&page=${page}`} style={{ marginLeft: '8px' }}>
                           <IconButton color="secondary" aria-label="view report">
                             <VisibilityIcon />
                           </IconButton>

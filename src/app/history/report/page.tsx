@@ -28,6 +28,7 @@ export default function ReportPage() {
   const theme = useTheme();
   const searchParams = useSearchParams();
   const reportId = searchParams.get('id');
+  const historyPage = searchParams.get('page') || '1';
 
   const [report, setReport] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -101,7 +102,7 @@ export default function ReportPage() {
   return (
     <Container maxWidth="lg" sx={{ mt: 4 }}>
       <Box sx={{ mb: 3 }}>
-        <Link href="/history" passHref>
+        <Link href={`/history?page=${historyPage}`} passHref>
           <Button variant="outlined" startIcon={<ArrowBackIcon />}>
             Back to History
           </Button>
