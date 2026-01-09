@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Container,
   Box,
@@ -68,6 +68,9 @@ export default function PublishComponent() {
   const [anchorEl, setAnchorEl] = useState<HTMLButtonElement | null>(null); // State for emoji popover anchor
   const [emojiCategory, setEmojiCategory] = useState(0); // 0: History, 1: Smileys, ...
   const [emojiHistory, setEmojiHistory] = useState<string[]>([]); // Stores last used emojis
+  const [pendingEmojiHistory, setPendingEmojiHistory] = useState<string[]>([]); // Pending history updates during popover session
+  const textFieldRef = useRef<HTMLInputElement | null>(null); // Ref for the TextField input
+  const cursorPositionRef = useRef<number | null>(null); // Track cursor position
 
   // Load emoji history from localStorage on mount
   useEffect(() => {
@@ -83,14 +86,31 @@ export default function PublishComponent() {
   const isTwitterWarning = charCount > TWITTER_CHAR_LIMIT && selectedXAccounts.length > 0;
 
   const handleEmojiClick = (emoji: string) => {
-    setPostText((prevText) => prevText + emoji);
-    setEmojiHistory((prev) => {
+    const input = textFieldRef.current;
+    const cursorPos = cursorPositionRef.current ?? postText.length;
+
+    // Insert emoji at cursor position
+    const newText = postText.slice(0, cursorPos) + emoji + postText.slice(cursorPos);
+    setPostText(newText);
+
+    // Update cursor position for next emoji (after the inserted emoji)
+    const newCursorPos = cursorPos + emoji.length;
+    cursorPositionRef.current = newCursorPos;
+
+    // Restore focus and cursor position after React re-renders
+    setTimeout(() => {
+      if (input) {
+        input.focus();
+        input.setSelectionRange(newCursorPos, newCursorPos);
+      }
+    }, 0);
+
+    // Track pending emoji history (don't reorder immediately)
+    setPendingEmojiHistory((prev) => {
       const filtered = prev.filter((e) => e !== emoji);
-      const updated = [emoji, ...filtered].slice(0, 16);
-      localStorage.setItem('emojiHistory', JSON.stringify(updated));
-      return updated;
+      return [emoji, ...filtered];
     });
-  } // Do not close popover after selecting emoji
+  }; // Do not close popover after selecting emoji
 
   const handleClearEmojiHistory = () => {
     setEmojiHistory([]);
@@ -98,12 +118,25 @@ export default function PublishComponent() {
   };
 
   const handlePopoverOpen = (event: React.MouseEvent<HTMLButtonElement>) => {
+    // Save cursor position before opening popover
+    const input = textFieldRef.current;
+    if (input) {
+      cursorPositionRef.current = input.selectionStart ?? postText.length;
+    }
+    // Initialize pending history with current history
+    setPendingEmojiHistory([...emojiHistory]);
     setAnchorEl(event.currentTarget);
-  }
+  };
 
   const handlePopoverClose = () => {
+    // Apply pending emoji history to actual history on close
+    if (pendingEmojiHistory.length > 0) {
+      const updatedHistory = pendingEmojiHistory.slice(0, 16);
+      setEmojiHistory(updatedHistory);
+      localStorage.setItem('emojiHistory', JSON.stringify(updatedHistory));
+    }
     setAnchorEl(null);
-  }
+  };
 
   const handleCategoryChange = (_event: React.SyntheticEvent, newValue: number) => {
     setEmojiCategory(newValue);
@@ -427,9 +460,12 @@ export default function PublishComponent() {
               onChange={(e) => setPostText(e.target.value)}
               variant="outlined"
               sx={{ mb: 2 }}
-              InputProps={{
-                style: { fontSize: '1.1rem' },
-                sx: { textAlign: 'right', direction: 'rtl' }
+              inputRef={textFieldRef}
+              slotProps={{
+                input: {
+                  style: { fontSize: '1.1rem' },
+                  sx: { textAlign: 'right', direction: 'rtl' }
+                }
               }}
             />
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
