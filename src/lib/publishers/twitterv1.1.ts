@@ -2,12 +2,9 @@ import { Pool } from 'pg';
 import { TwitterApi } from 'twitter-api-v2';
 import { MediaFile } from '@/types/interfaces';
 import { SendTweetV2Params } from 'twitter-api-v2/dist/esm/types/v2/tweet.definition.v2';
+import { createLogger } from '@/lib/logger';
 
-const logger = {
-  info: (message: string, data?: unknown) => console.log(`[TwitterPublisherV1] INFO: ${message}`, data ? JSON.stringify(data, null, 2) : ''),
-  error: (message: string, error?: unknown) => console.error(`[TwitterPublisherV1] ERROR: ${message}`, error),
-  warn: (message: string, data?: unknown) => console.warn(`[TwitterPublisherV1] WARN: ${message}`, data ? JSON.stringify(data, null, 2) : '')
-};
+const logger = createLogger('TwitterPublisherV1');
 
 export interface TwitterAccountTokenV1 {
   x_user_id: string;

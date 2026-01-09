@@ -2,20 +2,10 @@
 import axios from 'axios';
 import { Pool } from 'pg';
 import FormData from 'form-data';
-import { MediaFile } from '@/types/interfaces'; // Import MediaFile from interfaces
+import { MediaFile } from '@/types/interfaces';
+import { createLogger } from '@/lib/logger';
 
-// Simple logger utility
-const logger = {
-  info: (message: string, data?: unknown) => {
-    console.log(`[FacebookPublisher] INFO: ${message}`, data ? JSON.stringify(data, null, 2) : '');
-  },
-  error: (message: string, error?: unknown) => {
-    console.error(`[FacebookPublisher] ERROR: ${message}`, error);
-  },
-  warn: (message: string, data?: unknown) => {
-    console.warn(`[FacebookPublisher] WARN: ${message}`, data ? JSON.stringify(data, null, 2) : '');
-  }
-};
+const logger = createLogger('FacebookPublisher');
 
 export interface FacebookPageToken {
   page_id: string;
