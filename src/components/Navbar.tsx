@@ -74,7 +74,7 @@ export default function Navbar() {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [openSubMenu, setOpenSubMenu] = useState<string | null>(null); // State for mobile sub-menu
 
-  const { isLoggedIn, setIsLoggedIn } = useAuth();
+  const { isLoggedIn, logout } = useAuth();
 
   const handleSubMenuClick = useCallback((label: string) => {
     setOpenSubMenu((prev) => (prev === label ? null : label));
@@ -102,22 +102,9 @@ export default function Navbar() {
   }, []);
 
   const handleLogout = useCallback(async () => {
-    try {
-      const res = await fetch('/api/logout', {
-        method: 'POST',
-        credentials: 'include'
-      });
-
-      if (!res.ok) throw new Error('Logout failed');
-
-      setIsLoggedIn(false);
-      router.push('/login');
-
-      if (isMobile) setDrawerOpen(false);
-    } catch (err) {
-      console.error('Logout failed', err);
-    }
-  }, [router, isMobile, setIsLoggedIn]);
+    if (isMobile) setDrawerOpen(false);
+    await logout();
+  }, [isMobile, logout]);
 
   const currentNavLinks = getNavLinks(isLoggedIn);
 

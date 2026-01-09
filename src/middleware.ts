@@ -50,6 +50,6 @@ export async function middleware(req: NextRequest) {
 // Only protect API routes except the listed exceptions
 export const config = {
   matcher: [
-    '/api((?!/login|/register|/twitter/login|/twitter/callback|/twitter-v1.1/auth/callback).*)',
+    '/api((?!/login|/register|/auth/check|/twitter/login|/twitter/callback|/twitter-v1.1/auth/callback).*)',
   ],
 };

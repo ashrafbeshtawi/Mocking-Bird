@@ -2,30 +2,54 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Box, TextField, Button, Typography, Paper } from '@mui/material';
+import Link from 'next/link';
+import { Box, TextField, Button, Typography, Paper, CircularProgress, Alert } from '@mui/material';
+
+interface FieldErrors {
+  username?: string;
+  email?: string;
+  password?: string;
+}
 
 export default function RegisterPage() {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setFieldErrors({});
+    setIsLoading(true);
 
-    const res = await fetch('/api/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, email, password }),
-    });
+    try {
+      const res = await fetch('/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, email, password }),
+      });
 
-    if (res.ok) {
-      router.push('/login');
-    } else {
-      const { error } = await res.json();
-      setError(error || 'An error occurred');
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        router.push('/login?registered=true');
+      } else {
+        // Handle field-specific errors
+        if (data.field) {
+          setFieldErrors({ [data.field]: data.error });
+        } else {
+          setError(data.error || 'An error occurred');
+        }
+      }
+    } catch (err) {
+      console.error('Registration error:', err);
+      setError('An error occurred. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -41,18 +65,28 @@ export default function RegisterPage() {
         <Typography variant="h4" component="h1" gutterBottom align="center">
           Register
         </Typography>
+
         {error && (
-          <Typography color="error" align="center" gutterBottom>
+          <Alert severity="error" sx={{ mb: 2 }}>
             {error}
-          </Typography>
+          </Alert>
         )}
-        <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+
+        <Box
+          component="form"
+          onSubmit={handleSubmit}
+          sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}
+        >
           <TextField
             label="Username"
             variant="outlined"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             required
+            disabled={isLoading}
+            error={!!fieldErrors.username}
+            helperText={fieldErrors.username || 'Letters, numbers, underscores, and hyphens only'}
+            autoComplete="username"
           />
           <TextField
             label="Email"
@@ -61,6 +95,10 @@ export default function RegisterPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
+            disabled={isLoading}
+            error={!!fieldErrors.email}
+            helperText={fieldErrors.email}
+            autoComplete="email"
           />
           <TextField
             label="Password"
@@ -69,10 +107,31 @@ export default function RegisterPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
+            disabled={isLoading}
+            error={!!fieldErrors.password}
+            helperText={fieldErrors.password || 'At least 8 characters with letters and numbers'}
+            autoComplete="new-password"
           />
-          <Button variant="contained" color="primary" type="submit">
-            Register
+          <Button
+            variant="contained"
+            color="primary"
+            type="submit"
+            disabled={isLoading}
+            startIcon={isLoading ? <CircularProgress size={20} color="inherit" /> : null}
+          >
+            {isLoading ? 'Registering...' : 'Register'}
           </Button>
+        </Box>
+
+        <Box mt={2} textAlign="center">
+          <Typography variant="body2">
+            Already have an account?{' '}
+            <Link href="/login" passHref>
+              <Button color="primary" size="small">
+                Login
+              </Button>
+            </Link>
+          </Typography>
         </Box>
       </Paper>
     </Box>

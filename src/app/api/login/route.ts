@@ -4,17 +4,38 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { serialize } from 'cookie';
 
+// Validation constants
+const USERNAME_MIN_LENGTH = 3;
+const USERNAME_MAX_LENGTH = 50;
+const PASSWORD_MIN_LENGTH = 3;
+
 export async function POST(req: Request) {
-  const { username, password } = await req.json();
-
-  if (!username || !password) {
-    return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
-  }
-
   try {
+    const { username, password } = await req.json();
+
+    // Input validation
+    if (!username || !password) {
+      return NextResponse.json({ error: 'Username and password are required' }, { status: 400 });
+    }
+
+    if (typeof username !== 'string' || typeof password !== 'string') {
+      return NextResponse.json({ error: 'Invalid input types' }, { status: 400 });
+    }
+
+    const trimmedUsername = username.trim();
+
+    if (trimmedUsername.length < USERNAME_MIN_LENGTH || trimmedUsername.length > USERNAME_MAX_LENGTH) {
+      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
+    }
+
+    if (password.length < PASSWORD_MIN_LENGTH) {
+      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
+    }
+
     const client = await pool.connect();
     try {
-      const result = await client.query('SELECT * FROM users WHERE username = $1', [username]);
+      const result = await client.query('SELECT * FROM users WHERE username = $1', [trimmedUsername]);
+
       if (result.rows.length === 0) {
         return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
       }
@@ -27,7 +48,8 @@ export async function POST(req: Request) {
       }
 
       if (!process.env.JWT_SECRET) {
-        throw new Error('JWT_SECRET is not defined');
+        console.error('JWT_SECRET is not defined');
+        return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
       }
 
       // Create JWT valid for 30 days
@@ -35,16 +57,19 @@ export async function POST(req: Request) {
         expiresIn: '30d',
       });
 
-      // Create HTTP-only cookie
+      // Create HTTP-only cookie (secure against XSS)
       const cookie = serialize('jwt', token, {
-        httpOnly: false,
+        httpOnly: true,  // FIXED: Prevents JavaScript access
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'strict',
         maxAge: 60 * 60 * 24 * 30, // 30 days
         path: '/',
       });
 
-      const res = NextResponse.json({ message: 'Login successful' });
+      const res = NextResponse.json({
+        success: true,
+        message: 'Login successful'
+      });
       res.headers.set('Set-Cookie', cookie);
       return res;
 
@@ -52,7 +77,7 @@ export async function POST(req: Request) {
       client.release();
     }
   } catch (error) {
-    console.error(error);
+    console.error('Login error:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
