@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Typography, Grid, Divider } from '@mui/material';
+import { Typography, Box } from '@mui/material';
 import { FacebookSelector } from './FacebookSelector';
 import { XSelector } from './XSelector';
 import { InstagramSelector } from './InstagramSelector';
@@ -39,38 +39,40 @@ export function AccountSelector({
 }: AccountSelectorProps) {
   return (
     <>
-      <Divider sx={{ my: 3 }} />
-
-      <Typography variant="h6" gutterBottom>
-        Select Accounts to Publish to
+      <Typography
+        variant="subtitle2"
+        color="text.secondary"
+        sx={{ mb: 2, textTransform: 'uppercase', letterSpacing: 1 }}
+      >
+        Select Destinations
       </Typography>
 
-      <Grid container spacing={2}>
-        <Grid>
-          <FacebookSelector
-            pages={facebookPages}
-            selected={selectedFacebookPages}
-            onChange={onFacebookChange}
-          />
-        </Grid>
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' },
+          gap: 2,
+        }}
+      >
+        <FacebookSelector
+          pages={facebookPages}
+          selected={selectedFacebookPages}
+          onChange={onFacebookChange}
+        />
 
-        <Grid>
-          <XSelector
-            accounts={xAccounts}
-            selected={selectedXAccounts}
-            onChange={onXChange}
-          />
-        </Grid>
+        <InstagramSelector
+          accounts={instagramAccounts}
+          selected={selectedInstagramAccounts}
+          onChange={onInstagramChange}
+          mediaSelected={mediaSelected}
+        />
 
-        <Grid>
-          <InstagramSelector
-            accounts={instagramAccounts}
-            selected={selectedInstagramAccounts}
-            onChange={onInstagramChange}
-            mediaSelected={mediaSelected}
-          />
-        </Grid>
-      </Grid>
+        <XSelector
+          accounts={xAccounts}
+          selected={selectedXAccounts}
+          onChange={onXChange}
+        />
+      </Box>
     </>
   );
 }

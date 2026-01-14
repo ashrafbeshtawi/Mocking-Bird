@@ -8,9 +8,11 @@ import {
   Button,
   CircularProgress,
   Paper,
-  useTheme,
   Backdrop,
+  Fade,
 } from '@mui/material';
+import SendIcon from '@mui/icons-material/Send';
+import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
 import { useConnectedAccounts } from '@/hooks/useConnectedAccounts';
 import { usePublish } from '@/hooks/usePublish';
 import { PostComposer } from '@/components/publish/PostComposer';
@@ -21,8 +23,6 @@ import type { InstagramSelection } from '@/types/accounts';
 import { TWITTER_CHAR_LIMIT } from '@/types/accounts';
 
 export default function PublishPage() {
-  const theme = useTheme();
-
   // Data fetching
   const {
     facebookPages,
@@ -104,7 +104,6 @@ export default function PublishPage() {
     });
 
     if (wasSuccessful) {
-      // Reset form on success
       setPostText('');
       setUploadedMedia([]);
       setSelectedFacebookPages(facebookPages.map((p) => p.page_id));
@@ -133,88 +132,215 @@ export default function PublishPage() {
       selectedXAccounts.length > 0 ||
       hasInstagramSelection);
 
+  const selectedCount =
+    selectedFacebookPages.length +
+    selectedXAccounts.length +
+    Object.values(selectedInstagramAccounts).filter((s) => s.publish || s.story).length;
+
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-        <CircularProgress />
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: '60vh',
+        }}
+      >
+        <CircularProgress size={48} />
       </Box>
     );
   }
 
   return (
-    <Container maxWidth="md" sx={{ mt: 4 }}>
-      {/* Loading overlay */}
-      <Backdrop
-        sx={{
-          color: '#fff',
-          zIndex: (theme) => theme.zIndex.drawer + 1,
-          flexDirection: 'column',
-          gap: 2,
-        }}
-        open={isPublishing}
-      >
-        <CircularProgress color="inherit" size={60} />
-        <Typography variant="h6">Publishing your post...</Typography>
-      </Backdrop>
+    <Box
+      sx={{
+        minHeight: '100vh',
+        background: 'linear-gradient(180deg, rgba(25,118,210,0.05) 0%, rgba(255,255,255,0) 50%)',
+        py: 4,
+      }}
+    >
+      <Container maxWidth="md">
+        {/* Loading overlay */}
+        <Backdrop
+          sx={{
+            color: '#fff',
+            zIndex: (theme) => theme.zIndex.drawer + 1,
+            flexDirection: 'column',
+            gap: 3,
+            backdropFilter: 'blur(8px)',
+            background: 'rgba(0,0,0,0.7)',
+          }}
+          open={isPublishing}
+        >
+          <RocketLaunchIcon sx={{ fontSize: 64, animation: 'pulse 1.5s infinite' }} />
+          <CircularProgress color="inherit" size={48} />
+          <Typography variant="h5" fontWeight="medium">
+            Publishing your post...
+          </Typography>
+          <Typography variant="body2" color="grey.400">
+            This may take a moment
+          </Typography>
+        </Backdrop>
 
-      <Typography
-        variant="h4"
-        gutterBottom
-        sx={{ fontWeight: theme.typography.fontWeightBold }}
-      >
-        Publish to Social Media
-      </Typography>
+        {/* Header */}
+        <Fade in timeout={600}>
+          <Box sx={{ mb: 4 }}>
+            <Typography
+              variant="h3"
+              fontWeight="bold"
+              sx={{
+                background: 'linear-gradient(90deg, #1877f2, #E1306C, #F77737)',
+                backgroundClip: 'text',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                mb: 1,
+              }}
+            >
+              Create Post
+            </Typography>
+            <Typography variant="body1" color="text.secondary">
+              Share your content across multiple platforms at once
+            </Typography>
+          </Box>
+        </Fade>
 
-      <Paper elevation={3} sx={{ p: 4, mt: 3 }}>
+        {/* Results */}
         <PublishResults error={error} success={success} results={results} />
 
         {!hasAnyAccount ? (
-          <Box sx={{ textAlign: 'center', my: 4 }}>
-            <Typography variant="h6" color="text.secondary">
-              No accounts are connected. Please connect your Facebook Pages, Instagram,
-              and X accounts first.
-            </Typography>
-          </Box>
+          <Fade in timeout={800}>
+            <Paper
+              elevation={0}
+              sx={{
+                p: 6,
+                textAlign: 'center',
+                borderRadius: 4,
+                border: '2px dashed',
+                borderColor: 'divider',
+                bgcolor: 'background.paper',
+              }}
+            >
+              <Typography variant="h5" color="text.secondary" gutterBottom>
+                No accounts connected
+              </Typography>
+              <Typography variant="body1" color="text.secondary">
+                Head to the Dashboard to connect your Facebook, Instagram, and X accounts.
+              </Typography>
+            </Paper>
+          </Fade>
         ) : (
-          <>
-            <PostComposer
-              postText={postText}
-              onTextChange={setPostText}
-              uploadedMedia={uploadedMedia}
-              onMediaChange={setUploadedMedia}
-              showTwitterWarning={showTwitterWarning}
-            />
-
-            <AccountSelector
-              facebookPages={facebookPages}
-              xAccounts={xAccounts}
-              instagramAccounts={instagramAccounts}
-              selectedFacebookPages={selectedFacebookPages}
-              selectedXAccounts={selectedXAccounts}
-              selectedInstagramAccounts={selectedInstagramAccounts}
-              onFacebookChange={handleFacebookChange}
-              onXChange={handleXChange}
-              onInstagramChange={handleInstagramChange}
-              mediaSelected={uploadedMedia.length > 0}
-            />
-
-            <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
-              <Button
-                variant="contained"
-                color="primary"
-                size="large"
-                onClick={handlePublish}
-                disabled={!canPublish}
-                startIcon={
-                  isPublishing ? <CircularProgress size={20} color="inherit" /> : null
-                }
+          <Fade in timeout={800}>
+            <Box>
+              {/* Composer Section */}
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 3,
+                  borderRadius: 3,
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  bgcolor: 'background.paper',
+                  mb: 3,
+                }}
               >
-                {isPublishing ? 'Publishing...' : 'Publish Post'}
-              </Button>
+                <Typography
+                  variant="subtitle2"
+                  color="text.secondary"
+                  sx={{ mb: 2, textTransform: 'uppercase', letterSpacing: 1 }}
+                >
+                  Compose Your Post
+                </Typography>
+                <PostComposer
+                  postText={postText}
+                  onTextChange={setPostText}
+                  uploadedMedia={uploadedMedia}
+                  onMediaChange={setUploadedMedia}
+                  showTwitterWarning={showTwitterWarning}
+                />
+              </Paper>
+
+              {/* Account Selector Section */}
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 3,
+                  borderRadius: 3,
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  bgcolor: 'background.paper',
+                  mb: 3,
+                }}
+              >
+                <AccountSelector
+                  facebookPages={facebookPages}
+                  xAccounts={xAccounts}
+                  instagramAccounts={instagramAccounts}
+                  selectedFacebookPages={selectedFacebookPages}
+                  selectedXAccounts={selectedXAccounts}
+                  selectedInstagramAccounts={selectedInstagramAccounts}
+                  onFacebookChange={handleFacebookChange}
+                  onXChange={handleXChange}
+                  onInstagramChange={handleInstagramChange}
+                  mediaSelected={uploadedMedia.length > 0}
+                />
+              </Paper>
+
+              {/* Publish Button */}
+              <Box
+                sx={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  mt: 2,
+                }}
+              >
+                <Typography variant="body2" color="text.secondary">
+                  {selectedCount > 0
+                    ? `Publishing to ${selectedCount} destination${selectedCount > 1 ? 's' : ''}`
+                    : 'Select at least one account'}
+                </Typography>
+                <Button
+                  variant="contained"
+                  size="large"
+                  onClick={handlePublish}
+                  disabled={!canPublish}
+                  endIcon={<SendIcon />}
+                  sx={{
+                    px: 4,
+                    py: 1.5,
+                    borderRadius: 3,
+                    textTransform: 'none',
+                    fontSize: '1rem',
+                    fontWeight: 600,
+                    background: canPublish
+                      ? 'linear-gradient(90deg, #1877f2 0%, #E1306C 50%, #F77737 100%)'
+                      : undefined,
+                    '&:hover': {
+                      background: canPublish
+                        ? 'linear-gradient(90deg, #155eaf 0%, #c02a5c 50%, #d96830 100%)'
+                        : undefined,
+                    },
+                    '&.Mui-disabled': {
+                      background: 'action.disabledBackground',
+                    },
+                  }}
+                >
+                  Publish Now
+                </Button>
+              </Box>
             </Box>
-          </>
+          </Fade>
         )}
-      </Paper>
-    </Container>
+      </Container>
+
+      {/* Keyframes for animations */}
+      <style jsx global>{`
+        @keyframes pulse {
+          0%, 100% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.1); opacity: 0.8; }
+        }
+      `}</style>
+    </Box>
   );
 }
