@@ -1,11 +1,7 @@
 import axios from 'axios';
 import { Pool } from 'pg';
-import { MediaFile } from '@/types/interfaces';
 import { createLogger } from '@/lib/logger';
-import {
-  uploadMultipleToCloudinary,
-  UploadedMedia,
-} from '@/lib/services/cloudinaryService';
+import { CloudinaryMediaInfo } from '@/lib/publish/types';
 
 const logger = createLogger('InstagramPublisher');
 
@@ -39,7 +35,7 @@ export interface InstagramPublishError {
 
 export interface InstagramPublishOptions {
   text?: string;
-  files?: MediaFile[];
+  cloudinaryMedia?: CloudinaryMediaInfo[];
 }
 
 type MediaType = 'IMAGE' | 'VIDEO' | 'CAROUSEL_ALBUM' | 'REELS' | 'STORIES';
@@ -574,6 +570,7 @@ export class InstagramPublisher {
 
   /**
    * Publishes to Instagram feed (images, videos, or carousels)
+   * Uses pre-uploaded Cloudinary URLs directly - no server-side upload needed
    */
   async publishToFeed(
     options: InstagramPublishOptions,
@@ -581,21 +578,19 @@ export class InstagramPublisher {
   ): Promise<{
     successful: InstagramPublishResult[];
     failed: InstagramPublishError[];
-    uploadedMedia: UploadedMedia[];
   }> {
-    const { text, files = [] } = options;
+    const { text, cloudinaryMedia = [] } = options;
 
     logger.info('Starting Instagram feed publishing', {
       textLength: text?.length || 0,
-      fileCount: files.length,
+      mediaCount: cloudinaryMedia.length,
       accountCount: tokens.length,
     });
 
     const successful: InstagramPublishResult[] = [];
     const failed: InstagramPublishError[] = [];
-    let uploadedMedia: UploadedMedia[] = [];
 
-    if (files.length === 0) {
+    if (cloudinaryMedia.length === 0) {
       // Instagram doesn't support text-only posts
       logger.warn('Instagram requires media for feed posts');
       for (const token of tokens) {
@@ -608,31 +603,11 @@ export class InstagramPublisher {
           },
         });
       }
-      return { successful, failed, uploadedMedia };
+      return { successful, failed };
     }
 
-    // Upload files to Cloudinary first
-    const uploadResult = await uploadMultipleToCloudinary(files);
-
-    if (uploadResult.successful.length === 0) {
-      logger.error('All media uploads to Cloudinary failed');
-      for (const token of tokens) {
-        failed.push({
-          platform: 'instagram',
-          instagram_account_id: token.instagram_account_id,
-          post_type: 'feed',
-          error: {
-            message: 'Failed to upload media files',
-            details: uploadResult.failed,
-          },
-        });
-      }
-      return { successful, failed, uploadedMedia };
-    }
-
-    uploadedMedia = uploadResult.successful;
-    const images = uploadedMedia.filter((m) => m.resourceType === 'image');
-    const videos = uploadedMedia.filter((m) => m.resourceType === 'video');
+    const images = cloudinaryMedia.filter((m) => m.resourceType === 'image');
+    const videos = cloudinaryMedia.filter((m) => m.resourceType === 'video');
 
     // Publish to each account
     const publishPromises = tokens.map(async (token) => {
@@ -697,11 +672,12 @@ export class InstagramPublisher {
       failed: failed.length,
     });
 
-    return { successful, failed, uploadedMedia };
+    return { successful, failed };
   }
 
   /**
    * Publishes stories to Instagram
+   * Uses pre-uploaded Cloudinary URLs directly - no server-side upload needed
    */
   async publishToStories(
     options: InstagramPublishOptions,
@@ -709,20 +685,18 @@ export class InstagramPublisher {
   ): Promise<{
     successful: InstagramPublishResult[];
     failed: InstagramPublishError[];
-    uploadedMedia: UploadedMedia[];
   }> {
-    const { files = [] } = options;
+    const { cloudinaryMedia = [] } = options;
 
     logger.info('Starting Instagram story publishing', {
-      fileCount: files.length,
+      mediaCount: cloudinaryMedia.length,
       accountCount: tokens.length,
     });
 
     const successful: InstagramPublishResult[] = [];
     const failed: InstagramPublishError[] = [];
-    let uploadedMedia: UploadedMedia[] = [];
 
-    if (files.length === 0) {
+    if (cloudinaryMedia.length === 0) {
       logger.warn('Instagram stories require media');
       for (const token of tokens) {
         failed.push({
@@ -734,30 +708,11 @@ export class InstagramPublisher {
           },
         });
       }
-      return { successful, failed, uploadedMedia };
+      return { successful, failed };
     }
 
-    // Upload first file to Cloudinary (stories are single media)
-    const uploadResult = await uploadMultipleToCloudinary([files[0]]);
-
-    if (uploadResult.successful.length === 0) {
-      logger.error('Media upload to Cloudinary failed for story');
-      for (const token of tokens) {
-        failed.push({
-          platform: 'instagram',
-          instagram_account_id: token.instagram_account_id,
-          post_type: 'story',
-          error: {
-            message: 'Failed to upload media file for story',
-            details: uploadResult.failed,
-          },
-        });
-      }
-      return { successful, failed, uploadedMedia };
-    }
-
-    uploadedMedia = uploadResult.successful;
-    const media = uploadedMedia[0];
+    // Stories use first media only
+    const media = cloudinaryMedia[0];
     const isVideo = media.resourceType === 'video';
 
     // Publish to each account
@@ -800,6 +755,6 @@ export class InstagramPublisher {
       failed: failed.length,
     });
 
-    return { successful, failed, uploadedMedia };
+    return { successful, failed };
   }
 }

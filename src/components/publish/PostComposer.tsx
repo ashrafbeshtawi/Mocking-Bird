@@ -3,21 +3,21 @@
 import React, { useRef, useCallback } from 'react';
 import { Box, TextField, Typography } from '@mui/material';
 import { EmojiPicker } from './EmojiPicker';
-import { MediaUploader } from './MediaUploader';
+import { MediaUploader, UploadedMedia } from './MediaUploader';
 import { TWITTER_CHAR_LIMIT } from '@/types/accounts';
 
 interface PostComposerProps {
   postText: string;
   onTextChange: (text: string) => void;
-  mediaFiles: File[];
-  onMediaChange: (files: File[]) => void;
+  uploadedMedia: UploadedMedia[];
+  onMediaChange: (media: UploadedMedia[]) => void;
   showTwitterWarning: boolean;
 }
 
 export function PostComposer({
   postText,
   onTextChange,
-  mediaFiles,
+  uploadedMedia,
   onMediaChange,
   showTwitterWarning,
 }: PostComposerProps) {
@@ -99,7 +99,7 @@ export function PostComposer({
       </Box>
 
       <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
-        <MediaUploader files={mediaFiles} onFilesChange={onMediaChange} />
+        <MediaUploader uploadedMedia={uploadedMedia} onMediaChange={onMediaChange} />
         <EmojiPicker onEmojiSelect={handleEmojiSelect} onOpen={handleEmojiPickerOpen} />
       </Box>
     </>

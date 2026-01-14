@@ -195,3 +195,27 @@ export async function deleteMultipleFromCloudinary(
 
   await Promise.all(deletePromises);
 }
+
+/**
+ * Deletes Cloudinary media by public ID and resource type
+ * Used for cleaning up client-uploaded media after publishing
+ */
+export async function cleanupCloudinaryMedia(
+  media: Array<{ publicId: string; resourceType: 'image' | 'video' }>
+): Promise<void> {
+  if (media.length === 0) return;
+
+  logger.info('Cleaning up Cloudinary media after publish', { count: media.length });
+
+  const deletePromises = media.map((item) =>
+    deleteFromCloudinary(item.publicId, item.resourceType).catch((error) => {
+      logger.error('Failed to cleanup Cloudinary media', {
+        publicId: item.publicId,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    })
+  );
+
+  await Promise.all(deletePromises);
+  logger.info('Cloudinary cleanup complete');
+}

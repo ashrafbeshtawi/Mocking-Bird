@@ -9,12 +9,14 @@ import {
   CircularProgress,
   Paper,
   useTheme,
+  Backdrop,
 } from '@mui/material';
 import { useConnectedAccounts } from '@/hooks/useConnectedAccounts';
 import { usePublish } from '@/hooks/usePublish';
 import { PostComposer } from '@/components/publish/PostComposer';
 import { AccountSelector } from '@/components/publish/AccountSelector';
 import { PublishResults } from '@/components/publish/PublishResults';
+import type { UploadedMedia } from '@/components/publish/MediaUploader';
 import type { InstagramSelection } from '@/types/accounts';
 import { TWITTER_CHAR_LIMIT } from '@/types/accounts';
 
@@ -34,7 +36,7 @@ export default function PublishPage() {
 
   // Form state
   const [postText, setPostText] = useState('');
-  const [mediaFiles, setMediaFiles] = useState<File[]>([]);
+  const [uploadedMedia, setUploadedMedia] = useState<UploadedMedia[]>([]);
   const [selectedFacebookPages, setSelectedFacebookPages] = useState<string[]>([]);
   const [selectedXAccounts, setSelectedXAccounts] = useState<string[]>([]);
   const [selectedInstagramAccounts, setSelectedInstagramAccounts] = useState<
@@ -95,7 +97,7 @@ export default function PublishPage() {
   const handlePublish = async () => {
     const wasSuccessful = await publish({
       postText,
-      mediaFiles,
+      uploadedMedia,
       selectedFacebookPages,
       selectedXAccounts,
       selectedInstagramAccounts,
@@ -104,7 +106,7 @@ export default function PublishPage() {
     if (wasSuccessful) {
       // Reset form on success
       setPostText('');
-      setMediaFiles([]);
+      setUploadedMedia([]);
       setSelectedFacebookPages(facebookPages.map((p) => p.page_id));
       setSelectedXAccounts(xAccounts.map((a) => a.id));
 
@@ -126,7 +128,7 @@ export default function PublishPage() {
   );
   const canPublish =
     !isPublishing &&
-    (postText.trim() !== '' || mediaFiles.length > 0) &&
+    (postText.trim() !== '' || uploadedMedia.length > 0) &&
     (selectedFacebookPages.length > 0 ||
       selectedXAccounts.length > 0 ||
       hasInstagramSelection);
@@ -141,6 +143,20 @@ export default function PublishPage() {
 
   return (
     <Container maxWidth="md" sx={{ mt: 4 }}>
+      {/* Loading overlay */}
+      <Backdrop
+        sx={{
+          color: '#fff',
+          zIndex: (theme) => theme.zIndex.drawer + 1,
+          flexDirection: 'column',
+          gap: 2,
+        }}
+        open={isPublishing}
+      >
+        <CircularProgress color="inherit" size={60} />
+        <Typography variant="h6">Publishing your post...</Typography>
+      </Backdrop>
+
       <Typography
         variant="h4"
         gutterBottom
@@ -164,8 +180,8 @@ export default function PublishPage() {
             <PostComposer
               postText={postText}
               onTextChange={setPostText}
-              mediaFiles={mediaFiles}
-              onMediaChange={setMediaFiles}
+              uploadedMedia={uploadedMedia}
+              onMediaChange={setUploadedMedia}
               showTwitterWarning={showTwitterWarning}
             />
 
@@ -179,7 +195,7 @@ export default function PublishPage() {
               onFacebookChange={handleFacebookChange}
               onXChange={handleXChange}
               onInstagramChange={handleInstagramChange}
-              mediaSelected={mediaFiles.length > 0}
+              mediaSelected={uploadedMedia.length > 0}
             />
 
             <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>

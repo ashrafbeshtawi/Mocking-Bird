@@ -3,8 +3,7 @@ import { SuccessfulPublishResult, FailedPublishResult, MediaFile } from '@/types
 import { FacebookPublisher, FacebookPageToken } from '@/lib/publishers/facebook';
 import { TwitterPublisherV1, TwitterAccountTokenV1 } from '@/lib/publishers/twitterv1.1';
 import { InstagramPublisher, InstagramAccountToken } from '@/lib/publishers/instagram';
-import { deleteMultipleFromCloudinary } from '@/lib/services/cloudinaryService';
-import { ReportLogger } from './types';
+import { ReportLogger, CloudinaryMediaInfo } from './types';
 import {
   mapFacebookSuccess,
   mapFacebookFailed,
@@ -19,6 +18,7 @@ export interface ExecutePublishOptions {
   pool: Pool;
   text: string;
   mediaFiles: MediaFile[];
+  cloudinaryMedia: CloudinaryMediaInfo[];
   facebookTokens: FacebookPageToken[];
   twitterTokens: TwitterAccountTokenV1[];
   instagramFeedTokens: InstagramAccountToken[];
@@ -41,6 +41,7 @@ export async function executePublish(
     pool,
     text,
     mediaFiles,
+    cloudinaryMedia,
     facebookTokens,
     twitterTokens,
     instagramFeedTokens,
@@ -58,14 +59,16 @@ export async function executePublish(
   const twitterPublisher = new TwitterPublisherV1(pool);
   const instagramPublisher = new InstagramPublisher(pool);
 
+  // Facebook and Twitter use downloaded media files (buffers)
   const facebookOptions = {
     text: text.trim() || undefined,
     files: mediaFiles.length > 0 ? mediaFiles : undefined
   };
 
+  // Instagram uses Cloudinary URLs directly (no need to download)
   const instagramOptions = {
     text: text.trim() || undefined,
-    files: mediaFiles.length > 0 ? mediaFiles : undefined
+    cloudinaryMedia: cloudinaryMedia.length > 0 ? cloudinaryMedia : undefined
   };
 
   const publishPromises: Promise<{ successful: SuccessfulPublishResult[]; failed: FailedPublishResult[] }>[] = [];
@@ -146,97 +149,81 @@ export async function executePublish(
     publishPromises.push(Promise.resolve({ successful: [], failed: [] }));
   }
 
-  // Instagram feed publishing
+  // Instagram feed publishing (uses Cloudinary URLs directly)
   if (instagramFeedTokens.length > 0) {
     publishPromises.push(
-      instagramPublisher.publishToFeed(instagramOptions, instagramFeedTokens).then(async res => {
-        // Clean up Cloudinary uploads after Instagram publishing
-        if (res.uploadedMedia.length > 0) {
-          await deleteMultipleFromCloudinary(res.uploadedMedia).catch(err => {
-            reportLogger.add(`Warning: Failed to clean up Cloudinary uploads: ${err.message}`);
-          });
-        }
-        return {
-          successful: mapInstagramSuccess(
-            res.successful.map(item => ({
-              ...item,
-              result: item.result as { id?: string }
-            }))
-          ),
-          failed: mapInstagramFailed(
-            res.failed.map(item => ({
-              ...item,
-              error: item.error
-                ? {
-                    ...item.error,
-                    details: typeof item.error.details === 'object'
-                      ? item.error.details as {
-                          error?: {
-                            message?: string;
-                            type?: string;
-                            code?: number;
-                            error_subcode?: number;
-                            is_transient?: boolean;
-                            error_user_title?: string;
-                            error_user_msg?: string;
-                            fbtrace_id?: string;
-                          };
-                        }
-                      : undefined
-                  }
-                : undefined
-            }))
-          )
-        };
-      })
+      instagramPublisher.publishToFeed(instagramOptions, instagramFeedTokens).then(res => ({
+        successful: mapInstagramSuccess(
+          res.successful.map(item => ({
+            ...item,
+            result: item.result as { id?: string }
+          }))
+        ),
+        failed: mapInstagramFailed(
+          res.failed.map(item => ({
+            ...item,
+            error: item.error
+              ? {
+                  ...item.error,
+                  details: typeof item.error.details === 'object'
+                    ? item.error.details as {
+                        error?: {
+                          message?: string;
+                          type?: string;
+                          code?: number;
+                          error_subcode?: number;
+                          is_transient?: boolean;
+                          error_user_title?: string;
+                          error_user_msg?: string;
+                          fbtrace_id?: string;
+                        };
+                      }
+                    : undefined
+                }
+              : undefined
+          }))
+        )
+      }))
     );
   } else {
     publishPromises.push(Promise.resolve({ successful: [], failed: [] }));
   }
 
-  // Instagram story publishing
+  // Instagram story publishing (uses Cloudinary URLs directly)
   if (instagramStoryTokens.length > 0) {
     publishPromises.push(
-      instagramPublisher.publishToStories(instagramOptions, instagramStoryTokens).then(async res => {
-        // Clean up Cloudinary uploads after Instagram publishing
-        if (res.uploadedMedia.length > 0) {
-          await deleteMultipleFromCloudinary(res.uploadedMedia).catch(err => {
-            reportLogger.add(`Warning: Failed to clean up Cloudinary uploads: ${err.message}`);
-          });
-        }
-        return {
-          successful: mapInstagramSuccess(
-            res.successful.map(item => ({
-              ...item,
-              result: item.result as { id?: string }
-            }))
-          ),
-          failed: mapInstagramFailed(
-            res.failed.map(item => ({
-              ...item,
-              error: item.error
-                ? {
-                    ...item.error,
-                    details: typeof item.error.details === 'object'
-                      ? item.error.details as {
-                          error?: {
-                            message?: string;
-                            type?: string;
-                            code?: number;
-                            error_subcode?: number;
-                            is_transient?: boolean;
-                            error_user_title?: string;
-                            error_user_msg?: string;
-                            fbtrace_id?: string;
-                          };
-                        }
-                      : undefined
-                  }
-                : undefined
-            }))
-          )
-        };
-      })
+      instagramPublisher.publishToStories(instagramOptions, instagramStoryTokens).then(res => ({
+        successful: mapInstagramSuccess(
+          res.successful.map(item => ({
+            ...item,
+            result: item.result as { id?: string }
+          }))
+        ),
+        failed: mapInstagramFailed(
+          res.failed.map(item => ({
+            ...item,
+            error: item.error
+              ? {
+                  ...item.error,
+                  details: typeof item.error.details === 'object'
+                    ? item.error.details as {
+                        error?: {
+                          message?: string;
+                          type?: string;
+                          code?: number;
+                          error_subcode?: number;
+                          is_transient?: boolean;
+                          error_user_title?: string;
+                          error_user_msg?: string;
+                          fbtrace_id?: string;
+                        };
+                      }
+                    : undefined
+                }
+              : undefined
+          }))
+        )
+      }))
     );
   } else {
     publishPromises.push(Promise.resolve({ successful: [], failed: [] }));

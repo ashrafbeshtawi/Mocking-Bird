@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react';
 import { fetchWithAuth } from '@/lib/fetch';
 import type { InstagramSelection } from '@/types/accounts';
+import type { UploadedMedia } from '@/components/publish/MediaUploader';
 
 interface PublishResult {
   platform: string;
@@ -27,7 +28,7 @@ interface PublishResults {
 
 interface PublishParams {
   postText: string;
-  mediaFiles: File[];
+  uploadedMedia: UploadedMedia[];
   selectedFacebookPages: string[];
   selectedXAccounts: string[];
   selectedInstagramAccounts: Record<string, InstagramSelection>;
@@ -57,7 +58,7 @@ export function usePublish(): UsePublishReturn {
   const publish = useCallback(
     async ({
       postText,
-      mediaFiles,
+      uploadedMedia,
       selectedFacebookPages,
       selectedXAccounts,
       selectedInstagramAccounts,
@@ -81,18 +82,11 @@ export function usePublish(): UsePublishReturn {
         return false;
       }
 
-      if (postText.trim() === '' && mediaFiles.length === 0) {
+      if (postText.trim() === '' && uploadedMedia.length === 0) {
         setError({ message: 'Post text or media cannot be empty.' });
         setIsPublishing(false);
         return false;
       }
-
-      // Build FormData
-      const formData = new FormData();
-      formData.append('text', postText);
-
-      selectedFacebookPages.forEach((id) => formData.append('facebookPages', id));
-      selectedXAccounts.forEach((id) => formData.append('xAccounts', id));
 
       // Process Instagram selections
       const instagramPublishAccounts: string[] = [];
@@ -107,19 +101,32 @@ export function usePublish(): UsePublishReturn {
         }
       });
 
-      instagramPublishAccounts.forEach((id) =>
-        formData.append('instagramPublishAccounts', id)
-      );
-      instagramStoryAccounts.forEach((id) =>
-        formData.append('instagramStoryAccounts', id)
-      );
-
-      mediaFiles.forEach((file) => formData.append('media', file));
+      // Build JSON payload with Cloudinary URLs (no file upload needed)
+      const payload = {
+        text: postText,
+        facebookPages: selectedFacebookPages,
+        xAccounts: selectedXAccounts,
+        instagramPublishAccounts,
+        instagramStoryAccounts,
+        // Send Cloudinary media info instead of raw files
+        cloudinaryMedia: uploadedMedia.map((media) => ({
+          publicId: media.publicId,
+          publicUrl: media.publicUrl,
+          resourceType: media.resourceType,
+          format: media.format,
+          width: media.width,
+          height: media.height,
+          originalFilename: media.originalFilename,
+        })),
+      };
 
       try {
         const response = await fetchWithAuth('/api/publish', {
           method: 'POST',
-          body: formData,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
         });
 
         const responseData = await response.json();

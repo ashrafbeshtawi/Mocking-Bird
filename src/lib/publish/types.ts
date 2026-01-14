@@ -1,7 +1,20 @@
 import { MediaFile, SuccessfulPublishResult, FailedPublishResult } from '@/types/interfaces';
 
 /**
- * Parsed publish request data from FormData
+ * Cloudinary media info sent from the frontend
+ */
+export interface CloudinaryMediaInfo {
+  publicId: string;
+  publicUrl: string;
+  resourceType: 'image' | 'video';
+  format: string;
+  width?: number;
+  height?: number;
+  originalFilename: string;
+}
+
+/**
+ * Parsed publish request data from JSON
  */
 export interface PublishRequest {
   text: string;
@@ -9,7 +22,7 @@ export interface PublishRequest {
   xAccounts: string[];
   instagramPublishAccounts: string[];
   instagramStoryAccounts: string[];
-  mediaFiles: File[];
+  cloudinaryMedia: CloudinaryMediaInfo[];
 }
 
 /**

@@ -46,7 +46,7 @@ export function InstagramSelector({
               return (
                 <Box key={account.id} sx={{ mb: 1 }}>
                   <Typography variant="body2" component="div" sx={{ fontWeight: 'bold' }}>
-                    {account.username} ({account.displayName})
+                    {account.username} {account.displayName}
                   </Typography>
                   <Box sx={{ display: 'flex', pl: 2 }}>
                     <FormControlLabel

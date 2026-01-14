@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import pool from '@/lib/db';
 import { createLogger } from '@/lib/logger';
 import { validateUserId, validateTextContent, validateAccountArrays, parsePublishRequest } from '@/lib/publish/validators/requestValidator';
-import { processMediaFiles, validateMediaMix } from '@/lib/publish/validators/mediaValidator';
+import { processCloudinaryMedia, validateMediaMix } from '@/lib/publish/validators/mediaValidator';
 import { fetchAllTokens, validateMissingAccounts, formatMissingAccounts, hasMissingAccounts } from '@/lib/publish/services/tokenService';
 import { createReportLogger, buildAndSaveResponse, buildErrorResponse } from '@/lib/publish/services/reportService';
 import { executePublish } from '@/lib/publish/orchestrator';
+import { cleanupCloudinaryMedia } from '@/lib/services/cloudinaryService';
 
 const logger = createLogger('PublishAPI');
 
@@ -25,30 +26,27 @@ export async function POST(req: NextRequest) {
   reportLogger.add(`Processing request for user: ${userId}`);
 
   try {
-    // 2. Parse request
-    const formData = await req.formData();
-    const parseResult = await parsePublishRequest(formData);
+    // 2. Parse request (JSON body)
+    const body = await req.json();
+    const parseResult = await parsePublishRequest(body);
 
     if (!parseResult.success || !parseResult.data) {
       return buildErrorResponse(reportLogger.getReport(), 400, parseResult.error || 'Failed to parse request');
     }
 
-    const { text, facebookPages, xAccounts, instagramPublishAccounts, instagramStoryAccounts, mediaFiles: rawMediaFiles } = parseResult.data;
-    reportLogger.add(`Request payload parsed. Text length: ${text?.length || 0}, Facebook pages: ${facebookPages?.length || 0}, X accounts: ${xAccounts?.length || 0}, Instagram feed: ${instagramPublishAccounts?.length || 0}, Instagram stories: ${instagramStoryAccounts?.length || 0}, Media files: ${rawMediaFiles?.length || 0}`);
+    const { text, facebookPages, xAccounts, instagramPublishAccounts, instagramStoryAccounts, cloudinaryMedia } = parseResult.data;
+    reportLogger.add(`Request payload parsed. Text length: ${text?.length || 0}, Facebook pages: ${facebookPages?.length || 0}, X accounts: ${xAccounts?.length || 0}, Instagram feed: ${instagramPublishAccounts?.length || 0}, Instagram stories: ${instagramStoryAccounts?.length || 0}, Cloudinary media: ${cloudinaryMedia?.length || 0}`);
 
-    // 3. Process media files
-    const mediaResult = await processMediaFiles(rawMediaFiles, reportLogger);
-
-    // Check for mixed media types
-    if (mediaResult.files.length > 0) {
-      const mixCheck = validateMediaMix(mediaResult.files);
+    // 3. Check for mixed media types
+    if (cloudinaryMedia.length > 0) {
+      const mixCheck = validateMediaMix(cloudinaryMedia);
       if (mixCheck.mixed) {
         reportLogger.add(`Error: Mixed media types detected. Images: ${mixCheck.imageCount}, Videos: ${mixCheck.videoCount}`);
         return await buildAndSaveResponse({
           pool,
           userId,
           report: reportLogger.getReport(),
-          contentToStore: text + (mediaResult.files.length > 0 ? ` [${mediaResult.files.length} media files attached]` : ''),
+          contentToStore: text + (cloudinaryMedia.length > 0 ? ` [${cloudinaryMedia.length} media files attached]` : ''),
           successful: [],
           failed: [],
           status: 400,
@@ -59,7 +57,7 @@ export async function POST(req: NextRequest) {
 
     // 4. Validate text content
     const hasAnyAccount = facebookPages.length > 0 || xAccounts.length > 0 || instagramPublishAccounts.length > 0 || instagramStoryAccounts.length > 0;
-    const textValidation = validateTextContent(text, mediaResult.files.length > 0, hasAnyAccount);
+    const textValidation = validateTextContent(text, cloudinaryMedia.length > 0, hasAnyAccount);
     if (!textValidation.success) {
       reportLogger.add(`WARN: Invalid text input and no media files. Text: ${text?.substring(0, 100)}`);
       return await buildAndSaveResponse({
@@ -71,10 +69,10 @@ export async function POST(req: NextRequest) {
         failed: [],
         status: 400,
         error: textValidation.error,
-        mediaProcessing: rawMediaFiles.length > 0 ? {
-          totalFiles: rawMediaFiles.length,
-          processedFiles: mediaResult.files.length,
-          errors: mediaResult.errors.map(error => ({ message: error }))
+        mediaProcessing: cloudinaryMedia.length > 0 ? {
+          totalFiles: cloudinaryMedia.length,
+          processedFiles: 0,
+          errors: []
         } : undefined
       });
     }
@@ -95,8 +93,15 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 6. Check if all media failed
-    if (mediaResult.allFailed && rawMediaFiles.length > 0) {
+    // 6. Process Cloudinary media (download for Facebook/Twitter)
+    // We only need to download if we have Facebook or Twitter accounts
+    const needsDownload = facebookPages.length > 0 || xAccounts.length > 0;
+    const mediaResult = needsDownload
+      ? await processCloudinaryMedia(cloudinaryMedia, reportLogger)
+      : { files: [], errors: [], totalFiles: cloudinaryMedia.length, allFailed: false };
+
+    // Check if all media failed (only for Facebook/Twitter)
+    if (needsDownload && mediaResult.allFailed && cloudinaryMedia.length > 0) {
       reportLogger.add(`ERROR: All media files failed processing`);
       return await buildAndSaveResponse({
         pool,
@@ -106,9 +111,9 @@ export async function POST(req: NextRequest) {
         successful: [],
         failed: [],
         status: 400,
-        error: 'All media files failed processing. Please check file types and sizes.',
+        error: 'All media files failed processing. Please try uploading again.',
         mediaProcessing: {
-          totalFiles: rawMediaFiles.length,
+          totalFiles: cloudinaryMedia.length,
           processedFiles: 0,
           errors: mediaResult.errors.map(error => ({ message: error }))
         }
@@ -127,7 +132,6 @@ export async function POST(req: NextRequest) {
     );
 
     // 8. Validate missing accounts
-    // Combine all Instagram account IDs for validation (deduplicate)
     const allInstagramAccountIds = [...new Set([...instagramPublishAccounts, ...instagramStoryAccounts])];
     const allInstagramTokens = [...instagramFeedTokens, ...instagramStoryTokens].filter(
       (token, index, self) => index === self.findIndex(t => t.instagram_account_id === token.instagram_account_id)
@@ -154,6 +158,7 @@ export async function POST(req: NextRequest) {
       pool,
       text: text.trim(),
       mediaFiles: mediaResult.files,
+      cloudinaryMedia, // Pass Cloudinary info for Instagram
       facebookTokens,
       twitterTokens,
       instagramFeedTokens,
@@ -162,12 +167,12 @@ export async function POST(req: NextRequest) {
     });
 
     const { successful, failed } = publishResult;
-    const contentToStore = text + (mediaResult.files.length > 0 ? ` [${mediaResult.files.length} media files attached]` : '');
+    const contentToStore = text + (cloudinaryMedia.length > 0 ? ` [${cloudinaryMedia.length} media files attached]` : '');
 
     // 10. Build response based on results
-    const mediaProcessing = rawMediaFiles.length > 0 ? {
-      totalFiles: rawMediaFiles.length,
-      processedFiles: mediaResult.files.length,
+    const mediaProcessing = cloudinaryMedia.length > 0 ? {
+      totalFiles: cloudinaryMedia.length,
+      processedFiles: needsDownload ? mediaResult.files.length : cloudinaryMedia.length,
       errors: mediaResult.errors.map(error => ({ message: error }))
     } : undefined;
 
@@ -188,6 +193,12 @@ export async function POST(req: NextRequest) {
 
     if (failed.length > 0) {
       reportLogger.add(`Partial success - some posts failed`);
+      // Clean up Cloudinary media even on partial success (media was used)
+      if (cloudinaryMedia.length > 0) {
+        cleanupCloudinaryMedia(cloudinaryMedia).catch((err) => {
+          reportLogger.add(`Warning: Failed to cleanup Cloudinary media: ${err.message}`);
+        });
+      }
       return await buildAndSaveResponse({
         pool,
         userId,
@@ -202,6 +213,12 @@ export async function POST(req: NextRequest) {
     }
 
     reportLogger.add(`All posts published successfully`);
+    // Clean up Cloudinary media after successful publish
+    if (cloudinaryMedia.length > 0) {
+      cleanupCloudinaryMedia(cloudinaryMedia).catch((err) => {
+        reportLogger.add(`Warning: Failed to cleanup Cloudinary media: ${err.message}`);
+      });
+    }
     return await buildAndSaveResponse({
       pool,
       userId,

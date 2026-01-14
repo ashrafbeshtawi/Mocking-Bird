@@ -1,4 +1,4 @@
-import { PublishRequest } from '../types';
+import { PublishRequest, CloudinaryMediaInfo } from '../types';
 
 export interface ValidationResult<T> {
   success: boolean;
@@ -72,17 +72,77 @@ export function validateAccountArrays(
 }
 
 /**
- * Parses FormData into a typed PublishRequest
+ * Validates Cloudinary media info
+ */
+function validateCloudinaryMedia(media: unknown[]): ValidationResult<CloudinaryMediaInfo[]> {
+  if (!Array.isArray(media)) {
+    return { success: true, data: [] };
+  }
+
+  const validMedia: CloudinaryMediaInfo[] = [];
+  for (const item of media) {
+    if (
+      typeof item === 'object' &&
+      item !== null &&
+      'publicId' in item &&
+      'publicUrl' in item &&
+      'resourceType' in item
+    ) {
+      const mediaItem = item as CloudinaryMediaInfo;
+      if (
+        typeof mediaItem.publicId === 'string' &&
+        typeof mediaItem.publicUrl === 'string' &&
+        (mediaItem.resourceType === 'image' || mediaItem.resourceType === 'video')
+      ) {
+        validMedia.push({
+          publicId: mediaItem.publicId,
+          publicUrl: mediaItem.publicUrl,
+          resourceType: mediaItem.resourceType,
+          format: mediaItem.format || '',
+          width: mediaItem.width,
+          height: mediaItem.height,
+          originalFilename: mediaItem.originalFilename || 'unknown',
+        });
+      }
+    }
+  }
+
+  return { success: true, data: validMedia };
+}
+
+/**
+ * Parses JSON body into a typed PublishRequest
  */
 export async function parsePublishRequest(
-  formData: FormData
+  body: unknown
 ): Promise<ValidationResult<PublishRequest>> {
-  const text = formData.get('text') as string || '';
-  const facebookPages = formData.getAll('facebookPages').map(String);
-  const xAccounts = formData.getAll('xAccounts').map(String);
-  const instagramPublishAccounts = formData.getAll('instagramPublishAccounts').map(String);
-  const instagramStoryAccounts = formData.getAll('instagramStoryAccounts').map(String);
-  const media = formData.getAll('media').filter((f) => typeof f !== 'string') as File[];
+  if (typeof body !== 'object' || body === null) {
+    return { success: false, error: 'Invalid request body' };
+  }
+
+  const data = body as Record<string, unknown>;
+
+  const text = typeof data.text === 'string' ? data.text : '';
+  const facebookPages = Array.isArray(data.facebookPages)
+    ? data.facebookPages.filter((id): id is string => typeof id === 'string')
+    : [];
+  const xAccounts = Array.isArray(data.xAccounts)
+    ? data.xAccounts.filter((id): id is string => typeof id === 'string')
+    : [];
+  const instagramPublishAccounts = Array.isArray(data.instagramPublishAccounts)
+    ? data.instagramPublishAccounts.filter((id): id is string => typeof id === 'string')
+    : [];
+  const instagramStoryAccounts = Array.isArray(data.instagramStoryAccounts)
+    ? data.instagramStoryAccounts.filter((id): id is string => typeof id === 'string')
+    : [];
+
+  const mediaValidation = validateCloudinaryMedia(
+    Array.isArray(data.cloudinaryMedia) ? data.cloudinaryMedia : []
+  );
+
+  if (!mediaValidation.success) {
+    return { success: false, error: mediaValidation.error };
+  }
 
   return {
     success: true,
@@ -92,7 +152,7 @@ export async function parsePublishRequest(
       xAccounts,
       instagramPublishAccounts,
       instagramStoryAccounts,
-      mediaFiles: media
-    }
+      cloudinaryMedia: mediaValidation.data || [],
+    },
   };
 }
