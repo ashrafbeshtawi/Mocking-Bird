@@ -4,11 +4,41 @@ import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('CloudinaryService');
 
-// Configure Cloudinary from CLOUDINARY_URL environment variable
+let isConfigured = false;
+
+// Parse CLOUDINARY_URL and configure explicitly
 // Format: cloudinary://API_KEY:API_SECRET@CLOUD_NAME
-cloudinary.config({
-  secure: true,
-});
+function ensureConfigured() {
+  if (isConfigured) return;
+
+  const cloudinaryUrl = process.env.CLOUDINARY_URL;
+
+  if (!cloudinaryUrl) {
+    logger.error('CLOUDINARY_URL environment variable is not set');
+    throw new Error('CLOUDINARY_URL environment variable is not set');
+  }
+
+  // Parse the URL: cloudinary://API_KEY:API_SECRET@CLOUD_NAME
+  const match = cloudinaryUrl.match(/cloudinary:\/\/(\d+):([^@]+)@(.+)/);
+
+  if (!match) {
+    logger.error('Invalid CLOUDINARY_URL format', { url: cloudinaryUrl.substring(0, 20) + '...' });
+    throw new Error('Invalid CLOUDINARY_URL format. Expected: cloudinary://API_KEY:API_SECRET@CLOUD_NAME');
+  }
+
+  const [, apiKey, apiSecret, cloudName] = match;
+
+  logger.info('Configuring Cloudinary', { cloudName, apiKeyPrefix: apiKey.substring(0, 6) + '...' });
+
+  cloudinary.config({
+    cloud_name: cloudName,
+    api_key: apiKey,
+    api_secret: apiSecret,
+    secure: true,
+  });
+
+  isConfigured = true;
+}
 
 export interface UploadedMedia {
   publicUrl: string;
@@ -28,6 +58,9 @@ export interface CloudinaryUploadError {
  * Uploads a media file to Cloudinary and returns the public URL
  */
 export async function uploadToCloudinary(file: MediaFile): Promise<UploadedMedia> {
+  // Ensure Cloudinary is configured before uploading
+  ensureConfigured();
+
   logger.info('Uploading file to Cloudinary', {
     filename: file.filename,
     mimetype: file.mimetype,
@@ -126,6 +159,9 @@ export async function deleteFromCloudinary(
   publicId: string,
   resourceType: 'image' | 'video' = 'image'
 ): Promise<void> {
+  // Ensure Cloudinary is configured before deleting
+  ensureConfigured();
+
   logger.info('Deleting file from Cloudinary', { publicId, resourceType });
 
   try {

@@ -254,15 +254,39 @@ export class InstagramPublisher {
   private async checkContainerStatus(
     containerId: string,
     accessToken: string
-  ): Promise<'FINISHED' | 'IN_PROGRESS' | 'ERROR'> {
-    const response = await axios.get(`${GRAPH_API_BASE}/${containerId}`, {
-      params: {
-        access_token: accessToken,
-        fields: 'status_code',
-      },
-    });
+  ): Promise<{ status: string; statusCode?: string }> {
+    try {
+      const response = await axios.get(`${GRAPH_API_BASE}/${containerId}`, {
+        params: {
+          access_token: accessToken,
+          fields: 'status_code,status',
+        },
+      });
 
-    return response.data.status_code;
+      logger.info('Container status check response', {
+        containerId,
+        statusCode: response.data.status_code,
+        status: response.data.status,
+      });
+
+      return {
+        status: response.data.status || 'UNKNOWN',
+        statusCode: response.data.status_code,
+      };
+    } catch (error) {
+      logger.error('Failed to check container status', {
+        containerId,
+        error: axios.isAxiosError(error)
+          ? {
+              status: error.response?.status,
+              data: error.response?.data,
+              message: error.message,
+            }
+          : error,
+      });
+      // Return IN_PROGRESS on error to continue polling
+      return { status: 'IN_PROGRESS', statusCode: undefined };
+    }
   }
 
   /**
@@ -271,34 +295,42 @@ export class InstagramPublisher {
   private async waitForContainerReady(
     containerId: string,
     accessToken: string,
-    maxAttempts = 30,
-    delayMs = 5000
+    maxAttempts = 60,
+    delayMs = 3000
   ): Promise<void> {
-    logger.info('Waiting for container to be ready', { containerId });
+    logger.info('Waiting for container to be ready', { containerId, maxAttempts, delayMs });
+
+    // Initial delay - Instagram needs time to start processing
+    await new Promise((resolve) => setTimeout(resolve, 2000));
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      const status = await this.checkContainerStatus(containerId, accessToken);
+      const { status, statusCode } = await this.checkContainerStatus(containerId, accessToken);
 
-      if (status === 'FINISHED') {
-        logger.info('Container is ready', { containerId, attempt });
+      // Check for finished status
+      if (statusCode === 'FINISHED' || status === 'FINISHED') {
+        logger.info('Container is ready', { containerId, attempt, statusCode, status });
         return;
       }
 
-      if (status === 'ERROR') {
-        throw new Error('Media container processing failed');
+      // Check for error status
+      if (statusCode === 'ERROR' || status === 'ERROR' || statusCode === 'EXPIRED') {
+        logger.error('Container processing failed', { containerId, statusCode, status });
+        throw new Error(`Media container processing failed with status: ${statusCode || status}`);
       }
 
       logger.info('Container still processing', {
         containerId,
+        statusCode,
         status,
         attempt,
         maxAttempts,
+        elapsedSeconds: attempt * (delayMs / 1000),
       });
 
       await new Promise((resolve) => setTimeout(resolve, delayMs));
     }
 
-    throw new Error('Timeout waiting for media container to be ready');
+    throw new Error(`Timeout waiting for media container to be ready after ${maxAttempts * delayMs / 1000} seconds`);
   }
 
   /**
@@ -351,6 +383,59 @@ export class InstagramPublisher {
   }
 
   /**
+   * Waits for an image container to be ready
+   * Images don't return status_code, so we use a simple delay with retry
+   */
+  private async waitForImageContainerReady(
+    containerId: string,
+    accessToken: string,
+    instagramAccountId: string,
+    maxRetries = 5,
+    delayMs = 3000
+  ): Promise<void> {
+    logger.info('Waiting for image container to be ready', { containerId, maxRetries, delayMs });
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      // Wait before attempting to publish
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+
+      try {
+        // Try to check if container exists and is accessible
+        const response = await axios.get(`${GRAPH_API_BASE}/${containerId}`, {
+          params: {
+            access_token: accessToken,
+            fields: 'id,status',
+          },
+        });
+
+        logger.info('Image container check', {
+          containerId,
+          attempt,
+          response: response.data,
+        });
+
+        // If we get a response, the container is ready
+        if (response.data.id) {
+          logger.info('Image container is ready', { containerId, attempt });
+          return;
+        }
+      } catch (error) {
+        logger.warn('Image container not ready yet', {
+          containerId,
+          attempt,
+          error: axios.isAxiosError(error) ? error.response?.data : error,
+        });
+
+        if (attempt === maxRetries) {
+          // On last attempt, don't throw - let the publish attempt handle the error
+          logger.info('Max retries reached, attempting to publish anyway', { containerId });
+          return;
+        }
+      }
+    }
+  }
+
+  /**
    * Publishes a single image to Instagram feed
    */
   private async publishSingleImage(
@@ -364,7 +449,13 @@ export class InstagramPublisher {
       { imageUrl, caption }
     );
 
-    // Images don't need processing wait
+    // Wait for image container to be ready
+    await this.waitForImageContainerReady(
+      containerId,
+      token.page_access_token,
+      token.instagram_account_id
+    );
+
     return this.publishContainer(
       token.instagram_account_id,
       token.page_access_token,
@@ -420,12 +511,23 @@ export class InstagramPublisher {
       childrenIds.push(childId);
     }
 
+    // Wait for all child containers to be ready
+    logger.info('Waiting for carousel child containers to be ready', { count: childrenIds.length });
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+
     // Create the carousel container
     const carouselId = await this.createCarouselContainer(
       token.instagram_account_id,
       token.page_access_token,
       childrenIds,
       caption
+    );
+
+    // Wait for carousel container to be ready
+    await this.waitForImageContainerReady(
+      carouselId,
+      token.page_access_token,
+      token.instagram_account_id
     );
 
     return this.publishContainer(
@@ -454,6 +556,13 @@ export class InstagramPublisher {
 
     if (isVideo) {
       await this.waitForContainerReady(containerId, token.page_access_token);
+    } else {
+      // Wait for image story container to be ready
+      await this.waitForImageContainerReady(
+        containerId,
+        token.page_access_token,
+        token.instagram_account_id
+      );
     }
 
     return this.publishContainer(
