@@ -20,6 +20,7 @@
     "@types/jsonwebtoken": "^9.0.10",
     "axios": "^1.11.0",
     "bcrypt": "^6.0.0",
+    "cloudinary": "^2.8.0",
     "cookie": "^1.0.2",
     "crypto-js": "^4.2.0",
     "dotenv": "^17.2.0",

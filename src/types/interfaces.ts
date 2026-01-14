@@ -3,11 +3,13 @@ export interface FailedPublishResult {
   platform: string;
   page_id?: string;
   account_id?: string;
+  instagram_account_id?: string;
+  post_type?: 'feed' | 'story';
   error?: {
     message?: string;
     code?: string;
     details?: { // Added details based on user feedback
-      error?: { // Facebook specific
+      error?: { // Facebook/Instagram specific
         message?: string;
         type?: string;
         code?: number;
@@ -31,6 +33,9 @@ export interface SuccessfulPublishResult {
   tweet_id?: string; // e.g., for Twitter tweet ID
   page_id?: string; // For Facebook pages
   account_id?: string; // For X accounts
+  instagram_account_id?: string; // For Instagram accounts
+  instagram_media_id?: string; // For Instagram media ID
+  post_type?: 'feed' | 'story'; // For Instagram post type
 }
 
 // Define the overall structure for publish results
@@ -110,6 +115,37 @@ export interface TwitterSuccessItem {
     data?: {
       id?: string;
     };
+  };
+}
+
+export interface InstagramFailedItem {
+  platform: 'instagram';
+  instagram_account_id: string;
+  post_type: 'feed' | 'story';
+  error?: {
+    message?: string;
+    code?: string;
+    details?: {
+      error?: {
+        message?: string;
+        type?: string;
+        code?: number;
+        error_subcode?: number;
+        is_transient?: boolean;
+        error_user_title?: string;
+        error_user_msg?: string;
+        fbtrace_id?: string;
+      };
+    };
+  };
+}
+
+export interface InstagramSuccessItem {
+  platform: 'instagram';
+  instagram_account_id: string;
+  post_type: 'feed' | 'story';
+  result?: {
+    id?: string;
   };
 }
 

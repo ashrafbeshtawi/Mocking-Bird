@@ -37,7 +37,9 @@ export function validateTextContent(
  */
 export function validateAccountArrays(
   facebookPages: string[],
-  xAccounts: string[]
+  xAccounts: string[],
+  instagramPublishAccounts: string[] = [],
+  instagramStoryAccounts: string[] = []
 ): ValidationResult<void> {
   if (!Array.isArray(facebookPages) || !Array.isArray(xAccounts)) {
     return {
@@ -46,7 +48,20 @@ export function validateAccountArrays(
     };
   }
 
-  if (facebookPages.length === 0 && xAccounts.length === 0) {
+  if (!Array.isArray(instagramPublishAccounts) || !Array.isArray(instagramStoryAccounts)) {
+    return {
+      success: false,
+      error: 'instagramPublishAccounts and instagramStoryAccounts must be arrays'
+    };
+  }
+
+  const hasAnyAccount =
+    facebookPages.length > 0 ||
+    xAccounts.length > 0 ||
+    instagramPublishAccounts.length > 0 ||
+    instagramStoryAccounts.length > 0;
+
+  if (!hasAnyAccount) {
     return {
       success: false,
       error: 'At least one social media account must be selected'
@@ -65,6 +80,8 @@ export async function parsePublishRequest(
   const text = formData.get('text') as string || '';
   const facebookPages = formData.getAll('facebookPages').map(String);
   const xAccounts = formData.getAll('xAccounts').map(String);
+  const instagramPublishAccounts = formData.getAll('instagramPublishAccounts').map(String);
+  const instagramStoryAccounts = formData.getAll('instagramStoryAccounts').map(String);
   const media = formData.getAll('media').filter((f) => typeof f !== 'string') as File[];
 
   return {
@@ -73,6 +90,8 @@ export async function parsePublishRequest(
       text,
       facebookPages,
       xAccounts,
+      instagramPublishAccounts,
+      instagramStoryAccounts,
       mediaFiles: media
     }
   };

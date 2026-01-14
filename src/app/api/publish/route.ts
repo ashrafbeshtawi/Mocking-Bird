@@ -33,8 +33,8 @@ export async function POST(req: NextRequest) {
       return buildErrorResponse(reportLogger.getReport(), 400, parseResult.error || 'Failed to parse request');
     }
 
-    const { text, facebookPages, xAccounts, mediaFiles: rawMediaFiles } = parseResult.data;
-    reportLogger.add(`Request payload parsed. Text length: ${text?.length || 0}, Facebook pages: ${facebookPages?.length || 0}, X accounts: ${xAccounts?.length || 0}, Media files: ${rawMediaFiles?.length || 0}`);
+    const { text, facebookPages, xAccounts, instagramPublishAccounts, instagramStoryAccounts, mediaFiles: rawMediaFiles } = parseResult.data;
+    reportLogger.add(`Request payload parsed. Text length: ${text?.length || 0}, Facebook pages: ${facebookPages?.length || 0}, X accounts: ${xAccounts?.length || 0}, Instagram feed: ${instagramPublishAccounts?.length || 0}, Instagram stories: ${instagramStoryAccounts?.length || 0}, Media files: ${rawMediaFiles?.length || 0}`);
 
     // 3. Process media files
     const mediaResult = await processMediaFiles(rawMediaFiles, reportLogger);
@@ -58,7 +58,8 @@ export async function POST(req: NextRequest) {
     }
 
     // 4. Validate text content
-    const textValidation = validateTextContent(text, mediaResult.files.length > 0, facebookPages.length > 0 || xAccounts.length > 0);
+    const hasAnyAccount = facebookPages.length > 0 || xAccounts.length > 0 || instagramPublishAccounts.length > 0 || instagramStoryAccounts.length > 0;
+    const textValidation = validateTextContent(text, mediaResult.files.length > 0, hasAnyAccount);
     if (!textValidation.success) {
       reportLogger.add(`WARN: Invalid text input and no media files. Text: ${text?.substring(0, 100)}`);
       return await buildAndSaveResponse({
@@ -79,7 +80,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 5. Validate account arrays
-    const accountValidation = validateAccountArrays(facebookPages, xAccounts);
+    const accountValidation = validateAccountArrays(facebookPages, xAccounts, instagramPublishAccounts, instagramStoryAccounts);
     if (!accountValidation.success) {
       reportLogger.add(`WARN: ${accountValidation.error}`);
       return await buildAndSaveResponse({
@@ -115,10 +116,23 @@ export async function POST(req: NextRequest) {
     }
 
     // 7. Fetch tokens
-    const { facebookTokens, twitterTokens } = await fetchAllTokens(pool, userId, facebookPages, xAccounts, reportLogger);
+    const { facebookTokens, twitterTokens, instagramFeedTokens, instagramStoryTokens } = await fetchAllTokens(
+      pool,
+      userId,
+      facebookPages,
+      xAccounts,
+      instagramPublishAccounts,
+      instagramStoryAccounts,
+      reportLogger
+    );
 
     // 8. Validate missing accounts
-    const missing = validateMissingAccounts(facebookPages, xAccounts, facebookTokens, twitterTokens);
+    // Combine all Instagram account IDs for validation (deduplicate)
+    const allInstagramAccountIds = [...new Set([...instagramPublishAccounts, ...instagramStoryAccounts])];
+    const allInstagramTokens = [...instagramFeedTokens, ...instagramStoryTokens].filter(
+      (token, index, self) => index === self.findIndex(t => t.instagram_account_id === token.instagram_account_id)
+    );
+    const missing = validateMissingAccounts(facebookPages, xAccounts, allInstagramAccountIds, facebookTokens, twitterTokens, allInstagramTokens);
     if (hasMissingAccounts(missing)) {
       const missingAccounts = formatMissingAccounts(missing);
       reportLogger.add(`ERROR: Missing accounts detected. Details: ${missingAccounts.join(', ')}`);
@@ -142,6 +156,8 @@ export async function POST(req: NextRequest) {
       mediaFiles: mediaResult.files,
       facebookTokens,
       twitterTokens,
+      instagramFeedTokens,
+      instagramStoryTokens,
       reportLogger
     });
 

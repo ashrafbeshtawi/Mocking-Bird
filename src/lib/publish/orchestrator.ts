@@ -2,12 +2,16 @@ import { Pool } from 'pg';
 import { SuccessfulPublishResult, FailedPublishResult, MediaFile } from '@/types/interfaces';
 import { FacebookPublisher, FacebookPageToken } from '@/lib/publishers/facebook';
 import { TwitterPublisherV1, TwitterAccountTokenV1 } from '@/lib/publishers/twitterv1.1';
+import { InstagramPublisher, InstagramAccountToken } from '@/lib/publishers/instagram';
+import { deleteMultipleFromCloudinary } from '@/lib/services/cloudinaryService';
 import { ReportLogger } from './types';
 import {
   mapFacebookSuccess,
   mapFacebookFailed,
   mapTwitterSuccess,
   mapTwitterFailed,
+  mapInstagramSuccess,
+  mapInstagramFailed,
   formatFailedDetails
 } from './mappers/resultMappers';
 
@@ -17,6 +21,8 @@ export interface ExecutePublishOptions {
   mediaFiles: MediaFile[];
   facebookTokens: FacebookPageToken[];
   twitterTokens: TwitterAccountTokenV1[];
+  instagramFeedTokens: InstagramAccountToken[];
+  instagramStoryTokens: InstagramAccountToken[];
   reportLogger: ReportLogger;
 }
 
@@ -31,14 +37,33 @@ export interface ExecutePublishResult {
 export async function executePublish(
   options: ExecutePublishOptions
 ): Promise<ExecutePublishResult> {
-  const { pool, text, mediaFiles, facebookTokens, twitterTokens, reportLogger } = options;
+  const {
+    pool,
+    text,
+    mediaFiles,
+    facebookTokens,
+    twitterTokens,
+    instagramFeedTokens,
+    instagramStoryTokens,
+    reportLogger
+  } = options;
 
-  reportLogger.add(`Starting publishing process to ${facebookTokens.length} Facebook pages and ${twitterTokens.length} X accounts`);
+  reportLogger.add(
+    `Starting publishing process to ${facebookTokens.length} Facebook pages, ` +
+    `${twitterTokens.length} X accounts, ${instagramFeedTokens.length} Instagram feed accounts, ` +
+    `${instagramStoryTokens.length} Instagram story accounts`
+  );
 
   const facebookPublisher = new FacebookPublisher(pool);
   const twitterPublisher = new TwitterPublisherV1(pool);
+  const instagramPublisher = new InstagramPublisher(pool);
 
   const facebookOptions = {
+    text: text.trim() || undefined,
+    files: mediaFiles.length > 0 ? mediaFiles : undefined
+  };
+
+  const instagramOptions = {
     text: text.trim() || undefined,
     files: mediaFiles.length > 0 ? mediaFiles : undefined
   };
@@ -121,10 +146,116 @@ export async function executePublish(
     publishPromises.push(Promise.resolve({ successful: [], failed: [] }));
   }
 
-  const [fbResults, xResults] = await Promise.all(publishPromises);
+  // Instagram feed publishing
+  if (instagramFeedTokens.length > 0) {
+    publishPromises.push(
+      instagramPublisher.publishToFeed(instagramOptions, instagramFeedTokens).then(async res => {
+        // Clean up Cloudinary uploads after Instagram publishing
+        if (res.uploadedMedia.length > 0) {
+          await deleteMultipleFromCloudinary(res.uploadedMedia).catch(err => {
+            reportLogger.add(`Warning: Failed to clean up Cloudinary uploads: ${err.message}`);
+          });
+        }
+        return {
+          successful: mapInstagramSuccess(
+            res.successful.map(item => ({
+              ...item,
+              result: item.result as { id?: string }
+            }))
+          ),
+          failed: mapInstagramFailed(
+            res.failed.map(item => ({
+              ...item,
+              error: item.error
+                ? {
+                    ...item.error,
+                    details: typeof item.error.details === 'object'
+                      ? item.error.details as {
+                          error?: {
+                            message?: string;
+                            type?: string;
+                            code?: number;
+                            error_subcode?: number;
+                            is_transient?: boolean;
+                            error_user_title?: string;
+                            error_user_msg?: string;
+                            fbtrace_id?: string;
+                          };
+                        }
+                      : undefined
+                  }
+                : undefined
+            }))
+          )
+        };
+      })
+    );
+  } else {
+    publishPromises.push(Promise.resolve({ successful: [], failed: [] }));
+  }
 
-  const allSuccessful = [...fbResults.successful, ...xResults.successful];
-  const allFailed = [...fbResults.failed, ...xResults.failed];
+  // Instagram story publishing
+  if (instagramStoryTokens.length > 0) {
+    publishPromises.push(
+      instagramPublisher.publishToStories(instagramOptions, instagramStoryTokens).then(async res => {
+        // Clean up Cloudinary uploads after Instagram publishing
+        if (res.uploadedMedia.length > 0) {
+          await deleteMultipleFromCloudinary(res.uploadedMedia).catch(err => {
+            reportLogger.add(`Warning: Failed to clean up Cloudinary uploads: ${err.message}`);
+          });
+        }
+        return {
+          successful: mapInstagramSuccess(
+            res.successful.map(item => ({
+              ...item,
+              result: item.result as { id?: string }
+            }))
+          ),
+          failed: mapInstagramFailed(
+            res.failed.map(item => ({
+              ...item,
+              error: item.error
+                ? {
+                    ...item.error,
+                    details: typeof item.error.details === 'object'
+                      ? item.error.details as {
+                          error?: {
+                            message?: string;
+                            type?: string;
+                            code?: number;
+                            error_subcode?: number;
+                            is_transient?: boolean;
+                            error_user_title?: string;
+                            error_user_msg?: string;
+                            fbtrace_id?: string;
+                          };
+                        }
+                      : undefined
+                  }
+                : undefined
+            }))
+          )
+        };
+      })
+    );
+  } else {
+    publishPromises.push(Promise.resolve({ successful: [], failed: [] }));
+  }
+
+  const [fbResults, xResults, igFeedResults, igStoryResults] = await Promise.all(publishPromises);
+
+  const allSuccessful = [
+    ...fbResults.successful,
+    ...xResults.successful,
+    ...igFeedResults.successful,
+    ...igStoryResults.successful
+  ];
+  const allFailed = [
+    ...fbResults.failed,
+    ...xResults.failed,
+    ...igFeedResults.failed,
+    ...igStoryResults.failed
+  ];
 
   reportLogger.add(`Publishing complete. Successful posts: ${allSuccessful.length}, Failed posts: ${allFailed.length}`);
 

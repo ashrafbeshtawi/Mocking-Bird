@@ -3,7 +3,15 @@
     "allow": [
       "mcp__ide__getDiagnostics",
       "Bash(npx tsc:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "WebSearch",
+      "WebFetch(domain:turivishal.medium.com)",
+      "WebFetch(domain:gist.github.com)",
+      "WebFetch(domain:developers.facebook.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:medium.com)",
+      "WebFetch(domain:www.getphyllo.com)",
+      "Bash(npm install:*)"
     ]
   }
 }

@@ -7,6 +7,8 @@ export interface PublishRequest {
   text: string;
   facebookPages: string[];
   xAccounts: string[];
+  instagramPublishAccounts: string[];
+  instagramStoryAccounts: string[];
   mediaFiles: File[];
 }
 
@@ -57,4 +59,5 @@ export type PublishStatus = 'success' | 'partial_success' | 'failed';
 export interface MissingAccounts {
   facebook: string[];
   twitter: string[];
+  instagram: string[];
 }
