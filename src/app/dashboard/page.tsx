@@ -148,31 +148,17 @@ export default function DashboardPage() {
             <CircularProgress />
           </Box>
         ) : (
-          <>
-            <AccountsTable
-              title="Connected Facebook Pages"
-              data={normalizedAccounts.facebook}
-              emptyMessage="No Facebook pages connected yet."
-              loadingId={deletingId}
-              onDelete={promptDelete}
-            />
-
-            <AccountsTable
-              title="Connected Instagram Accounts"
-              data={normalizedAccounts.instagram}
-              emptyMessage="No Instagram accounts linked."
-              loadingId={deletingId}
-              onDelete={promptDelete}
-            />
-
-            <AccountsTable
-              title="Connected X (Twitter) Accounts"
-              data={normalizedAccounts.twitter}
-              emptyMessage="No X accounts connected yet."
-              loadingId={deletingId}
-              onDelete={promptDelete}
-            />
-          </>
+          <AccountsTable
+            title="Connected Accounts"
+            data={[
+              ...normalizedAccounts.facebook,
+              ...normalizedAccounts.instagram,
+              ...normalizedAccounts.twitter,
+            ]}
+            emptyMessage="No accounts connected yet. Use the buttons above to connect your social media accounts."
+            loadingId={deletingId}
+            onDelete={promptDelete}
+          />
         )}
       </Container>
 

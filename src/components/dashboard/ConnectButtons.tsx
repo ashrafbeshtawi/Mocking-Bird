@@ -4,6 +4,7 @@ import React from 'react';
 import { Box, Button, CircularProgress } from '@mui/material';
 import {
   Facebook as FacebookIcon,
+  Instagram as InstagramIcon,
   Twitter as TwitterIcon,
 } from '@mui/icons-material';
 
@@ -30,12 +31,20 @@ export function ConnectButtons({
           facebookLoading ? (
             <CircularProgress size={20} color="inherit" />
           ) : (
-            <FacebookIcon />
+            <Box sx={{ display: 'flex', gap: 0.5 }}>
+              <FacebookIcon />
+              <InstagramIcon />
+            </Box>
           )
         }
-        sx={{ bgcolor: '#1877f2', '&:hover': { bgcolor: '#155eaf' } }}
+        sx={{
+          background: 'linear-gradient(90deg, #1877f2 0%, #E1306C 50%, #F77737 100%)',
+          '&:hover': {
+            background: 'linear-gradient(90deg, #155eaf 0%, #c02a5c 50%, #d96830 100%)',
+          },
+        }}
       >
-        {facebookLoading ? 'Connecting...' : 'Add Facebook Page'}
+        {facebookLoading ? 'Connecting...' : 'Add Meta Account'}
       </Button>
 
       <Button

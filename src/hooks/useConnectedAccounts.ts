@@ -89,8 +89,7 @@ export function useConnectedAccounts(): UseConnectedAccountsReturn {
     })),
     instagram: instagramAccounts.map((a) => ({
       id: a.id,
-      name: a.username,
-      details: a.displayName,
+      name: a.displayName || a.username,
       platform: 'instagram' as const,
     })),
     twitter: xAccounts.map((a) => ({
