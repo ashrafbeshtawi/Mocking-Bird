@@ -1,13 +1,12 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   Container,
   Box,
   Typography,
-  CircularProgress,
   Alert,
   AlertTitle,
   Paper,
@@ -16,6 +15,12 @@ import {
   Divider,
   Fade,
   Skeleton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+  Snackbar,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -25,6 +30,7 @@ import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import ArticleIcon from '@mui/icons-material/Article';
 import TerminalIcon from '@mui/icons-material/Terminal';
 import DownloadIcon from '@mui/icons-material/Download';
+import DeleteIcon from '@mui/icons-material/Delete';
 
 interface ReportData {
   id: number;
@@ -76,6 +82,7 @@ function LoadingSkeleton() {
 }
 
 export default function ReportPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const reportId = searchParams.get('id');
   const historyPage = searchParams.get('page') || '1';
@@ -83,6 +90,21 @@ export default function ReportPage() {
   const [report, setReport] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Delete dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  // Snackbar state
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error';
+  }>({
+    open: false,
+    message: '',
+    severity: 'success',
+  });
 
   const fetchReport = useCallback(async (id: string) => {
     setLoading(true);
@@ -122,6 +144,59 @@ export default function ReportPage() {
       setError('No report ID provided.');
     }
   }, [fetchReport, reportId]);
+
+  const handleDeleteClick = () => {
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteDialogOpen(false);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!report) return;
+
+    setDeleting(true);
+    try {
+      const response = await fetch('/api/publish/publish-history', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ id: report.id }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete report');
+      }
+
+      setSnackbar({
+        open: true,
+        message: 'Report deleted successfully',
+        severity: 'success',
+      });
+
+      // Redirect back to history page after a short delay
+      setTimeout(() => {
+        router.push(`/history?page=${historyPage}`);
+      }, 1000);
+    } catch (err: unknown) {
+      console.error('Error deleting report:', err);
+      setSnackbar({
+        open: true,
+        message: (err as Error)?.message || 'Failed to delete report',
+        severity: 'error',
+      });
+      setDeleting(false);
+      setDeleteDialogOpen(false);
+    }
+  };
+
+  const handleSnackbarClose = () => {
+    setSnackbar((prev) => ({ ...prev, open: false }));
+  };
 
   const status = report
     ? statusConfig[report.publish_status] || statusConfig.failed
@@ -205,16 +280,35 @@ export default function ReportPage() {
                       {status?.description}
                     </Typography>
                   </Box>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    startIcon={<DownloadIcon />}
-                    href={`/api/publish/download-report?id=${report.id}`}
-                    download
-                    sx={{ borderRadius: 2 }}
-                  >
-                    Download
-                  </Button>
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={<DownloadIcon />}
+                      href={`/api/publish/download-report?id=${report.id}`}
+                      download
+                      sx={{ borderRadius: 2 }}
+                    >
+                      Download
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={<DeleteIcon />}
+                      onClick={handleDeleteClick}
+                      sx={{
+                        borderRadius: 2,
+                        borderColor: '#ef444450',
+                        color: '#ef4444',
+                        '&:hover': {
+                          borderColor: '#ef4444',
+                          bgcolor: '#ef444410',
+                        },
+                      }}
+                    >
+                      Delete
+                    </Button>
+                  </Box>
                 </Box>
               </Paper>
 
@@ -366,6 +460,118 @@ export default function ReportPage() {
           </Fade>
         )}
       </Container>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={handleDeleteCancel}
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            maxWidth: 400,
+          },
+        }}
+      >
+        <DialogTitle sx={{ pb: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Box
+              sx={{
+                width: 40,
+                height: 40,
+                borderRadius: 2,
+                bgcolor: '#ef444415',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <DeleteIcon sx={{ color: '#ef4444' }} />
+            </Box>
+            <Typography variant="h6" fontWeight={600}>
+              Delete Report
+            </Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to delete this publish report? This action
+            cannot be undone.
+          </DialogContentText>
+          {report && (
+            <Paper
+              elevation={0}
+              sx={{
+                mt: 2,
+                p: 2,
+                bgcolor: 'grey.50',
+                borderRadius: 2,
+                border: '1px solid',
+                borderColor: 'divider',
+              }}
+            >
+              <Typography
+                variant="body2"
+                sx={{
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {report.content.substring(0, 80) || 'No text content'}
+                {report.content.length > 80 && '...'}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {new Date(report.created_at).toLocaleString()}
+              </Typography>
+            </Paper>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 3 }}>
+          <Button
+            onClick={handleDeleteCancel}
+            disabled={deleting}
+            sx={{
+              borderRadius: 2,
+              textTransform: 'none',
+              px: 3,
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleDeleteConfirm}
+            variant="contained"
+            disabled={deleting}
+            sx={{
+              borderRadius: 2,
+              textTransform: 'none',
+              px: 3,
+              bgcolor: '#ef4444',
+              '&:hover': {
+                bgcolor: '#dc2626',
+              },
+            }}
+          >
+            {deleting ? 'Deleting...' : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Snackbar for feedback */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={handleSnackbarClose}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={handleSnackbarClose}
+          severity={snackbar.severity}
+          sx={{ borderRadius: 2 }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

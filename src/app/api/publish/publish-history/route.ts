@@ -3,6 +3,94 @@
 import { NextRequest, NextResponse } from 'next/server';
 import pool from '@/lib/db';
 
+export async function DELETE(req: NextRequest) {
+  try {
+    // 1. Get user_id from the custom 'x-user-id' header set by the middleware
+    const userId = req.headers.get('x-user-id');
+
+    if (!userId) {
+      console.error('[DeletePublishHistory API Error] User ID not found in headers.');
+      return NextResponse.json({ error: 'Authentication required: User ID not provided.' }, { status: 401 });
+    }
+
+    const parsedUserId = parseInt(userId, 10);
+    if (isNaN(parsedUserId)) {
+      console.error(`[DeletePublishHistory API Error] Invalid user ID format: ${userId}`);
+      return NextResponse.json({ error: 'Invalid user ID format.' }, { status: 400 });
+    }
+
+    // 2. Get report ID(s) from request body - supports single ID or array of IDs
+    const body = await req.json();
+    const reportIds: number[] = [];
+
+    // Handle single ID
+    if (body.id !== undefined) {
+      const parsedId = parseInt(body.id, 10);
+      if (isNaN(parsedId)) {
+        return NextResponse.json({ error: 'Invalid report ID format.' }, { status: 400 });
+      }
+      reportIds.push(parsedId);
+    }
+
+    // Handle array of IDs for bulk delete
+    if (body.ids && Array.isArray(body.ids)) {
+      for (const id of body.ids) {
+        const parsedId = parseInt(id, 10);
+        if (isNaN(parsedId)) {
+          return NextResponse.json({ error: 'Invalid report ID format in ids array.' }, { status: 400 });
+        }
+        reportIds.push(parsedId);
+      }
+    }
+
+    if (reportIds.length === 0) {
+      return NextResponse.json({ error: 'Report ID(s) required. Provide "id" or "ids" array.' }, { status: 400 });
+    }
+
+    // 3. Connect to database and delete
+    const client = await pool.connect();
+    console.log(`Deleting ${reportIds.length} report(s) for user ${parsedUserId}: [${reportIds.join(', ')}]`);
+
+    try {
+      // First verify all reports belong to this user
+      const placeholders = reportIds.map((_, i) => `$${i + 2}`).join(', ');
+      const { rows: checkRows } = await client.query(
+        `SELECT id FROM publish_history WHERE id IN (${placeholders}) AND user_id = $1`,
+        [parsedUserId, ...reportIds]
+      );
+
+      if (checkRows.length === 0) {
+        return NextResponse.json({ error: 'No reports found or unauthorized.' }, { status: 404 });
+      }
+
+      const foundIds = checkRows.map((row: { id: number }) => row.id);
+      const notFoundIds = reportIds.filter(id => !foundIds.includes(id));
+
+      // Delete the reports that belong to this user
+      await client.query(
+        `DELETE FROM publish_history WHERE id IN (${placeholders}) AND user_id = $1`,
+        [parsedUserId, ...reportIds]
+      );
+
+      const deletedCount = foundIds.length;
+      console.log(`${deletedCount} report(s) deleted successfully.`);
+
+      return NextResponse.json({
+        success: true,
+        message: `${deletedCount} report(s) deleted successfully.`,
+        deletedCount,
+        deletedIds: foundIds,
+        notFoundIds: notFoundIds.length > 0 ? notFoundIds : undefined,
+      });
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('[DeletePublishHistory API Error]', error);
+    return NextResponse.json({ error: 'Internal Server Error.' }, { status: 500 });
+  }
+}
+
 export async function GET(req: NextRequest) {
   try {
     // 1. Get user_id from the custom 'x-user-id' header set by the middleware
