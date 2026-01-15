@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -16,22 +16,15 @@ import {
   Stepper,
   Step,
   StepLabel,
-  Avatar,
-  Chip,
+  Paper,
+  IconButton,
+  Tooltip,
 } from '@mui/material';
 import TelegramIcon from '@mui/icons-material/Telegram';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { fetchWithAuth } from '@/lib/fetch';
-
-interface TelegramLoginData {
-  id: number;
-  first_name: string;
-  last_name?: string;
-  username?: string;
-  photo_url?: string;
-  auth_date: number;
-  hash: string;
-}
 
 interface TelegramConnectDialogProps {
   open: boolean;
@@ -39,19 +32,11 @@ interface TelegramConnectDialogProps {
   onSuccess: () => void;
 }
 
-// Extend Window interface for Telegram widget
-declare global {
-  interface Window {
-    Telegram?: {
-      Login: {
-        auth: (
-          options: { bot_id: string; request_access?: boolean },
-          callback: (data: TelegramLoginData | false) => void
-        ) => void;
-      };
-    };
-    TelegramLoginCallback?: (data: TelegramLoginData) => void;
-  }
+interface VerificationData {
+  verification_code: string;
+  channel_title: string;
+  channel_username?: string;
+  expires_in: number;
 }
 
 export function TelegramConnectDialog({
@@ -62,15 +47,15 @@ export function TelegramConnectDialog({
   const [activeStep, setActiveStep] = useState(0);
   const [channelId, setChannelId] = useState('');
   const [loading, setLoading] = useState(false);
+  const [verifying, setVerifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [botUsername, setBotUsername] = useState<string | null>(null);
-  const [botId, setBotId] = useState<string | null>(null);
   const [loadingBotInfo, setLoadingBotInfo] = useState(false);
-  const [telegramAuth, setTelegramAuth] = useState<TelegramLoginData | null>(null);
-  const [telegramWidgetLoaded, setTelegramWidgetLoaded] = useState(false);
-  const widgetContainerRef = useRef<HTMLDivElement>(null);
+  const [verification, setVerification] = useState<VerificationData | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(0);
 
-  const steps = ['Log in with Telegram', 'Connect Channel'];
+  const steps = ['Enter Channel', 'Verify Ownership', 'Complete'];
 
   // Fetch bot info when dialog opens
   useEffect(() => {
@@ -80,11 +65,9 @@ export function TelegramConnectDialog({
         .then((res) => res.json())
         .then((data) => {
           setBotUsername(data.bot_username);
-          setBotId(data.bot_id);
         })
         .catch(() => {
           setBotUsername(null);
-          setBotId(null);
         })
         .finally(() => {
           setLoadingBotInfo(false);
@@ -92,59 +75,26 @@ export function TelegramConnectDialog({
     }
   }, [open]);
 
-  // Load Telegram widget script
+  // Countdown timer for verification expiry
   useEffect(() => {
-    if (!open || !botUsername) return;
+    if (!verification || timeLeft <= 0) return;
 
-    const existingScript = document.getElementById('telegram-widget-script');
-    if (existingScript) {
-      setTelegramWidgetLoaded(true);
-      return;
-    }
-
-    const script = document.createElement('script');
-    script.id = 'telegram-widget-script';
-    script.src = 'https://telegram.org/js/telegram-widget.js?22';
-    script.async = true;
-    script.onload = () => setTelegramWidgetLoaded(true);
-    document.body.appendChild(script);
-
-    return () => {
-      // Don't remove script as it might be needed again
-    };
-  }, [open, botUsername]);
-
-  // Handle Telegram Login
-  const handleTelegramLogin = useCallback(() => {
-    if (!botId || !window.Telegram?.Login) {
-      setError('Telegram widget not loaded. Please refresh the page.');
-      return;
-    }
-
-    setError(null);
-
-    window.Telegram.Login.auth(
-      { bot_id: botId, request_access: true },
-      (data) => {
-        if (data === false) {
-          setError('Telegram login was cancelled.');
-          return;
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          return 0;
         }
-        setTelegramAuth(data);
-        setActiveStep(1);
-      }
-    );
-  }, [botId]);
+        return prev - 1;
+      });
+    }, 1000);
 
-  const handleConnect = async () => {
+    return () => clearInterval(timer);
+  }, [verification, timeLeft]);
+
+  const handleStartVerification = async () => {
     if (!channelId.trim()) {
       setError('Please enter a channel ID or username');
-      return;
-    }
-
-    if (!telegramAuth) {
-      setError('Please log in with Telegram first');
-      setActiveStep(0);
       return;
     }
 
@@ -152,25 +102,22 @@ export function TelegramConnectDialog({
     setError(null);
 
     try {
-      const response = await fetchWithAuth('/api/telegram/connect', {
+      const response = await fetchWithAuth('/api/telegram/verify-channel', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          channel_id: channelId.trim(),
-          telegram_auth: telegramAuth,
-        }),
+        body: JSON.stringify({ channel_id: channelId.trim() }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || 'Failed to connect channel');
+        setError(data.error || 'Failed to start verification');
         return;
       }
 
-      // Success
-      handleClose();
-      onSuccess();
+      setVerification(data);
+      setTimeLeft(data.expires_in);
+      setActiveStep(1);
     } catch (err) {
       setError((err as Error)?.message || 'An error occurred');
     } finally {
@@ -178,12 +125,64 @@ export function TelegramConnectDialog({
     }
   };
 
+  const handleVerify = async () => {
+    setVerifying(true);
+    setError(null);
+
+    try {
+      const response = await fetchWithAuth('/api/telegram/verify-channel', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channel_id: channelId.trim() }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || 'Verification failed');
+        return;
+      }
+
+      if (!data.verified) {
+        setError(data.message || 'Verification code not found. Please post the code in your channel.');
+        return;
+      }
+
+      // Success!
+      setActiveStep(2);
+      setTimeout(() => {
+        handleClose();
+        onSuccess();
+      }, 1500);
+    } catch (err) {
+      setError((err as Error)?.message || 'An error occurred');
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const handleCopyCode = useCallback(() => {
+    if (verification?.verification_code) {
+      navigator.clipboard.writeText(verification.verification_code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }, [verification]);
+
   const handleClose = () => {
     setChannelId('');
     setError(null);
     setActiveStep(0);
-    setTelegramAuth(null);
+    setVerification(null);
+    setTimeLeft(0);
+    setCopied(false);
     onClose();
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   const renderStepContent = () => {
@@ -206,139 +205,155 @@ export function TelegramConnectDialog({
     if (activeStep === 0) {
       return (
         <>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            To verify you own the channel you want to connect, please log in with your Telegram account.
-          </Typography>
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="subtitle2" sx={{ mb: 1 }}>
+              Step 1: Add the bot as admin
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Add{' '}
+              <Link
+                href={`https://t.me/${botUsername}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                sx={{ fontWeight: 600 }}
+              >
+                @{botUsername}
+              </Link>{' '}
+              as an administrator to your Telegram channel with permission to post messages.
+            </Typography>
+          </Box>
 
-          <Alert severity="info" sx={{ mb: 3 }}>
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="subtitle2" sx={{ mb: 1 }}>
+              Step 2: Enter your channel ID
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Enter your channel username (e.g., @mychannel) or channel ID (e.g., -1001234567890).
+            </Typography>
+
+            <TextField
+              fullWidth
+              label="Channel ID or Username"
+              placeholder="@mychannel or -1001234567890"
+              value={channelId}
+              onChange={(e) => setChannelId(e.target.value)}
+              disabled={loading}
+              autoFocus
+            />
+          </Box>
+
+          <Alert severity="info" sx={{ mt: 2 }}>
             <Typography variant="body2">
-              <strong>Why is this needed?</strong> We verify that you are an admin of the channel before allowing the connection.
-              This prevents unauthorized users from connecting channels they don&apos;t own.
+              <strong>Tip:</strong> To find your channel ID, forward any message from your channel to{' '}
+              <Link
+                href="https://t.me/userinfobot"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                @userinfobot
+              </Link>{' '}
+              on Telegram.
             </Typography>
           </Alert>
-
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
-            {telegramWidgetLoaded ? (
-              <Button
-                variant="contained"
-                size="large"
-                onClick={handleTelegramLogin}
-                startIcon={<TelegramIcon />}
-                sx={{
-                  bgcolor: '#0088cc',
-                  '&:hover': { bgcolor: '#006699' },
-                  px: 4,
-                  py: 1.5,
-                }}
-              >
-                Log in with Telegram
-              </Button>
-            ) : (
-              <CircularProgress size={24} />
-            )}
-          </Box>
         </>
       );
     }
 
-    return (
-      <>
-        {telegramAuth && (
-          <Box
+    if (activeStep === 1 && verification) {
+      return (
+        <>
+          <Alert severity="info" sx={{ mb: 3 }}>
+            <Typography variant="body2">
+              To verify you&apos;re an admin of <strong>{verification.channel_title}</strong>,
+              post the verification code below in your channel.
+            </Typography>
+          </Alert>
+
+          <Paper
+            elevation={0}
             sx={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 2,
+              p: 3,
               mb: 3,
-              p: 2,
               bgcolor: 'action.hover',
               borderRadius: 2,
+              textAlign: 'center',
             }}
           >
-            <Avatar
-              src={telegramAuth.photo_url}
-              sx={{ width: 40, height: 40, bgcolor: '#0088cc' }}
-            >
-              {telegramAuth.first_name[0]}
-            </Avatar>
-            <Box sx={{ flexGrow: 1 }}>
-              <Typography variant="subtitle2">
-                {telegramAuth.first_name} {telegramAuth.last_name || ''}
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+              Post this code in your channel:
+            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+              <Typography
+                variant="h4"
+                sx={{
+                  fontFamily: 'monospace',
+                  fontWeight: 'bold',
+                  letterSpacing: 2,
+                  color: 'primary.main',
+                }}
+              >
+                {verification.verification_code}
               </Typography>
-              {telegramAuth.username && (
-                <Typography variant="caption" color="text.secondary">
-                  @{telegramAuth.username}
-                </Typography>
-              )}
+              <Tooltip title={copied ? 'Copied!' : 'Copy code'}>
+                <IconButton onClick={handleCopyCode} size="small">
+                  {copied ? <CheckCircleIcon color="success" /> : <ContentCopyIcon />}
+                </IconButton>
+              </Tooltip>
             </Box>
-            <Chip
-              icon={<CheckCircleIcon />}
-              label="Verified"
-              color="success"
-              size="small"
-            />
-          </Box>
-        )}
+            <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block' }}>
+              {timeLeft > 0 ? (
+                <>Expires in {formatTime(timeLeft)}</>
+              ) : (
+                <Box component="span" sx={{ color: 'error.main' }}>Code expired - please start over</Box>
+              )}
+            </Typography>
+          </Paper>
 
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="subtitle2" sx={{ mb: 1 }}>
-            Step 1: Add the bot as admin
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            After posting the code:
+          </Typography>
+          <ol style={{ margin: 0, paddingLeft: 20 }}>
+            <li>
+              <Typography variant="body2" color="text.secondary">
+                Wait a few seconds for the message to appear
+              </Typography>
+            </li>
+            <li>
+              <Typography variant="body2" color="text.secondary">
+                Click &quot;Verify & Connect&quot; below
+              </Typography>
+            </li>
+            <li>
+              <Typography variant="body2" color="text.secondary">
+                The verification message will be automatically deleted
+              </Typography>
+            </li>
+          </ol>
+
+          <Alert severity="warning" sx={{ mt: 2 }}>
+            <Typography variant="body2">
+              Only channel <strong>admins</strong> can post messages. This proves you have admin access.
+            </Typography>
+          </Alert>
+        </>
+      );
+    }
+
+    if (activeStep === 2) {
+      return (
+        <Box sx={{ textAlign: 'center', py: 4 }}>
+          <CheckCircleIcon sx={{ fontSize: 64, color: 'success.main', mb: 2 }} />
+          <Typography variant="h6" color="success.main">
+            Channel Connected Successfully!
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Add{' '}
-            <Link
-              href={`https://t.me/${botUsername}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              sx={{ fontWeight: 600 }}
-            >
-              @{botUsername}
-            </Link>{' '}
-            as an administrator to your Telegram channel with permission to post messages.
+            {verification?.channel_title} is now ready to use.
           </Typography>
         </Box>
+      );
+    }
 
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="subtitle2" sx={{ mb: 1 }}>
-            Step 2: Enter your channel ID
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Enter your channel username (e.g., @mychannel) or channel ID (e.g., -1001234567890).
-          </Typography>
-
-          <TextField
-            fullWidth
-            label="Channel ID or Username"
-            placeholder="@mychannel or -1001234567890"
-            value={channelId}
-            onChange={(e) => setChannelId(e.target.value)}
-            disabled={loading}
-            autoFocus
-          />
-        </Box>
-
-        <Alert severity="info" sx={{ mt: 2 }}>
-          <Typography variant="body2">
-            <strong>Tip:</strong> To find your channel ID, forward any message from your channel to{' '}
-            <Link
-              href="https://t.me/userinfobot"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              @userinfobot
-            </Link>{' '}
-            on Telegram.
-          </Typography>
-        </Alert>
-
-        <Alert severity="warning" sx={{ mt: 2 }}>
-          <Typography variant="body2">
-            You must be an <strong>admin</strong> of the channel to connect it. If you&apos;re not an admin,
-            the connection will fail.
-          </Typography>
-        </Alert>
-      </>
-    );
+    return null;
   };
 
   return (
@@ -365,7 +380,6 @@ export function TelegramConnectDialog({
           </Alert>
         )}
 
-        <div ref={widgetContainerRef} />
         {renderStepContent()}
       </DialogContent>
 
@@ -374,28 +388,45 @@ export function TelegramConnectDialog({
           <Button
             onClick={() => {
               setActiveStep(0);
-              setTelegramAuth(null);
+              setVerification(null);
+              setError(null);
             }}
-            disabled={loading}
+            disabled={verifying}
+            startIcon={<RefreshIcon />}
           >
-            Back
+            Start Over
           </Button>
         )}
-        <Button onClick={handleClose} disabled={loading}>
+        <Box sx={{ flex: 1 }} />
+        <Button onClick={handleClose} disabled={loading || verifying}>
           Cancel
         </Button>
-        {activeStep === 1 && (
+        {activeStep === 0 && (
           <Button
             variant="contained"
-            onClick={handleConnect}
-            disabled={loading || !botUsername}
+            onClick={handleStartVerification}
+            disabled={loading || !botUsername || !channelId.trim()}
             startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <TelegramIcon />}
             sx={{
               bgcolor: '#0088cc',
               '&:hover': { bgcolor: '#006699' },
             }}
           >
-            {loading ? 'Connecting...' : 'Connect Channel'}
+            {loading ? 'Checking...' : 'Continue'}
+          </Button>
+        )}
+        {activeStep === 1 && (
+          <Button
+            variant="contained"
+            onClick={handleVerify}
+            disabled={verifying || timeLeft <= 0}
+            startIcon={verifying ? <CircularProgress size={20} color="inherit" /> : <CheckCircleIcon />}
+            sx={{
+              bgcolor: '#0088cc',
+              '&:hover': { bgcolor: '#006699' },
+            }}
+          >
+            {verifying ? 'Verifying...' : 'Verify & Connect'}
           </Button>
         )}
       </DialogActions>
