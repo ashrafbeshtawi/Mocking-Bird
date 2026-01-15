@@ -10,6 +10,7 @@ import {
   Paper,
   Backdrop,
   Fade,
+  LinearProgress,
 } from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
 import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
@@ -32,7 +33,25 @@ export default function PublishPage() {
   } = useConnectedAccounts();
 
   // Publishing logic
-  const { isPublishing, error, success, results, publish } = usePublish();
+  const { isPublishing, error, success, results, statusMessage, stepProgress, publish } = usePublish();
+
+  // Calculate overall progress percentage
+  const calculateProgress = () => {
+    if (!stepProgress) return 0;
+    const { stepIndex, totalSteps, subProgress } = stepProgress;
+
+    // Base progress from completed steps
+    const baseProgress = ((stepIndex - 1) / totalSteps) * 100;
+
+    // If we have sub-progress (during publishing step), interpolate within the step
+    if (subProgress && subProgress.total > 0) {
+      const stepWidth = 100 / totalSteps;
+      const subProgressPercent = (subProgress.current / subProgress.total) * stepWidth;
+      return baseProgress + subProgressPercent;
+    }
+
+    return baseProgress;
+  };
 
   // Form state
   const [postText, setPostText] = useState('');
@@ -167,20 +186,53 @@ export default function PublishPage() {
             color: '#fff',
             zIndex: (theme) => theme.zIndex.drawer + 1,
             flexDirection: 'column',
-            gap: 3,
+            gap: 2,
             backdropFilter: 'blur(8px)',
             background: 'rgba(0,0,0,0.7)',
           }}
           open={isPublishing}
         >
-          <RocketLaunchIcon sx={{ fontSize: 64, animation: 'pulse 1.5s infinite' }} />
-          <CircularProgress color="inherit" size={48} />
+          <RocketLaunchIcon sx={{ fontSize: 56, animation: 'pulse 1.5s infinite' }} />
           <Typography variant="h5" fontWeight="medium">
             Publishing your post...
           </Typography>
-          <Typography variant="body2" color="grey.400">
-            This may take a moment
-          </Typography>
+          <Box sx={{ width: 320, textAlign: 'center' }}>
+            <Typography
+              variant="body1"
+              sx={{
+                mb: 2,
+                minHeight: 24,
+                color: 'grey.300',
+                transition: 'opacity 0.3s',
+              }}
+            >
+              {statusMessage || 'Preparing...'}
+            </Typography>
+            <Box sx={{ width: '100%' }}>
+              <LinearProgress
+                variant="determinate"
+                value={calculateProgress()}
+                sx={{
+                  height: 8,
+                  borderRadius: 4,
+                  bgcolor: 'rgba(255,255,255,0.2)',
+                  '& .MuiLinearProgress-bar': {
+                    borderRadius: 4,
+                    background: 'linear-gradient(90deg, #1877f2 0%, #E1306C 50%, #F77737 100%)',
+                    transition: 'transform 0.3s ease-out',
+                  },
+                }}
+              />
+              {stepProgress && (
+                <Typography variant="caption" sx={{ mt: 1, display: 'block', color: 'grey.400' }}>
+                  Step {stepProgress.stepIndex} of {stepProgress.totalSteps}
+                  {stepProgress.subProgress && stepProgress.subProgress.total > 0 && (
+                    <> &middot; {stepProgress.subProgress.current} of {stepProgress.subProgress.total} accounts</>
+                  )}
+                </Typography>
+              )}
+            </Box>
+          </Box>
         </Backdrop>
 
         {/* Header */}

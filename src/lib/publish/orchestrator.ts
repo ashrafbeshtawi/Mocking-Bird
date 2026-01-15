@@ -14,6 +14,16 @@ import {
   formatFailedDetails
 } from './mappers/resultMappers';
 
+export interface ProgressUpdate {
+  platform: string;
+  action: 'starting' | 'completed' | 'failed';
+  accountName?: string;
+  current: number;
+  total: number;
+}
+
+export type ProgressCallback = (progress: ProgressUpdate) => void | Promise<void>;
+
 export interface ExecutePublishOptions {
   pool: Pool;
   text: string;
@@ -24,6 +34,7 @@ export interface ExecutePublishOptions {
   instagramFeedTokens: InstagramAccountToken[];
   instagramStoryTokens: InstagramAccountToken[];
   reportLogger: ReportLogger;
+  onProgress?: ProgressCallback;
 }
 
 export interface ExecutePublishResult {
@@ -243,6 +254,383 @@ export async function executePublish(
     ...igFeedResults.failed,
     ...igStoryResults.failed
   ];
+
+  reportLogger.add(`Publishing complete. Successful posts: ${allSuccessful.length}, Failed posts: ${allFailed.length}`);
+
+  if (allFailed.length > 0) {
+    reportLogger.add(`Failed posts details: ${formatFailedDetails(allFailed)}`);
+  }
+
+  return { successful: allSuccessful, failed: allFailed };
+}
+
+/**
+ * Executes publishing with progress updates (sequential for streaming feedback)
+ */
+export async function executePublishWithProgress(
+  options: ExecutePublishOptions
+): Promise<ExecutePublishResult> {
+  const {
+    pool,
+    text,
+    mediaFiles,
+    cloudinaryMedia,
+    facebookTokens,
+    twitterTokens,
+    instagramFeedTokens,
+    instagramStoryTokens,
+    reportLogger,
+    onProgress
+  } = options;
+
+  const totalAccounts = facebookTokens.length + twitterTokens.length +
+    instagramFeedTokens.length + instagramStoryTokens.length;
+  let currentIndex = 0;
+
+  const allSuccessful: SuccessfulPublishResult[] = [];
+  const allFailed: FailedPublishResult[] = [];
+
+  const facebookPublisher = new FacebookPublisher(pool);
+  const twitterPublisher = new TwitterPublisherV1(pool);
+  const instagramPublisher = new InstagramPublisher(pool);
+
+  const facebookOptions = {
+    text: text.trim() || undefined,
+    files: mediaFiles.length > 0 ? mediaFiles : undefined
+  };
+
+  const instagramOptions = {
+    text: text.trim() || undefined,
+    cloudinaryMedia: cloudinaryMedia.length > 0 ? cloudinaryMedia : undefined
+  };
+
+  // Facebook publishing (sequential for progress)
+  for (const token of facebookTokens) {
+    currentIndex++;
+    if (onProgress) {
+      await onProgress({
+        platform: 'Facebook',
+        action: 'starting',
+        accountName: token.page_name,
+        current: currentIndex,
+        total: totalAccounts
+      });
+    }
+
+    try {
+      const result = await facebookPublisher.publishToPages(facebookOptions, [token]);
+      if (result.successful.length > 0) {
+        const mapped = mapFacebookSuccess(
+          result.successful.map(item => ({
+            ...item,
+            result: item.result as { id?: string }
+          }))
+        );
+        allSuccessful.push(...mapped);
+        if (onProgress) {
+          await onProgress({
+            platform: 'Facebook',
+            action: 'completed',
+            accountName: token.page_name,
+            current: currentIndex,
+            total: totalAccounts
+          });
+        }
+      }
+      if (result.failed.length > 0) {
+        const mapped = mapFacebookFailed(
+          result.failed.map(item => ({
+            ...item,
+            error: item.error
+              ? {
+                  ...item.error,
+                  details: typeof item.error.details === 'object'
+                    ? item.error.details as {
+                        error?: {
+                          message?: string;
+                          type?: string;
+                          code?: number;
+                          error_subcode?: number;
+                          is_transient?: boolean;
+                          error_user_title?: string;
+                          error_user_msg?: string;
+                          fbtrace_id?: string;
+                        };
+                      }
+                    : undefined
+                }
+              : undefined
+          }))
+        );
+        allFailed.push(...mapped);
+        if (onProgress) {
+          await onProgress({
+            platform: 'Facebook',
+            action: 'failed',
+            accountName: token.page_name,
+            current: currentIndex,
+            total: totalAccounts
+          });
+        }
+      }
+    } catch (err) {
+      reportLogger.add(`Error publishing to Facebook ${token.page_name}: ${(err as Error).message}`);
+      if (onProgress) {
+        await onProgress({
+          platform: 'Facebook',
+          action: 'failed',
+          accountName: token.page_name,
+          current: currentIndex,
+          total: totalAccounts
+        });
+      }
+    }
+  }
+
+  // Twitter publishing (sequential for progress)
+  for (const token of twitterTokens) {
+    currentIndex++;
+    if (onProgress) {
+      await onProgress({
+        platform: 'X',
+        action: 'starting',
+        accountName: token.username,
+        current: currentIndex,
+        total: totalAccounts
+      });
+    }
+
+    try {
+      const result = await twitterPublisher.publishToAccounts(text, [token], mediaFiles);
+      if (result.successful.length > 0) {
+        const mapped = mapTwitterSuccess(
+          result.successful.map(item => ({
+            ...item,
+            result: item.result as { data?: { id?: string } }
+          }))
+        );
+        allSuccessful.push(...mapped);
+        if (onProgress) {
+          await onProgress({
+            platform: 'X',
+            action: 'completed',
+            accountName: token.username,
+            current: currentIndex,
+            total: totalAccounts
+          });
+        }
+      }
+      if (result.failed.length > 0) {
+        const mapped = mapTwitterFailed(
+          result.failed.map(item => ({
+            ...item,
+            error: item.error
+              ? {
+                  message: item.error.message,
+                  code: item.error.code,
+                  details: (() => {
+                    if (item.error && item.error.details) {
+                      const twitterDetails = item.error.details as { errors?: { message?: string; code?: number }[] };
+                      return twitterDetails.errors && twitterDetails.errors.length > 0
+                        ? { errors: twitterDetails.errors }
+                        : undefined;
+                    }
+                    return undefined;
+                  })()
+                }
+              : undefined
+          }))
+        );
+        allFailed.push(...mapped);
+        if (onProgress) {
+          await onProgress({
+            platform: 'X',
+            action: 'failed',
+            accountName: token.username,
+            current: currentIndex,
+            total: totalAccounts
+          });
+        }
+      }
+    } catch (err) {
+      reportLogger.add(`Error publishing to X ${token.username}: ${(err as Error).message}`);
+      if (onProgress) {
+        await onProgress({
+          platform: 'X',
+          action: 'failed',
+          accountName: token.username,
+          current: currentIndex,
+          total: totalAccounts
+        });
+      }
+    }
+  }
+
+  // Instagram feed publishing (sequential for progress)
+  for (const token of instagramFeedTokens) {
+    currentIndex++;
+    if (onProgress) {
+      await onProgress({
+        platform: 'Instagram',
+        action: 'starting',
+        accountName: token.username,
+        current: currentIndex,
+        total: totalAccounts
+      });
+    }
+
+    try {
+      const result = await instagramPublisher.publishToFeed(instagramOptions, [token]);
+      if (result.successful.length > 0) {
+        const mapped = mapInstagramSuccess(
+          result.successful.map(item => ({
+            ...item,
+            result: item.result as { id?: string }
+          }))
+        );
+        allSuccessful.push(...mapped);
+        if (onProgress) {
+          await onProgress({
+            platform: 'Instagram',
+            action: 'completed',
+            accountName: token.username,
+            current: currentIndex,
+            total: totalAccounts
+          });
+        }
+      }
+      if (result.failed.length > 0) {
+        const mapped = mapInstagramFailed(
+          result.failed.map(item => ({
+            ...item,
+            error: item.error
+              ? {
+                  ...item.error,
+                  details: typeof item.error.details === 'object'
+                    ? item.error.details as {
+                        error?: {
+                          message?: string;
+                          type?: string;
+                          code?: number;
+                          error_subcode?: number;
+                          is_transient?: boolean;
+                          error_user_title?: string;
+                          error_user_msg?: string;
+                          fbtrace_id?: string;
+                        };
+                      }
+                    : undefined
+                }
+              : undefined
+          }))
+        );
+        allFailed.push(...mapped);
+        if (onProgress) {
+          await onProgress({
+            platform: 'Instagram',
+            action: 'failed',
+            accountName: token.username,
+            current: currentIndex,
+            total: totalAccounts
+          });
+        }
+      }
+    } catch (err) {
+      reportLogger.add(`Error publishing to Instagram feed ${token.username}: ${(err as Error).message}`);
+      if (onProgress) {
+        await onProgress({
+          platform: 'Instagram',
+          action: 'failed',
+          accountName: token.username,
+          current: currentIndex,
+          total: totalAccounts
+        });
+      }
+    }
+  }
+
+  // Instagram story publishing (sequential for progress)
+  for (const token of instagramStoryTokens) {
+    currentIndex++;
+    if (onProgress) {
+      await onProgress({
+        platform: 'Instagram Story',
+        action: 'starting',
+        accountName: token.username,
+        current: currentIndex,
+        total: totalAccounts
+      });
+    }
+
+    try {
+      const result = await instagramPublisher.publishToStories(instagramOptions, [token]);
+      if (result.successful.length > 0) {
+        const mapped = mapInstagramSuccess(
+          result.successful.map(item => ({
+            ...item,
+            result: item.result as { id?: string }
+          }))
+        );
+        allSuccessful.push(...mapped);
+        if (onProgress) {
+          await onProgress({
+            platform: 'Instagram Story',
+            action: 'completed',
+            accountName: token.username,
+            current: currentIndex,
+            total: totalAccounts
+          });
+        }
+      }
+      if (result.failed.length > 0) {
+        const mapped = mapInstagramFailed(
+          result.failed.map(item => ({
+            ...item,
+            error: item.error
+              ? {
+                  ...item.error,
+                  details: typeof item.error.details === 'object'
+                    ? item.error.details as {
+                        error?: {
+                          message?: string;
+                          type?: string;
+                          code?: number;
+                          error_subcode?: number;
+                          is_transient?: boolean;
+                          error_user_title?: string;
+                          error_user_msg?: string;
+                          fbtrace_id?: string;
+                        };
+                      }
+                    : undefined
+                }
+              : undefined
+          }))
+        );
+        allFailed.push(...mapped);
+        if (onProgress) {
+          await onProgress({
+            platform: 'Instagram Story',
+            action: 'failed',
+            accountName: token.username,
+            current: currentIndex,
+            total: totalAccounts
+          });
+        }
+      }
+    } catch (err) {
+      reportLogger.add(`Error publishing to Instagram story ${token.username}: ${(err as Error).message}`);
+      if (onProgress) {
+        await onProgress({
+          platform: 'Instagram Story',
+          action: 'failed',
+          accountName: token.username,
+          current: currentIndex,
+          total: totalAccounts
+        });
+      }
+    }
+  }
 
   reportLogger.add(`Publishing complete. Successful posts: ${allSuccessful.length}, Failed posts: ${allFailed.length}`);
 
