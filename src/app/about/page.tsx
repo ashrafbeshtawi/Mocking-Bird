@@ -14,6 +14,7 @@ import Link from 'next/link';
 import FacebookIcon from '@mui/icons-material/Facebook';
 import InstagramIcon from '@mui/icons-material/Instagram';
 import XIcon from '@mui/icons-material/X';
+import TelegramIcon from '@mui/icons-material/Telegram';
 import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
 import LightbulbIcon from '@mui/icons-material/Lightbulb';
 import GroupsIcon from '@mui/icons-material/Groups';
@@ -26,6 +27,7 @@ import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 const FACEBOOK_COLOR = '#1877f2';
 const INSTAGRAM_COLOR = '#E1306C';
 const X_COLOR = '#000000';
+const TELEGRAM_COLOR = '#0088cc';
 
 function ValueCard({
   icon: Icon,
@@ -272,6 +274,7 @@ export default function AboutPage() {
                 { icon: FacebookIcon, color: FACEBOOK_COLOR, label: 'Facebook' },
                 { icon: InstagramIcon, color: INSTAGRAM_COLOR, label: 'Instagram' },
                 { icon: XIcon, color: X_COLOR, label: 'X' },
+                { icon: TelegramIcon, color: TELEGRAM_COLOR, label: 'Telegram' },
               ].map((platform, index) => (
                 <Paper
                   key={platform.label}
@@ -384,7 +387,7 @@ export default function AboutPage() {
           <TimelineItem
             year="Launch"
             title="Going Live"
-            description="Mockingbird launched with support for Facebook, Instagram, and X. The response from early users exceeded our expectations."
+            description="Mockingbird launched with support for Facebook, Instagram, X, and Telegram. The response from early users exceeded our expectations."
           />
           <TimelineItem
             year="Today"

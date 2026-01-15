@@ -15,6 +15,7 @@ import Link from 'next/link';
 import FacebookIcon from '@mui/icons-material/Facebook';
 import InstagramIcon from '@mui/icons-material/Instagram';
 import XIcon from '@mui/icons-material/X';
+import TelegramIcon from '@mui/icons-material/Telegram';
 import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import SpeedIcon from '@mui/icons-material/Speed';
@@ -28,6 +29,7 @@ import FormatQuoteIcon from '@mui/icons-material/FormatQuote';
 const FACEBOOK_COLOR = '#1877f2';
 const INSTAGRAM_COLOR = '#E1306C';
 const X_COLOR = '#000000';
+const TELEGRAM_COLOR = '#0088cc';
 
 function FloatingPlatformIcon({
   icon: Icon,
@@ -235,6 +237,12 @@ export default function LandingPage() {
             delay={1}
             position={{ bottom: '30%', left: '15%' }}
           />
+          <FloatingPlatformIcon
+            icon={TelegramIcon}
+            color={TELEGRAM_COLOR}
+            delay={1.5}
+            position={{ bottom: '25%', right: '8%' }}
+          />
         </Box>
 
         <Container maxWidth="md" sx={{ textAlign: 'center', position: 'relative', zIndex: 1 }}>
@@ -278,7 +286,7 @@ export default function LandingPage() {
             color="text.secondary"
             sx={{ mb: 5, maxWidth: 600, mx: 'auto', lineHeight: 1.6 }}
           >
-            Create your content once and instantly share it across Facebook, Instagram, and X.
+            Create your content once and instantly share it across Facebook, Instagram, X, and Telegram.
             Save hours every week with automated multi-platform publishing.
           </Typography>
 
@@ -336,6 +344,7 @@ export default function LandingPage() {
               { icon: FacebookIcon, label: 'Facebook', color: FACEBOOK_COLOR },
               { icon: InstagramIcon, label: 'Instagram', color: INSTAGRAM_COLOR },
               { icon: XIcon, label: 'X (Twitter)', color: X_COLOR },
+              { icon: TelegramIcon, label: 'Telegram', color: TELEGRAM_COLOR },
             ].map((platform) => (
               <Box
                 key={platform.label}
@@ -453,7 +462,7 @@ export default function LandingPage() {
               <StepCard
                 number={2}
                 title="Connect Accounts"
-                description="Link your Facebook, Instagram, and X accounts securely"
+                description="Link your Facebook, Instagram, X, and Telegram accounts securely"
               />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
