@@ -33,6 +33,7 @@ import HistoryIcon from '@mui/icons-material/History';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import ArticleIcon from '@mui/icons-material/Article';
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 
 interface PublishHistoryItem {
   id: number;
@@ -98,6 +99,7 @@ function HistoryCard({
   onSelect,
   onDelete,
   onClick,
+  onCopy,
 }: {
   item: PublishHistoryItem;
   index: number;
@@ -105,6 +107,7 @@ function HistoryCard({
   onSelect: (id: number, checked: boolean) => void;
   onDelete: (item: PublishHistoryItem) => void;
   onClick: (item: PublishHistoryItem) => void;
+  onCopy: (content: string) => void;
 }) {
   const status = statusConfig[item.publish_status] || statusConfig.failed;
   const StatusIcon = status.icon;
@@ -124,6 +127,11 @@ function HistoryCard({
 
   const handleDownloadClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+  };
+
+  const handleCopyClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onCopy(item.content);
   };
 
   return (
@@ -241,6 +249,18 @@ function HistoryCard({
               </Box>
 
               <Box sx={{ display: 'flex', gap: 0.5 }}>
+                <Tooltip title="Copy content">
+                  <IconButton
+                    size="small"
+                    onClick={handleCopyClick}
+                    sx={{
+                      color: 'text.secondary',
+                      '&:hover': { color: '#22c55e', bgcolor: '#22c55e10' },
+                    }}
+                  >
+                    <ContentCopyIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
                 <Tooltip title="Download report">
                   <IconButton
                     size="small"
@@ -421,6 +441,25 @@ export default function PublishHistoryPage() {
   // Card click handler - navigate to report detail
   const handleCardClick = (item: PublishHistoryItem) => {
     router.push(`/history/report?id=${item.id}&page=${page}`);
+  };
+
+  // Copy handler
+  const handleCopyContent = async (content: string) => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setSnackbar({
+        open: true,
+        message: 'Content copied to clipboard',
+        severity: 'success',
+      });
+    } catch (err) {
+      console.error('Failed to copy:', err);
+      setSnackbar({
+        open: true,
+        message: 'Failed to copy content',
+        severity: 'error',
+      });
+    }
   };
 
   // Single delete handlers
@@ -675,6 +714,7 @@ export default function PublishHistoryPage() {
                     onSelect={handleSelectItem}
                     onDelete={handleDeleteClick}
                     onClick={handleCardClick}
+                    onCopy={handleCopyContent}
                   />
                 ))}
               </Box>

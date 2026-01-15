@@ -14,6 +14,7 @@ import { useFacebookSDK, initiateTwitterAuth } from '@/hooks/useFacebookSDK';
 import { AccountsTable } from '@/components/dashboard/AccountsTable';
 import { ConnectButtons } from '@/components/dashboard/ConnectButtons';
 import { ConfirmDisconnectDialog } from '@/components/dashboard/ConfirmDisconnectDialog';
+import { TelegramConnectDialog } from '@/components/dashboard/TelegramConnectDialog';
 import type { AccountData } from '@/types/accounts';
 import { API_CONFIG } from '@/types/accounts';
 
@@ -26,6 +27,7 @@ export default function DashboardPage() {
     success: null,
   });
   const [twitterConnecting, setTwitterConnecting] = useState(false);
+  const [telegramDialogOpen, setTelegramDialogOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
@@ -76,6 +78,12 @@ export default function DashboardPage() {
     }
   }, []);
 
+  // Handle Telegram channel connection success
+  const handleTelegramSuccess = useCallback(() => {
+    setStatus({ error: null, success: 'Telegram channel connected successfully!' });
+    refetch();
+  }, [refetch]);
+
   // Handle account deletion
   const handleDeleteAccount = useCallback(
     async (account: AccountData) => {
@@ -124,6 +132,7 @@ export default function DashboardPage() {
       <ConnectButtons
         onFacebookConnect={handleFacebookConnect}
         onTwitterConnect={handleTwitterConnect}
+        onTelegramConnect={() => setTelegramDialogOpen(true)}
         facebookLoading={fbConnecting}
         twitterLoading={twitterConnecting}
       />
@@ -154,6 +163,7 @@ export default function DashboardPage() {
               ...normalizedAccounts.facebook,
               ...normalizedAccounts.instagram,
               ...normalizedAccounts.twitter,
+              ...normalizedAccounts.telegram,
             ]}
             emptyMessage="No accounts connected yet. Use the buttons above to connect your social media accounts."
             loadingId={deletingId}
@@ -167,6 +177,12 @@ export default function DashboardPage() {
         account={confirmDialog.account}
         onClose={() => setConfirmDialog({ open: false, account: null })}
         onConfirm={confirmDelete}
+      />
+
+      <TelegramConnectDialog
+        open={telegramDialogOpen}
+        onClose={() => setTelegramDialogOpen(false)}
+        onSuccess={handleTelegramSuccess}
       />
     </Box>
   );

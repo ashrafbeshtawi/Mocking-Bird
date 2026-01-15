@@ -1,6 +1,6 @@
 // Account types for social media platforms
 
-export type Platform = 'facebook' | 'instagram' | 'twitter';
+export type Platform = 'facebook' | 'instagram' | 'twitter' | 'telegram';
 
 // Facebook page from API
 export interface ConnectedPage {
@@ -46,6 +46,7 @@ export const API_CONFIG: Record<Platform, ApiConfig> = {
   facebook: { deleteUrl: '/api/facebook/delete-page', idParamName: 'page_id' },
   instagram: { deleteUrl: '/api/instagram', idParamName: 'instagram_account_id' },
   twitter: { deleteUrl: '/api/twitter-v1.1/delete-account', idParamName: 'page_id' },
+  telegram: { deleteUrl: '/api/telegram/delete-channel', idParamName: 'channel_id' },
 };
 
 // Twitter character limit
@@ -53,3 +54,18 @@ export const TWITTER_CHAR_LIMIT = 280;
 
 // Facebook App ID
 export const FB_APP_ID = '1471736117322956';
+
+// Telegram channel from API
+export interface TelegramChannel {
+  id: string;
+  channel_id: string;
+  channel_title: string;
+  channel_username?: string;
+}
+
+// Telegram channel token for publishing
+export interface TelegramChannelToken {
+  channel_id: string;
+  channel_title: string;
+  channel_username?: string;
+}

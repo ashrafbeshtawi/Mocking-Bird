@@ -29,6 +29,7 @@ export default function PublishPage() {
     facebookPages,
     xAccounts,
     instagramAccounts,
+    telegramChannels,
     loading,
   } = useConnectedAccounts();
 
@@ -61,6 +62,7 @@ export default function PublishPage() {
   const [selectedInstagramAccounts, setSelectedInstagramAccounts] = useState<
     Record<string, InstagramSelection>
   >({});
+  const [selectedTelegramChannels, setSelectedTelegramChannels] = useState<string[]>([]);
 
   // Initialize selections when accounts load
   useEffect(() => {
@@ -84,6 +86,12 @@ export default function PublishPage() {
       setSelectedInstagramAccounts(initial);
     }
   }, [instagramAccounts]);
+
+  useEffect(() => {
+    if (telegramChannels.length > 0) {
+      setSelectedTelegramChannels(telegramChannels.map((c) => c.channel_id));
+    }
+  }, [telegramChannels]);
 
   // Handlers
   const handleFacebookChange = useCallback((pageId: string) => {
@@ -113,6 +121,14 @@ export default function PublishPage() {
     []
   );
 
+  const handleTelegramChange = useCallback((channelId: string) => {
+    setSelectedTelegramChannels((prev) =>
+      prev.includes(channelId)
+        ? prev.filter((id) => id !== channelId)
+        : [...prev, channelId]
+    );
+  }, []);
+
   const handlePublish = async () => {
     const wasSuccessful = await publish({
       postText,
@@ -120,6 +136,7 @@ export default function PublishPage() {
       selectedFacebookPages,
       selectedXAccounts,
       selectedInstagramAccounts,
+      selectedTelegramChannels,
     });
 
     if (wasSuccessful) {
@@ -127,6 +144,7 @@ export default function PublishPage() {
       setUploadedMedia([]);
       setSelectedFacebookPages(facebookPages.map((p) => p.page_id));
       setSelectedXAccounts(xAccounts.map((a) => a.id));
+      setSelectedTelegramChannels(telegramChannels.map((c) => c.channel_id));
 
       const resetInstagram: Record<string, InstagramSelection> = {};
       instagramAccounts.forEach((a) => {
@@ -140,7 +158,7 @@ export default function PublishPage() {
   const charCount = postText.length;
   const showTwitterWarning = charCount > TWITTER_CHAR_LIMIT && selectedXAccounts.length > 0;
   const hasAnyAccount =
-    facebookPages.length > 0 || xAccounts.length > 0 || instagramAccounts.length > 0;
+    facebookPages.length > 0 || xAccounts.length > 0 || instagramAccounts.length > 0 || telegramChannels.length > 0;
   const hasInstagramSelection = Object.values(selectedInstagramAccounts).some(
     (s) => s.publish || s.story
   );
@@ -149,12 +167,14 @@ export default function PublishPage() {
     (postText.trim() !== '' || uploadedMedia.length > 0) &&
     (selectedFacebookPages.length > 0 ||
       selectedXAccounts.length > 0 ||
-      hasInstagramSelection);
+      hasInstagramSelection ||
+      selectedTelegramChannels.length > 0);
 
   const selectedCount =
     selectedFacebookPages.length +
     selectedXAccounts.length +
-    Object.values(selectedInstagramAccounts).filter((s) => s.publish || s.story).length;
+    Object.values(selectedInstagramAccounts).filter((s) => s.publish || s.story).length +
+    selectedTelegramChannels.length;
 
   if (loading) {
     return (
@@ -277,7 +297,7 @@ export default function PublishPage() {
                 No accounts connected
               </Typography>
               <Typography variant="body1" color="text.secondary">
-                Head to the Dashboard to connect your Facebook, Instagram, and X accounts.
+                Head to the Dashboard to connect your Facebook, Instagram, X, and Telegram accounts.
               </Typography>
             </Paper>
           </Fade>
@@ -328,12 +348,15 @@ export default function PublishPage() {
                   facebookPages={facebookPages}
                   xAccounts={xAccounts}
                   instagramAccounts={instagramAccounts}
+                  telegramChannels={telegramChannels}
                   selectedFacebookPages={selectedFacebookPages}
                   selectedXAccounts={selectedXAccounts}
                   selectedInstagramAccounts={selectedInstagramAccounts}
+                  selectedTelegramChannels={selectedTelegramChannels}
                   onFacebookChange={handleFacebookChange}
                   onXChange={handleXChange}
                   onInstagramChange={handleInstagramChange}
+                  onTelegramChange={handleTelegramChange}
                   mediaSelected={uploadedMedia.length > 0}
                 />
               </Paper>

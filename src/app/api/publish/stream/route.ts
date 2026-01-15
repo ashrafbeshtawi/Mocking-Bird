@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
         return;
       }
 
-      const { text, facebookPages, xAccounts, instagramPublishAccounts, instagramStoryAccounts, cloudinaryMedia } = parseResult.data;
+      const { text, facebookPages, xAccounts, instagramPublishAccounts, instagramStoryAccounts, telegramChannels, cloudinaryMedia } = parseResult.data;
       reportLogger.add(`Request payload parsed`);
 
       // Check for mixed media types
@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Validate text content
-      const hasAnyAccount = facebookPages.length > 0 || xAccounts.length > 0 || instagramPublishAccounts.length > 0 || instagramStoryAccounts.length > 0;
+      const hasAnyAccount = facebookPages.length > 0 || xAccounts.length > 0 || instagramPublishAccounts.length > 0 || instagramStoryAccounts.length > 0 || telegramChannels.length > 0;
       const textValidation = validateTextContent(text, cloudinaryMedia.length > 0, hasAnyAccount);
       if (!textValidation.success) {
         await sendEvent('error', { message: textValidation.error });
@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Validate account arrays
-      const accountValidation = validateAccountArrays(facebookPages, xAccounts, instagramPublishAccounts, instagramStoryAccounts);
+      const accountValidation = validateAccountArrays(facebookPages, xAccounts, instagramPublishAccounts, instagramStoryAccounts, telegramChannels);
       if (!accountValidation.success) {
         await sendEvent('error', { message: accountValidation.error });
         await writer.close();
@@ -124,13 +124,14 @@ export async function POST(req: NextRequest) {
       });
 
       // Fetch tokens
-      const { facebookTokens, twitterTokens, instagramFeedTokens, instagramStoryTokens } = await fetchAllTokens(
+      const { facebookTokens, twitterTokens, instagramFeedTokens, instagramStoryTokens, telegramTokens } = await fetchAllTokens(
         pool,
         userId,
         facebookPages,
         xAccounts,
         instagramPublishAccounts,
         instagramStoryAccounts,
+        telegramChannels,
         reportLogger
       );
 
@@ -139,7 +140,7 @@ export async function POST(req: NextRequest) {
       const allInstagramTokens = [...instagramFeedTokens, ...instagramStoryTokens].filter(
         (token, index, self) => index === self.findIndex(t => t.instagram_account_id === token.instagram_account_id)
       );
-      const missing = validateMissingAccounts(facebookPages, xAccounts, allInstagramAccountIds, facebookTokens, twitterTokens, allInstagramTokens);
+      const missing = validateMissingAccounts(facebookPages, xAccounts, allInstagramAccountIds, telegramChannels, facebookTokens, twitterTokens, allInstagramTokens, telegramTokens);
       if (hasMissingAccounts(missing)) {
         const missingAccounts = formatMissingAccounts(missing);
         await sendEvent('error', {
@@ -172,6 +173,7 @@ export async function POST(req: NextRequest) {
         twitterTokens,
         instagramFeedTokens,
         instagramStoryTokens,
+        telegramTokens,
         reportLogger,
         onProgress
       });
@@ -187,7 +189,7 @@ export async function POST(req: NextRequest) {
       });
 
       // Clean up Cloudinary media
-      if (cloudinaryMedia.length > 0 && (successful.length > 0 || failed.length < (facebookTokens.length + twitterTokens.length + instagramFeedTokens.length + instagramStoryTokens.length))) {
+      if (cloudinaryMedia.length > 0 && (successful.length > 0 || failed.length < (facebookTokens.length + twitterTokens.length + instagramFeedTokens.length + instagramStoryTokens.length + telegramTokens.length))) {
         cleanupCloudinaryMedia(cloudinaryMedia).catch((err) => {
           logger.error('Failed to cleanup Cloudinary media', err);
         });

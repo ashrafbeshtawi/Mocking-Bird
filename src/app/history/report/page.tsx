@@ -31,6 +31,7 @@ import ArticleIcon from '@mui/icons-material/Article';
 import TerminalIcon from '@mui/icons-material/Terminal';
 import DownloadIcon from '@mui/icons-material/Download';
 import DeleteIcon from '@mui/icons-material/Delete';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 
 interface ReportData {
   id: number;
@@ -198,6 +199,25 @@ export default function ReportPage() {
     setSnackbar((prev) => ({ ...prev, open: false }));
   };
 
+  const handleCopyContent = async () => {
+    if (!report) return;
+    try {
+      await navigator.clipboard.writeText(report.content);
+      setSnackbar({
+        open: true,
+        message: 'Content copied to clipboard',
+        severity: 'success',
+      });
+    } catch (err) {
+      console.error('Failed to copy:', err);
+      setSnackbar({
+        open: true,
+        message: 'Failed to copy content',
+        severity: 'error',
+      });
+    }
+  };
+
   const status = report
     ? statusConfig[report.publish_status] || statusConfig.failed
     : null;
@@ -281,6 +301,23 @@ export default function ReportPage() {
                     </Typography>
                   </Box>
                   <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={<ContentCopyIcon />}
+                      onClick={handleCopyContent}
+                      sx={{
+                        borderRadius: 2,
+                        borderColor: '#22c55e50',
+                        color: '#22c55e',
+                        '&:hover': {
+                          borderColor: '#22c55e',
+                          bgcolor: '#22c55e10',
+                        },
+                      }}
+                    >
+                      Copy
+                    </Button>
                     <Button
                       variant="outlined"
                       size="small"

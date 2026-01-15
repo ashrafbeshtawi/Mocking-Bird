@@ -3,3 +3,6 @@ export type { FacebookPageToken, FacebookPublishResult, FacebookPublishError, Fa
 
 export { TwitterPublisherV1 } from './twitterv1.1';
 export type { TwitterAccountTokenV1, TwitterPublishResult, TwitterPublishError } from './twitterv1.1';
+
+export { TelegramPublisher } from './telegram';
+export type { TelegramChannelToken, TelegramPublishResult, TelegramPublishError, TelegramPublishOptions } from './telegram';

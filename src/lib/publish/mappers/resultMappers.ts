@@ -6,7 +6,9 @@ import {
   FacebookSuccessItem,
   TwitterSuccessItem,
   InstagramFailedItem,
-  InstagramSuccessItem
+  InstagramSuccessItem,
+  TelegramFailedItem,
+  TelegramSuccessItem
 } from '@/types/interfaces';
 
 /**
@@ -108,6 +110,34 @@ export function mapInstagramSuccess(successful: InstagramSuccessItem[]): Success
 }
 
 /**
+ * Maps Telegram failed items to standardized FailedPublishResult
+ */
+export function mapTelegramFailed(failed: TelegramFailedItem[]): FailedPublishResult[] {
+  return failed.map(item => ({
+    platform: item.platform,
+    telegram_channel_id: item.channel_id,
+    error: item.error
+      ? {
+          message: item.error.message,
+          code: item.error.code,
+          details: undefined
+        }
+      : undefined
+  }));
+}
+
+/**
+ * Maps Telegram successful items to standardized SuccessfulPublishResult
+ */
+export function mapTelegramSuccess(successful: TelegramSuccessItem[]): SuccessfulPublishResult[] {
+  return successful.map(item => ({
+    platform: item.platform,
+    telegram_channel_id: item.channel_id,
+    telegram_message_id: item.message_id.toString()
+  }));
+}
+
+/**
  * Formats failed publish details for logging
  */
 export function formatFailedDetails(allFailed: FailedPublishResult[]): string {
@@ -119,6 +149,8 @@ export function formatFailedDetails(allFailed: FailedPublishResult[]): string {
       detailMessage += `Account ID ${item.account_id}`;
     } else if (item.instagram_account_id) {
       detailMessage += `Instagram Account ${item.instagram_account_id} (${item.post_type || 'feed'})`;
+    } else if (item.telegram_channel_id) {
+      detailMessage += `Telegram Channel ${item.telegram_channel_id}`;
     }
     detailMessage += ` - Error: ${item.error?.message || 'Unknown error'}`;
 

@@ -4,6 +4,7 @@ export interface FailedPublishResult {
   page_id?: string;
   account_id?: string;
   instagram_account_id?: string;
+  telegram_channel_id?: string;
   post_type?: 'feed' | 'story';
   error?: {
     message?: string;
@@ -35,6 +36,8 @@ export interface SuccessfulPublishResult {
   account_id?: string; // For X accounts
   instagram_account_id?: string; // For Instagram accounts
   instagram_media_id?: string; // For Instagram media ID
+  telegram_channel_id?: string; // For Telegram channels
+  telegram_message_id?: string; // For Telegram message ID
   post_type?: 'feed' | 'story'; // For Instagram post type
 }
 
@@ -147,6 +150,25 @@ export interface InstagramSuccessItem {
   result?: {
     id?: string;
   };
+}
+
+export interface TelegramFailedItem {
+  platform: 'telegram';
+  channel_id: string;
+  channel_title: string;
+  error?: {
+    message?: string;
+    code?: string;
+    details?: unknown;
+  };
+}
+
+export interface TelegramSuccessItem {
+  platform: 'telegram';
+  channel_id: string;
+  channel_title: string;
+  message_id: number;
+  chat_id: string;
 }
 
 export interface ApiResponse {

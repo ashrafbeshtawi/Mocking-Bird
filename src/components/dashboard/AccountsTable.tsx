@@ -20,8 +20,9 @@ import {
   Facebook as FacebookIcon,
   Instagram as InstagramIcon,
   Twitter as TwitterIcon,
+  Telegram as TelegramIcon,
 } from '@mui/icons-material';
-import type { AccountData } from '@/types/accounts';
+import type { AccountData, Platform } from '@/types/accounts';
 
 interface AccountsTableProps {
   title: string;
@@ -31,7 +32,7 @@ interface AccountsTableProps {
   onDelete: (account: AccountData) => void;
 }
 
-const platformConfig = {
+const platformConfig: Record<Platform, { label: string; icon: typeof FacebookIcon; color: string }> = {
   facebook: {
     label: 'Facebook',
     icon: FacebookIcon,
@@ -46,6 +47,11 @@ const platformConfig = {
     label: 'X',
     icon: TwitterIcon,
     color: '#000',
+  },
+  telegram: {
+    label: 'Telegram',
+    icon: TelegramIcon,
+    color: '#0088cc',
   },
 };
 
@@ -100,7 +106,14 @@ export function AccountsTable({
                         }}
                       />
                     </TableCell>
-                    <TableCell>{account.name}</TableCell>
+                    <TableCell>
+                      {account.name}
+                      {account.details && (
+                        <Typography variant="caption" color="text.secondary" display="block">
+                          {account.details}
+                        </Typography>
+                      )}
+                    </TableCell>
                     <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>
                       {account.id}
                     </TableCell>

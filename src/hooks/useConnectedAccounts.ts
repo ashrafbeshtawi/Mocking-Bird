@@ -6,6 +6,7 @@ import type {
   ConnectedPage,
   ConnectedXAccount,
   InstagramAccount,
+  TelegramChannel,
   AccountData,
 } from '@/types/accounts';
 
@@ -14,11 +15,13 @@ interface UseConnectedAccountsReturn {
   facebookPages: ConnectedPage[];
   xAccounts: ConnectedXAccount[];
   instagramAccounts: InstagramAccount[];
+  telegramChannels: TelegramChannel[];
   // Normalized data for dashboard
   normalizedAccounts: {
     facebook: AccountData[];
     instagram: AccountData[];
     twitter: AccountData[];
+    telegram: AccountData[];
   };
   // State
   loading: boolean;
@@ -31,6 +34,7 @@ export function useConnectedAccounts(): UseConnectedAccountsReturn {
   const [facebookPages, setFacebookPages] = useState<ConnectedPage[]>([]);
   const [xAccounts, setXAccounts] = useState<ConnectedXAccount[]>([]);
   const [instagramAccounts, setInstagramAccounts] = useState<InstagramAccount[]>([]);
+  const [telegramChannels, setTelegramChannels] = useState<TelegramChannel[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,10 +43,11 @@ export function useConnectedAccounts(): UseConnectedAccountsReturn {
     setError(null);
 
     try {
-      const [fbRes, instaRes, twitterRes] = await Promise.allSettled([
+      const [fbRes, instaRes, twitterRes, telegramRes] = await Promise.allSettled([
         fetchWithAuth('/api/facebook/get-pages'),
         fetchWithAuth('/api/instagram'),
         fetchWithAuth('/api/twitter-v1.1/get-accounts'),
+        fetchWithAuth('/api/telegram/get-channels'),
       ]);
 
       // Process Facebook pages
@@ -67,6 +72,14 @@ export function useConnectedAccounts(): UseConnectedAccountsReturn {
         setXAccounts(data.accounts || []);
       } else {
         setXAccounts([]);
+      }
+
+      // Process Telegram channels
+      if (telegramRes.status === 'fulfilled' && telegramRes.value.ok) {
+        const data = await telegramRes.value.json();
+        setTelegramChannels(data.channels || []);
+      } else {
+        setTelegramChannels([]);
       }
     } catch (err) {
       console.error('Error fetching accounts:', err);
@@ -97,12 +110,19 @@ export function useConnectedAccounts(): UseConnectedAccountsReturn {
       name: a.name,
       platform: 'twitter' as const,
     })),
+    telegram: telegramChannels.map((c) => ({
+      id: c.channel_id,
+      name: c.channel_title,
+      details: c.channel_username ? `@${c.channel_username}` : undefined,
+      platform: 'telegram' as const,
+    })),
   };
 
   return {
     facebookPages,
     xAccounts,
     instagramAccounts,
+    telegramChannels,
     normalizedAccounts,
     loading,
     error,

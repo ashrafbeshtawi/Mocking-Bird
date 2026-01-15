@@ -3,6 +3,7 @@ import { SuccessfulPublishResult, FailedPublishResult, MediaFile } from '@/types
 import { FacebookPublisher, FacebookPageToken } from '@/lib/publishers/facebook';
 import { TwitterPublisherV1, TwitterAccountTokenV1 } from '@/lib/publishers/twitterv1.1';
 import { InstagramPublisher, InstagramAccountToken } from '@/lib/publishers/instagram';
+import { TelegramPublisher, TelegramChannelToken } from '@/lib/publishers/telegram';
 import { ReportLogger, CloudinaryMediaInfo } from './types';
 import {
   mapFacebookSuccess,
@@ -11,6 +12,8 @@ import {
   mapTwitterFailed,
   mapInstagramSuccess,
   mapInstagramFailed,
+  mapTelegramSuccess,
+  mapTelegramFailed,
   formatFailedDetails
 } from './mappers/resultMappers';
 
@@ -33,6 +36,7 @@ export interface ExecutePublishOptions {
   twitterTokens: TwitterAccountTokenV1[];
   instagramFeedTokens: InstagramAccountToken[];
   instagramStoryTokens: InstagramAccountToken[];
+  telegramTokens: TelegramChannelToken[];
   reportLogger: ReportLogger;
   onProgress?: ProgressCallback;
 }
@@ -57,18 +61,24 @@ export async function executePublish(
     twitterTokens,
     instagramFeedTokens,
     instagramStoryTokens,
+    telegramTokens,
     reportLogger
   } = options;
 
   reportLogger.add(
     `Starting publishing process to ${facebookTokens.length} Facebook pages, ` +
     `${twitterTokens.length} X accounts, ${instagramFeedTokens.length} Instagram feed accounts, ` +
-    `${instagramStoryTokens.length} Instagram story accounts`
+    `${instagramStoryTokens.length} Instagram story accounts, ${telegramTokens.length} Telegram channels`
   );
 
   const facebookPublisher = new FacebookPublisher(pool);
   const twitterPublisher = new TwitterPublisherV1(pool);
   const instagramPublisher = new InstagramPublisher(pool);
+
+  // Only create Telegram publisher if bot token is configured
+  const telegramPublisher = process.env.TELEGRAM_BOT_TOKEN
+    ? new TelegramPublisher(pool)
+    : null;
 
   // Facebook and Twitter use downloaded media files (buffers)
   const facebookOptions = {
@@ -240,19 +250,47 @@ export async function executePublish(
     publishPromises.push(Promise.resolve({ successful: [], failed: [] }));
   }
 
-  const [fbResults, xResults, igFeedResults, igStoryResults] = await Promise.all(publishPromises);
+  // Telegram publishing (uses Cloudinary URLs directly)
+  if (telegramTokens.length > 0 && telegramPublisher) {
+    const telegramOptions = {
+      text: text.trim() || '',
+      cloudinaryMedia: cloudinaryMedia.length > 0 ? cloudinaryMedia : undefined
+    };
+    publishPromises.push(
+      telegramPublisher.publishToChannels(telegramOptions, telegramTokens).then(res => ({
+        successful: mapTelegramSuccess(
+          res.successful.map(item => ({
+            ...item,
+            platform: 'telegram' as const
+          }))
+        ),
+        failed: mapTelegramFailed(
+          res.failed.map(item => ({
+            ...item,
+            platform: 'telegram' as const
+          }))
+        )
+      }))
+    );
+  } else {
+    publishPromises.push(Promise.resolve({ successful: [], failed: [] }));
+  }
+
+  const [fbResults, xResults, igFeedResults, igStoryResults, telegramResults] = await Promise.all(publishPromises);
 
   const allSuccessful = [
     ...fbResults.successful,
     ...xResults.successful,
     ...igFeedResults.successful,
-    ...igStoryResults.successful
+    ...igStoryResults.successful,
+    ...telegramResults.successful
   ];
   const allFailed = [
     ...fbResults.failed,
     ...xResults.failed,
     ...igFeedResults.failed,
-    ...igStoryResults.failed
+    ...igStoryResults.failed,
+    ...telegramResults.failed
   ];
 
   reportLogger.add(`Publishing complete. Successful posts: ${allSuccessful.length}, Failed posts: ${allFailed.length}`);
@@ -279,12 +317,13 @@ export async function executePublishWithProgress(
     twitterTokens,
     instagramFeedTokens,
     instagramStoryTokens,
+    telegramTokens,
     reportLogger,
     onProgress
   } = options;
 
   const totalAccounts = facebookTokens.length + twitterTokens.length +
-    instagramFeedTokens.length + instagramStoryTokens.length;
+    instagramFeedTokens.length + instagramStoryTokens.length + telegramTokens.length;
   let currentIndex = 0;
 
   const allSuccessful: SuccessfulPublishResult[] = [];
@@ -294,6 +333,11 @@ export async function executePublishWithProgress(
   const twitterPublisher = new TwitterPublisherV1(pool);
   const instagramPublisher = new InstagramPublisher(pool);
 
+  // Only create Telegram publisher if bot token is configured
+  const telegramPublisher = process.env.TELEGRAM_BOT_TOKEN
+    ? new TelegramPublisher(pool)
+    : null;
+
   const facebookOptions = {
     text: text.trim() || undefined,
     files: mediaFiles.length > 0 ? mediaFiles : undefined
@@ -301,6 +345,11 @@ export async function executePublishWithProgress(
 
   const instagramOptions = {
     text: text.trim() || undefined,
+    cloudinaryMedia: cloudinaryMedia.length > 0 ? cloudinaryMedia : undefined
+  };
+
+  const telegramOptions = {
+    text: text.trim() || '',
     cloudinaryMedia: cloudinaryMedia.length > 0 ? cloudinaryMedia : undefined
   };
 
@@ -628,6 +677,73 @@ export async function executePublishWithProgress(
           current: currentIndex,
           total: totalAccounts
         });
+      }
+    }
+  }
+
+  // Telegram publishing (sequential for progress)
+  if (telegramPublisher) {
+    for (const token of telegramTokens) {
+      currentIndex++;
+      if (onProgress) {
+        await onProgress({
+          platform: 'Telegram',
+          action: 'starting',
+          accountName: token.channel_title,
+          current: currentIndex,
+          total: totalAccounts
+        });
+      }
+
+      try {
+        const result = await telegramPublisher.publishToChannels(telegramOptions, [token]);
+        if (result.successful.length > 0) {
+          const mapped = mapTelegramSuccess(
+            result.successful.map(item => ({
+              ...item,
+              platform: 'telegram' as const
+            }))
+          );
+          allSuccessful.push(...mapped);
+          if (onProgress) {
+            await onProgress({
+              platform: 'Telegram',
+              action: 'completed',
+              accountName: token.channel_title,
+              current: currentIndex,
+              total: totalAccounts
+            });
+          }
+        }
+        if (result.failed.length > 0) {
+          const mapped = mapTelegramFailed(
+            result.failed.map(item => ({
+              ...item,
+              platform: 'telegram' as const
+            }))
+          );
+          allFailed.push(...mapped);
+          if (onProgress) {
+            await onProgress({
+              platform: 'Telegram',
+              action: 'failed',
+              accountName: token.channel_title,
+              current: currentIndex,
+              total: totalAccounts
+            });
+          }
+        }
+      } catch (err) {
+        reportLogger.add(`Error publishing to Telegram channel ${token.channel_title}: ${(err as Error).message}`);
+        if (onProgress) {
+          await onProgress({
+            platform: 'Telegram',
+            action: 'failed',
+            accountName: token.channel_title,
+            current: currentIndex,
+            total: totalAccounts
+          });
+        }
       }
     }
   }

@@ -9,6 +9,7 @@ interface PublishResult {
   page_id?: string;
   account_id?: string;
   instagram_account_id?: string;
+  telegram_channel_id?: string;
   error?: {
     message?: string;
     code?: string;
@@ -31,6 +32,7 @@ interface PublishParams {
   selectedFacebookPages: string[];
   selectedXAccounts: string[];
   selectedInstagramAccounts: Record<string, InstagramSelection>;
+  selectedTelegramChannels: string[];
 }
 
 interface ProgressUpdate {
@@ -95,6 +97,7 @@ export function usePublish(): UsePublishReturn {
       selectedFacebookPages,
       selectedXAccounts,
       selectedInstagramAccounts,
+      selectedTelegramChannels,
     }: PublishParams): Promise<boolean> => {
       setIsPublishing(true);
       setError(null);
@@ -111,7 +114,8 @@ export function usePublish(): UsePublishReturn {
       if (
         selectedFacebookPages.length === 0 &&
         selectedXAccounts.length === 0 &&
-        !hasInstagramSelection
+        !hasInstagramSelection &&
+        selectedTelegramChannels.length === 0
       ) {
         setError({ message: 'Please select at least one page or account to publish to.' });
         setIsPublishing(false);
@@ -146,6 +150,7 @@ export function usePublish(): UsePublishReturn {
         xAccounts: selectedXAccounts,
         instagramPublishAccounts,
         instagramStoryAccounts,
+        telegramChannels: selectedTelegramChannels,
         // Send Cloudinary media info instead of raw files
         cloudinaryMedia: uploadedMedia.map((media) => ({
           publicId: media.publicId,
