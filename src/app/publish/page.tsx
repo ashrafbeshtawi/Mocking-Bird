@@ -34,7 +34,7 @@ export default function PublishPage() {
   } = useConnectedAccounts();
 
   // Publishing logic
-  const { isPublishing, error, success, results, statusMessage, stepProgress, publish } = usePublish();
+  const { isPublishing, error, success, results, statusMessage, stepProgress, publish, clearStatus } = usePublish();
 
   // Calculate overall progress percentage
   const calculateProgress = () => {
@@ -92,6 +92,35 @@ export default function PublishPage() {
       setSelectedTelegramChannels(telegramChannels.map((c) => c.channel_id));
     }
   }, [telegramChannels]);
+
+  // Auto-select Instagram accounts when media is added, deselect when removed
+  useEffect(() => {
+    if (instagramAccounts.length === 0) return;
+
+    if (uploadedMedia.length > 0) {
+      // Media added - auto-select if nothing is currently selected
+      setSelectedInstagramAccounts((prev) => {
+        const hasAnySelected = Object.values(prev).some((s) => s.publish || s.story);
+        if (!hasAnySelected) {
+          const updated: Record<string, InstagramSelection> = {};
+          instagramAccounts.forEach((a) => {
+            updated[a.id] = { publish: true, story: false };
+          });
+          return updated;
+        }
+        return prev;
+      });
+    } else {
+      // All media removed - deselect all Instagram options
+      setSelectedInstagramAccounts((prev) => {
+        const updated: Record<string, InstagramSelection> = {};
+        instagramAccounts.forEach((a) => {
+          updated[a.id] = { publish: false, story: false };
+        });
+        return updated;
+      });
+    }
+  }, [uploadedMedia.length, instagramAccounts]);
 
   // Handlers
   const handleFacebookChange = useCallback((pageId: string) => {
@@ -278,7 +307,7 @@ export default function PublishPage() {
         </Fade>
 
         {/* Results */}
-        <PublishResults error={error} success={success} results={results} />
+        <PublishResults error={error} success={success} results={results} onClose={clearStatus} />
 
         {!hasAnyAccount ? (
           <Fade in timeout={800}>
