@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
         success: true,
         accounts: result.rows.map(row => ({
           id: row.instagram_account_id,
-          name: row.username,
+          username: row.username,
           displayName: row.display_name,
           facebookPageId: row.facebook_page_id,
         }))

@@ -21,11 +21,21 @@ export interface ProgressUpdate {
   platform: string;
   action: 'starting' | 'completed' | 'failed';
   accountName?: string;
+  accountId?: string;
   current: number;
   total: number;
 }
 
+export interface AccountProgress {
+  accountId: string;
+  accountName: string;
+  platform: string;
+  status: 'pending' | 'publishing' | 'completed' | 'failed';
+  error?: string;
+}
+
 export type ProgressCallback = (progress: ProgressUpdate) => void | Promise<void>;
+export type AccountProgressCallback = (accounts: AccountProgress[]) => void | Promise<void>;
 
 export interface ExecutePublishOptions {
   pool: Pool;
@@ -39,6 +49,7 @@ export interface ExecutePublishOptions {
   telegramTokens: TelegramChannelToken[];
   reportLogger: ReportLogger;
   onProgress?: ProgressCallback;
+  onAccountProgress?: AccountProgressCallback;
 }
 
 export interface ExecutePublishResult {
@@ -303,7 +314,7 @@ export async function executePublish(
 }
 
 /**
- * Executes publishing with progress updates (sequential for streaming feedback)
+ * Executes publishing with progress updates (parallel publishing with per-account status)
  */
 export async function executePublishWithProgress(
   options: ExecutePublishOptions
@@ -319,21 +330,105 @@ export async function executePublishWithProgress(
     instagramStoryTokens,
     telegramTokens,
     reportLogger,
-    onProgress
+    onProgress,
+    onAccountProgress
   } = options;
 
   const totalAccounts = facebookTokens.length + twitterTokens.length +
     instagramFeedTokens.length + instagramStoryTokens.length + telegramTokens.length;
-  let currentIndex = 0;
 
   const allSuccessful: SuccessfulPublishResult[] = [];
   const allFailed: FailedPublishResult[] = [];
 
+  // Build account progress tracking
+  const accountsProgress: AccountProgress[] = [];
+
+  facebookTokens.forEach(token => {
+    accountsProgress.push({
+      accountId: token.page_id,
+      accountName: token.page_name,
+      platform: 'Facebook',
+      status: 'pending'
+    });
+  });
+
+  twitterTokens.forEach(token => {
+    accountsProgress.push({
+      accountId: token.x_user_id,
+      accountName: token.username,
+      platform: 'X',
+      status: 'pending'
+    });
+  });
+
+  instagramFeedTokens.forEach(token => {
+    accountsProgress.push({
+      accountId: `${token.instagram_account_id}-feed`,
+      accountName: token.username,
+      platform: 'Instagram',
+      status: 'pending'
+    });
+  });
+
+  instagramStoryTokens.forEach(token => {
+    accountsProgress.push({
+      accountId: `${token.instagram_account_id}-story`,
+      accountName: token.username,
+      platform: 'Instagram Story',
+      status: 'pending'
+    });
+  });
+
+  telegramTokens.forEach(token => {
+    accountsProgress.push({
+      accountId: token.channel_id,
+      accountName: token.channel_title,
+      platform: 'Telegram',
+      status: 'pending'
+    });
+  });
+
+  // Track completed count for progress updates
+  let completedCount = 0;
+
+  const updateAccountStatus = async (accountId: string, status: AccountProgress['status'], error?: string) => {
+    const account = accountsProgress.find(a => a.accountId === accountId);
+    if (account) {
+      account.status = status;
+      if (error) account.error = error;
+
+      if (status === 'completed' || status === 'failed') {
+        completedCount++;
+      }
+
+      // Emit account progress
+      if (onAccountProgress) {
+        await onAccountProgress([...accountsProgress]);
+      }
+
+      // Emit overall progress (only for starting/completed/failed, not pending)
+      if (onProgress && status !== 'pending') {
+        const action = status === 'publishing' ? 'starting' : status;
+        await onProgress({
+          platform: account.platform,
+          action,
+          accountName: account.accountName,
+          accountId: account.accountId,
+          current: completedCount,
+          total: totalAccounts
+        });
+      }
+    }
+  };
+
+  // Send initial account list
+  if (onAccountProgress) {
+    await onAccountProgress([...accountsProgress]);
+  }
+
   const facebookPublisher = new FacebookPublisher(pool);
   const twitterPublisher = new TwitterPublisherV1(pool);
   const instagramPublisher = new InstagramPublisher(pool);
-
-  // Only create Telegram publisher if bot token is configured
   const telegramPublisher = process.env.TELEGRAM_BOT_TOKEN
     ? new TelegramPublisher(pool)
     : null;
@@ -353,400 +448,253 @@ export async function executePublishWithProgress(
     cloudinaryMedia: cloudinaryMedia.length > 0 ? cloudinaryMedia : undefined
   };
 
-  // Facebook publishing (sequential for progress)
+  // Create all publish promises (parallel execution)
+  const publishPromises: Promise<void>[] = [];
+
+  // Facebook publishing (parallel)
   for (const token of facebookTokens) {
-    currentIndex++;
-    if (onProgress) {
-      await onProgress({
-        platform: 'Facebook',
-        action: 'starting',
-        accountName: token.page_name,
-        current: currentIndex,
-        total: totalAccounts
-      });
-    }
-
-    try {
-      const result = await facebookPublisher.publishToPages(facebookOptions, [token]);
-      if (result.successful.length > 0) {
-        const mapped = mapFacebookSuccess(
-          result.successful.map(item => ({
-            ...item,
-            result: item.result as { id?: string }
-          }))
-        );
-        allSuccessful.push(...mapped);
-        if (onProgress) {
-          await onProgress({
-            platform: 'Facebook',
-            action: 'completed',
-            accountName: token.page_name,
-            current: currentIndex,
-            total: totalAccounts
-          });
-        }
-      }
-      if (result.failed.length > 0) {
-        const mapped = mapFacebookFailed(
-          result.failed.map(item => ({
-            ...item,
-            error: item.error
-              ? {
-                  ...item.error,
-                  details: typeof item.error.details === 'object'
-                    ? item.error.details as {
-                        error?: {
-                          message?: string;
-                          type?: string;
-                          code?: number;
-                          error_subcode?: number;
-                          is_transient?: boolean;
-                          error_user_title?: string;
-                          error_user_msg?: string;
-                          fbtrace_id?: string;
-                        };
-                      }
-                    : undefined
-                }
-              : undefined
-          }))
-        );
-        allFailed.push(...mapped);
-        if (onProgress) {
-          await onProgress({
-            platform: 'Facebook',
-            action: 'failed',
-            accountName: token.page_name,
-            current: currentIndex,
-            total: totalAccounts
-          });
-        }
-      }
-    } catch (err) {
-      reportLogger.add(`Error publishing to Facebook ${token.page_name}: ${(err as Error).message}`);
-      if (onProgress) {
-        await onProgress({
-          platform: 'Facebook',
-          action: 'failed',
-          accountName: token.page_name,
-          current: currentIndex,
-          total: totalAccounts
-        });
-      }
-    }
-  }
-
-  // Twitter publishing (sequential for progress)
-  for (const token of twitterTokens) {
-    currentIndex++;
-    if (onProgress) {
-      await onProgress({
-        platform: 'X',
-        action: 'starting',
-        accountName: token.username,
-        current: currentIndex,
-        total: totalAccounts
-      });
-    }
-
-    try {
-      const result = await twitterPublisher.publishToAccounts(text, [token], mediaFiles);
-      if (result.successful.length > 0) {
-        const mapped = mapTwitterSuccess(
-          result.successful.map(item => ({
-            ...item,
-            result: item.result as { data?: { id?: string } }
-          }))
-        );
-        allSuccessful.push(...mapped);
-        if (onProgress) {
-          await onProgress({
-            platform: 'X',
-            action: 'completed',
-            accountName: token.username,
-            current: currentIndex,
-            total: totalAccounts
-          });
-        }
-      }
-      if (result.failed.length > 0) {
-        const mapped = mapTwitterFailed(
-          result.failed.map(item => ({
-            ...item,
-            error: item.error
-              ? {
-                  message: item.error.message,
-                  code: item.error.code,
-                  details: (() => {
-                    if (item.error && item.error.details) {
-                      const twitterDetails = item.error.details as { errors?: { message?: string; code?: number }[] };
-                      return twitterDetails.errors && twitterDetails.errors.length > 0
-                        ? { errors: twitterDetails.errors }
-                        : undefined;
-                    }
-                    return undefined;
-                  })()
-                }
-              : undefined
-          }))
-        );
-        allFailed.push(...mapped);
-        if (onProgress) {
-          await onProgress({
-            platform: 'X',
-            action: 'failed',
-            accountName: token.username,
-            current: currentIndex,
-            total: totalAccounts
-          });
-        }
-      }
-    } catch (err) {
-      reportLogger.add(`Error publishing to X ${token.username}: ${(err as Error).message}`);
-      if (onProgress) {
-        await onProgress({
-          platform: 'X',
-          action: 'failed',
-          accountName: token.username,
-          current: currentIndex,
-          total: totalAccounts
-        });
-      }
-    }
-  }
-
-  // Instagram feed publishing (sequential for progress)
-  for (const token of instagramFeedTokens) {
-    currentIndex++;
-    if (onProgress) {
-      await onProgress({
-        platform: 'Instagram',
-        action: 'starting',
-        accountName: token.username,
-        current: currentIndex,
-        total: totalAccounts
-      });
-    }
-
-    try {
-      const result = await instagramPublisher.publishToFeed(instagramOptions, [token]);
-      if (result.successful.length > 0) {
-        const mapped = mapInstagramSuccess(
-          result.successful.map(item => ({
-            ...item,
-            result: item.result as { id?: string }
-          }))
-        );
-        allSuccessful.push(...mapped);
-        if (onProgress) {
-          await onProgress({
-            platform: 'Instagram',
-            action: 'completed',
-            accountName: token.username,
-            current: currentIndex,
-            total: totalAccounts
-          });
-        }
-      }
-      if (result.failed.length > 0) {
-        const mapped = mapInstagramFailed(
-          result.failed.map(item => ({
-            ...item,
-            error: item.error
-              ? {
-                  ...item.error,
-                  details: typeof item.error.details === 'object'
-                    ? item.error.details as {
-                        error?: {
-                          message?: string;
-                          type?: string;
-                          code?: number;
-                          error_subcode?: number;
-                          is_transient?: boolean;
-                          error_user_title?: string;
-                          error_user_msg?: string;
-                          fbtrace_id?: string;
-                        };
-                      }
-                    : undefined
-                }
-              : undefined
-          }))
-        );
-        allFailed.push(...mapped);
-        if (onProgress) {
-          await onProgress({
-            platform: 'Instagram',
-            action: 'failed',
-            accountName: token.username,
-            current: currentIndex,
-            total: totalAccounts
-          });
-        }
-      }
-    } catch (err) {
-      reportLogger.add(`Error publishing to Instagram feed ${token.username}: ${(err as Error).message}`);
-      if (onProgress) {
-        await onProgress({
-          platform: 'Instagram',
-          action: 'failed',
-          accountName: token.username,
-          current: currentIndex,
-          total: totalAccounts
-        });
-      }
-    }
-  }
-
-  // Instagram story publishing (sequential for progress)
-  for (const token of instagramStoryTokens) {
-    currentIndex++;
-    if (onProgress) {
-      await onProgress({
-        platform: 'Instagram Story',
-        action: 'starting',
-        accountName: token.username,
-        current: currentIndex,
-        total: totalAccounts
-      });
-    }
-
-    try {
-      const result = await instagramPublisher.publishToStories(instagramOptions, [token]);
-      if (result.successful.length > 0) {
-        const mapped = mapInstagramSuccess(
-          result.successful.map(item => ({
-            ...item,
-            result: item.result as { id?: string }
-          }))
-        );
-        allSuccessful.push(...mapped);
-        if (onProgress) {
-          await onProgress({
-            platform: 'Instagram Story',
-            action: 'completed',
-            accountName: token.username,
-            current: currentIndex,
-            total: totalAccounts
-          });
-        }
-      }
-      if (result.failed.length > 0) {
-        const mapped = mapInstagramFailed(
-          result.failed.map(item => ({
-            ...item,
-            error: item.error
-              ? {
-                  ...item.error,
-                  details: typeof item.error.details === 'object'
-                    ? item.error.details as {
-                        error?: {
-                          message?: string;
-                          type?: string;
-                          code?: number;
-                          error_subcode?: number;
-                          is_transient?: boolean;
-                          error_user_title?: string;
-                          error_user_msg?: string;
-                          fbtrace_id?: string;
-                        };
-                      }
-                    : undefined
-                }
-              : undefined
-          }))
-        );
-        allFailed.push(...mapped);
-        if (onProgress) {
-          await onProgress({
-            platform: 'Instagram Story',
-            action: 'failed',
-            accountName: token.username,
-            current: currentIndex,
-            total: totalAccounts
-          });
-        }
-      }
-    } catch (err) {
-      reportLogger.add(`Error publishing to Instagram story ${token.username}: ${(err as Error).message}`);
-      if (onProgress) {
-        await onProgress({
-          platform: 'Instagram Story',
-          action: 'failed',
-          accountName: token.username,
-          current: currentIndex,
-          total: totalAccounts
-        });
-      }
-    }
-  }
-
-  // Telegram publishing (sequential for progress)
-  if (telegramPublisher) {
-    for (const token of telegramTokens) {
-      currentIndex++;
-      if (onProgress) {
-        await onProgress({
-          platform: 'Telegram',
-          action: 'starting',
-          accountName: token.channel_title,
-          current: currentIndex,
-          total: totalAccounts
-        });
-      }
+    publishPromises.push((async () => {
+      await updateAccountStatus(token.page_id, 'publishing');
 
       try {
-        const result = await telegramPublisher.publishToChannels(telegramOptions, [token]);
+        const result = await facebookPublisher.publishToPages(facebookOptions, [token]);
         if (result.successful.length > 0) {
-          const mapped = mapTelegramSuccess(
+          const mapped = mapFacebookSuccess(
             result.successful.map(item => ({
               ...item,
-              platform: 'telegram' as const
+              result: item.result as { id?: string }
             }))
           );
           allSuccessful.push(...mapped);
-          if (onProgress) {
-            await onProgress({
-              platform: 'Telegram',
-              action: 'completed',
-              accountName: token.channel_title,
-              current: currentIndex,
-              total: totalAccounts
-            });
-          }
+          await updateAccountStatus(token.page_id, 'completed');
         }
         if (result.failed.length > 0) {
-          const mapped = mapTelegramFailed(
+          const mapped = mapFacebookFailed(
             result.failed.map(item => ({
               ...item,
-              platform: 'telegram' as const
+              error: item.error
+                ? {
+                    ...item.error,
+                    details: typeof item.error.details === 'object'
+                      ? item.error.details as {
+                          error?: {
+                            message?: string;
+                            type?: string;
+                            code?: number;
+                            error_subcode?: number;
+                            is_transient?: boolean;
+                            error_user_title?: string;
+                            error_user_msg?: string;
+                            fbtrace_id?: string;
+                          };
+                        }
+                      : undefined
+                  }
+                : undefined
             }))
           );
           allFailed.push(...mapped);
-          if (onProgress) {
-            await onProgress({
-              platform: 'Telegram',
-              action: 'failed',
-              accountName: token.channel_title,
-              current: currentIndex,
-              total: totalAccounts
-            });
-          }
+          await updateAccountStatus(token.page_id, 'failed', result.failed[0]?.error?.message);
         }
       } catch (err) {
-        reportLogger.add(`Error publishing to Telegram channel ${token.channel_title}: ${(err as Error).message}`);
-        if (onProgress) {
-          await onProgress({
-            platform: 'Telegram',
-            action: 'failed',
-            accountName: token.channel_title,
-            current: currentIndex,
-            total: totalAccounts
-          });
-        }
+        reportLogger.add(`Error publishing to Facebook ${token.page_name}: ${(err as Error).message}`);
+        await updateAccountStatus(token.page_id, 'failed', (err as Error).message);
       }
+    })());
+  }
+
+  // Twitter publishing (parallel)
+  for (const token of twitterTokens) {
+    publishPromises.push((async () => {
+      await updateAccountStatus(token.x_user_id, 'publishing');
+
+      try {
+        const result = await twitterPublisher.publishToAccounts(text, [token], mediaFiles);
+        if (result.successful.length > 0) {
+          const mapped = mapTwitterSuccess(
+            result.successful.map(item => ({
+              ...item,
+              result: item.result as { data?: { id?: string } }
+            }))
+          );
+          allSuccessful.push(...mapped);
+          await updateAccountStatus(token.x_user_id, 'completed');
+        }
+        if (result.failed.length > 0) {
+          const mapped = mapTwitterFailed(
+            result.failed.map(item => ({
+              ...item,
+              error: item.error
+                ? {
+                    message: item.error.message,
+                    code: item.error.code,
+                    details: (() => {
+                      if (item.error && item.error.details) {
+                        const twitterDetails = item.error.details as { errors?: { message?: string; code?: number }[] };
+                        return twitterDetails.errors && twitterDetails.errors.length > 0
+                          ? { errors: twitterDetails.errors }
+                          : undefined;
+                      }
+                      return undefined;
+                    })()
+                  }
+                : undefined
+            }))
+          );
+          allFailed.push(...mapped);
+          await updateAccountStatus(token.x_user_id, 'failed', result.failed[0]?.error?.message);
+        }
+      } catch (err) {
+        reportLogger.add(`Error publishing to X ${token.username}: ${(err as Error).message}`);
+        await updateAccountStatus(token.x_user_id, 'failed', (err as Error).message);
+      }
+    })());
+  }
+
+  // Instagram feed publishing (parallel)
+  for (const token of instagramFeedTokens) {
+    const accountId = `${token.instagram_account_id}-feed`;
+    publishPromises.push((async () => {
+      await updateAccountStatus(accountId, 'publishing');
+
+      try {
+        const result = await instagramPublisher.publishToFeed(instagramOptions, [token]);
+        if (result.successful.length > 0) {
+          const mapped = mapInstagramSuccess(
+            result.successful.map(item => ({
+              ...item,
+              result: item.result as { id?: string }
+            }))
+          );
+          allSuccessful.push(...mapped);
+          await updateAccountStatus(accountId, 'completed');
+        }
+        if (result.failed.length > 0) {
+          const mapped = mapInstagramFailed(
+            result.failed.map(item => ({
+              ...item,
+              error: item.error
+                ? {
+                    ...item.error,
+                    details: typeof item.error.details === 'object'
+                      ? item.error.details as {
+                          error?: {
+                            message?: string;
+                            type?: string;
+                            code?: number;
+                            error_subcode?: number;
+                            is_transient?: boolean;
+                            error_user_title?: string;
+                            error_user_msg?: string;
+                            fbtrace_id?: string;
+                          };
+                        }
+                      : undefined
+                  }
+                : undefined
+            }))
+          );
+          allFailed.push(...mapped);
+          await updateAccountStatus(accountId, 'failed', result.failed[0]?.error?.message);
+        }
+      } catch (err) {
+        reportLogger.add(`Error publishing to Instagram feed ${token.username}: ${(err as Error).message}`);
+        await updateAccountStatus(accountId, 'failed', (err as Error).message);
+      }
+    })());
+  }
+
+  // Instagram story publishing (parallel)
+  for (const token of instagramStoryTokens) {
+    const accountId = `${token.instagram_account_id}-story`;
+    publishPromises.push((async () => {
+      await updateAccountStatus(accountId, 'publishing');
+
+      try {
+        const result = await instagramPublisher.publishToStories(instagramOptions, [token]);
+        if (result.successful.length > 0) {
+          const mapped = mapInstagramSuccess(
+            result.successful.map(item => ({
+              ...item,
+              result: item.result as { id?: string }
+            }))
+          );
+          allSuccessful.push(...mapped);
+          await updateAccountStatus(accountId, 'completed');
+        }
+        if (result.failed.length > 0) {
+          const mapped = mapInstagramFailed(
+            result.failed.map(item => ({
+              ...item,
+              error: item.error
+                ? {
+                    ...item.error,
+                    details: typeof item.error.details === 'object'
+                      ? item.error.details as {
+                          error?: {
+                            message?: string;
+                            type?: string;
+                            code?: number;
+                            error_subcode?: number;
+                            is_transient?: boolean;
+                            error_user_title?: string;
+                            error_user_msg?: string;
+                            fbtrace_id?: string;
+                          };
+                        }
+                      : undefined
+                  }
+                : undefined
+            }))
+          );
+          allFailed.push(...mapped);
+          await updateAccountStatus(accountId, 'failed', result.failed[0]?.error?.message);
+        }
+      } catch (err) {
+        reportLogger.add(`Error publishing to Instagram story ${token.username}: ${(err as Error).message}`);
+        await updateAccountStatus(accountId, 'failed', (err as Error).message);
+      }
+    })());
+  }
+
+  // Telegram publishing (parallel)
+  if (telegramPublisher) {
+    for (const token of telegramTokens) {
+      publishPromises.push((async () => {
+        await updateAccountStatus(token.channel_id, 'publishing');
+
+        try {
+          const result = await telegramPublisher.publishToChannels(telegramOptions, [token]);
+          if (result.successful.length > 0) {
+            const mapped = mapTelegramSuccess(
+              result.successful.map(item => ({
+                ...item,
+                platform: 'telegram' as const
+              }))
+            );
+            allSuccessful.push(...mapped);
+            await updateAccountStatus(token.channel_id, 'completed');
+          }
+          if (result.failed.length > 0) {
+            const mapped = mapTelegramFailed(
+              result.failed.map(item => ({
+                ...item,
+                platform: 'telegram' as const
+              }))
+            );
+            allFailed.push(...mapped);
+            await updateAccountStatus(token.channel_id, 'failed', result.failed[0]?.error?.message);
+          }
+        } catch (err) {
+          reportLogger.add(`Error publishing to Telegram channel ${token.channel_title}: ${(err as Error).message}`);
+          await updateAccountStatus(token.channel_id, 'failed', (err as Error).message);
+        }
+      })());
     }
   }
+
+  // Wait for all publishing to complete in parallel
+  await Promise.all(publishPromises);
 
   reportLogger.add(`Publishing complete. Successful posts: ${allSuccessful.length}, Failed posts: ${allFailed.length}`);
 

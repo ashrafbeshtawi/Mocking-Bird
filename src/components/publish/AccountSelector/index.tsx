@@ -1,11 +1,22 @@
 'use client';
 
 import React from 'react';
-import { Typography, Box } from '@mui/material';
-import { FacebookSelector } from './FacebookSelector';
-import { XSelector } from './XSelector';
-import { InstagramSelector } from './InstagramSelector';
-import { TelegramSelector } from './TelegramSelector';
+import {
+  Typography,
+  Box,
+  Checkbox,
+  Chip,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  ListItemSecondaryAction,
+  Tooltip,
+} from '@mui/material';
+import FacebookIcon from '@mui/icons-material/Facebook';
+import InstagramIcon from '@mui/icons-material/Instagram';
+import XIcon from '@mui/icons-material/X';
+import TelegramIcon from '@mui/icons-material/Telegram';
 import type {
   ConnectedPage,
   ConnectedXAccount,
@@ -30,6 +41,13 @@ interface AccountSelectorProps {
   mediaSelected: boolean;
 }
 
+const PLATFORM_CONFIG = {
+  facebook: { icon: FacebookIcon, color: '#1877f2', label: 'Facebook' },
+  instagram: { icon: InstagramIcon, color: '#E1306C', label: 'Instagram' },
+  x: { icon: XIcon, color: '#000000', label: 'X' },
+  telegram: { icon: TelegramIcon, color: '#0088cc', label: 'Telegram' },
+};
+
 export function AccountSelector({
   facebookPages,
   xAccounts,
@@ -45,6 +63,22 @@ export function AccountSelector({
   onTelegramChange,
   mediaSelected,
 }: AccountSelectorProps) {
+  const hasAnyAccount =
+    facebookPages.length > 0 ||
+    xAccounts.length > 0 ||
+    instagramAccounts.length > 0 ||
+    telegramChannels.length > 0;
+
+  if (!hasAnyAccount) {
+    return (
+      <Box sx={{ textAlign: 'center', py: 3 }}>
+        <Typography variant="body2" color="text.secondary">
+          No accounts connected. Go to Dashboard to connect your accounts.
+        </Typography>
+      </Box>
+    );
+  }
+
   return (
     <>
       <Typography
@@ -55,38 +89,247 @@ export function AccountSelector({
         Select Destinations
       </Typography>
 
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
-          gap: 2,
-        }}
-      >
-        <FacebookSelector
-          pages={facebookPages}
-          selected={selectedFacebookPages}
-          onChange={onFacebookChange}
-        />
+      <List dense sx={{ py: 0 }}>
+        {/* Facebook Pages */}
+        {facebookPages.map((page) => {
+          const config = PLATFORM_CONFIG.facebook;
+          const Icon = config.icon;
+          const isSelected = selectedFacebookPages.includes(page.page_id);
 
-        <InstagramSelector
-          accounts={instagramAccounts}
-          selected={selectedInstagramAccounts}
-          onChange={onInstagramChange}
-          mediaSelected={mediaSelected}
-        />
+          return (
+            <ListItem
+              key={`fb-${page.page_id}`}
+              sx={{
+                py: 1,
+                px: 1.5,
+                borderRadius: 2,
+                mb: 0.5,
+                cursor: 'pointer',
+                transition: 'background-color 0.2s',
+                bgcolor: isSelected ? `${config.color}10` : 'transparent',
+                '&:hover': {
+                  bgcolor: isSelected ? `${config.color}15` : 'action.hover',
+                },
+              }}
+              onClick={() => onFacebookChange(page.page_id)}
+            >
+              <ListItemIcon sx={{ minWidth: 40 }}>
+                <Icon sx={{ color: config.color, fontSize: 24 }} />
+              </ListItemIcon>
+              <ListItemText
+                primary={
+                  <Typography variant="body2" fontWeight={500}>
+                    {page.page_name}
+                  </Typography>
+                }
+              />
+              <ListItemSecondaryAction>
+                <Checkbox
+                  edge="end"
+                  checked={isSelected}
+                  onChange={() => onFacebookChange(page.page_id)}
+                  sx={{
+                    color: 'grey.400',
+                    '&.Mui-checked': { color: config.color },
+                  }}
+                />
+              </ListItemSecondaryAction>
+            </ListItem>
+          );
+        })}
 
-        <XSelector
-          accounts={xAccounts}
-          selected={selectedXAccounts}
-          onChange={onXChange}
-        />
+        {/* X Accounts */}
+        {xAccounts.map((account) => {
+          const config = PLATFORM_CONFIG.x;
+          const Icon = config.icon;
+          const isSelected = selectedXAccounts.includes(account.id);
 
-        <TelegramSelector
-          channels={telegramChannels}
-          selected={selectedTelegramChannels}
-          onChange={onTelegramChange}
-        />
-      </Box>
+          return (
+            <ListItem
+              key={`x-${account.id}`}
+              sx={{
+                py: 1,
+                px: 1.5,
+                borderRadius: 2,
+                mb: 0.5,
+                cursor: 'pointer',
+                transition: 'background-color 0.2s',
+                bgcolor: isSelected ? `${config.color}10` : 'transparent',
+                '&:hover': {
+                  bgcolor: isSelected ? `${config.color}15` : 'action.hover',
+                },
+              }}
+              onClick={() => onXChange(account.id)}
+            >
+              <ListItemIcon sx={{ minWidth: 40 }}>
+                <Icon sx={{ color: config.color, fontSize: 24 }} />
+              </ListItemIcon>
+              <ListItemText
+                primary={
+                  <Typography variant="body2" fontWeight={500}>
+                    @{account.name}
+                  </Typography>
+                }
+              />
+              <ListItemSecondaryAction>
+                <Checkbox
+                  edge="end"
+                  checked={isSelected}
+                  onChange={() => onXChange(account.id)}
+                  sx={{
+                    color: 'grey.400',
+                    '&.Mui-checked': { color: config.color },
+                  }}
+                />
+              </ListItemSecondaryAction>
+            </ListItem>
+          );
+        })}
+
+        {/* Instagram Accounts */}
+        {instagramAccounts.map((account) => {
+          const config = PLATFORM_CONFIG.instagram;
+          const Icon = config.icon;
+          const publishChecked = selectedInstagramAccounts[account.id]?.publish || false;
+          const storyChecked = selectedInstagramAccounts[account.id]?.story || false;
+          const isSelected = publishChecked || storyChecked;
+
+          return (
+            <ListItem
+              key={`ig-${account.id}`}
+              sx={{
+                py: 1,
+                px: 1.5,
+                borderRadius: 2,
+                mb: 0.5,
+                transition: 'background-color 0.2s',
+                bgcolor: isSelected ? `${config.color}10` : 'transparent',
+                opacity: mediaSelected ? 1 : 0.6,
+              }}
+            >
+              <ListItemIcon sx={{ minWidth: 40 }}>
+                <Icon sx={{ color: config.color, fontSize: 24 }} />
+              </ListItemIcon>
+              <ListItemText
+                primary={
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Typography variant="body2" fontWeight={500}>
+                      @{account.username}
+                    </Typography>
+                    {!mediaSelected && (
+                      <Chip
+                        label="Media required"
+                        size="small"
+                        sx={{
+                          fontSize: '0.6rem',
+                          height: 18,
+                          bgcolor: 'warning.light',
+                          color: 'warning.contrastText',
+                        }}
+                      />
+                    )}
+                  </Box>
+                }
+              />
+              <ListItemSecondaryAction>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <Tooltip title="Post to feed">
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <Checkbox
+                        size="small"
+                        checked={publishChecked}
+                        onChange={() => onInstagramChange(account.id, 'publish')}
+                        disabled={!mediaSelected}
+                        sx={{
+                          color: 'grey.400',
+                          '&.Mui-checked': { color: config.color },
+                          p: 0.5,
+                        }}
+                      />
+                      <Typography variant="caption" color="text.secondary" sx={{ mr: 1 }}>
+                        Post
+                      </Typography>
+                    </Box>
+                  </Tooltip>
+                  <Tooltip title="Post to story">
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <Checkbox
+                        size="small"
+                        checked={storyChecked}
+                        onChange={() => onInstagramChange(account.id, 'story')}
+                        disabled={!mediaSelected}
+                        sx={{
+                          color: 'grey.400',
+                          '&.Mui-checked': { color: config.color },
+                          p: 0.5,
+                        }}
+                      />
+                      <Typography variant="caption" color="text.secondary">
+                        Story
+                      </Typography>
+                    </Box>
+                  </Tooltip>
+                </Box>
+              </ListItemSecondaryAction>
+            </ListItem>
+          );
+        })}
+
+        {/* Telegram Channels */}
+        {telegramChannels.map((channel) => {
+          const config = PLATFORM_CONFIG.telegram;
+          const Icon = config.icon;
+          const isSelected = selectedTelegramChannels.includes(channel.channel_id);
+
+          return (
+            <ListItem
+              key={`tg-${channel.channel_id}`}
+              sx={{
+                py: 1,
+                px: 1.5,
+                borderRadius: 2,
+                mb: 0.5,
+                cursor: 'pointer',
+                transition: 'background-color 0.2s',
+                bgcolor: isSelected ? `${config.color}10` : 'transparent',
+                '&:hover': {
+                  bgcolor: isSelected ? `${config.color}15` : 'action.hover',
+                },
+              }}
+              onClick={() => onTelegramChange(channel.channel_id)}
+            >
+              <ListItemIcon sx={{ minWidth: 40 }}>
+                <Icon sx={{ color: config.color, fontSize: 24 }} />
+              </ListItemIcon>
+              <ListItemText
+                primary={
+                  <Typography variant="body2" fontWeight={500}>
+                    {channel.channel_title}
+                  </Typography>
+                }
+                secondary={
+                  channel.channel_username && (
+                    <Typography variant="caption" color="text.secondary">
+                      @{channel.channel_username}
+                    </Typography>
+                  )
+                }
+              />
+              <ListItemSecondaryAction>
+                <Checkbox
+                  edge="end"
+                  checked={isSelected}
+                  onChange={() => onTelegramChange(channel.channel_id)}
+                  sx={{
+                    color: 'grey.400',
+                    '&.Mui-checked': { color: config.color },
+                  }}
+                />
+              </ListItemSecondaryAction>
+            </ListItem>
+          );
+        })}
+      </List>
     </>
   );
 }

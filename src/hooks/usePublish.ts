@@ -39,8 +39,17 @@ interface ProgressUpdate {
   platform: string;
   action: 'starting' | 'completed' | 'failed';
   accountName?: string;
+  accountId?: string;
   current: number;
   total: number;
+}
+
+export interface AccountProgress {
+  accountId: string;
+  accountName: string;
+  platform: string;
+  status: 'pending' | 'publishing' | 'completed' | 'failed';
+  error?: string;
 }
 
 interface StatusUpdate {
@@ -67,6 +76,7 @@ interface UsePublishReturn {
   statusMessage: string;
   progress: ProgressUpdate | null;
   stepProgress: StepProgress | null;
+  accountsProgress: AccountProgress[];
   publish: (params: PublishParams) => Promise<boolean>;
   clearStatus: () => void;
 }
@@ -79,6 +89,7 @@ export function usePublish(): UsePublishReturn {
   const [statusMessage, setStatusMessage] = useState('');
   const [progress, setProgress] = useState<ProgressUpdate | null>(null);
   const [stepProgress, setStepProgress] = useState<StepProgress | null>(null);
+  const [accountsProgress, setAccountsProgress] = useState<AccountProgress[]>([]);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const clearStatus = useCallback(() => {
@@ -88,6 +99,7 @@ export function usePublish(): UsePublishReturn {
     setStatusMessage('');
     setProgress(null);
     setStepProgress(null);
+    setAccountsProgress([]);
   }, []);
 
   const publish = useCallback(
@@ -105,6 +117,7 @@ export function usePublish(): UsePublishReturn {
       setStatusMessage('Preparing...');
       setProgress(null);
       setStepProgress({ stepIndex: 0, totalSteps: 5 });
+      setAccountsProgress([]);
 
       // Validation
       const hasInstagramSelection = Object.values(selectedInstagramAccounts).some(
@@ -243,12 +256,23 @@ export function usePublish(): UsePublishReturn {
                         total: progressData.total
                       }
                     }));
-                    if (progressData.action === 'starting') {
-                      setStatusMessage(`Publishing to ${progressData.platform}${progressData.accountName ? ` (${progressData.accountName})` : ''}...`);
-                    } else if (progressData.action === 'completed') {
-                      setStatusMessage(`Published to ${progressData.platform}${progressData.accountName ? ` (${progressData.accountName})` : ''}`);
-                    } else if (progressData.action === 'failed') {
-                      setStatusMessage(`Failed to publish to ${progressData.platform}${progressData.accountName ? ` (${progressData.accountName})` : ''}`);
+                    break;
+
+                  case 'account_progress':
+                    // Update per-account progress
+                    setAccountsProgress(parsed as AccountProgress[]);
+                    // Calculate overall status message from accounts
+                    const accounts = parsed as AccountProgress[];
+                    const publishing = accounts.filter(a => a.status === 'publishing');
+                    const completed = accounts.filter(a => a.status === 'completed').length;
+                    const failed = accounts.filter(a => a.status === 'failed').length;
+                    const total = accounts.length;
+
+                    if (publishing.length > 0) {
+                      const names = publishing.map(a => a.accountName).join(', ');
+                      setStatusMessage(`Publishing to ${names}...`);
+                    } else if (completed + failed === total) {
+                      setStatusMessage(`Published to ${completed} of ${total} accounts`);
                     }
                     break;
 
@@ -316,6 +340,7 @@ export function usePublish(): UsePublishReturn {
     statusMessage,
     progress,
     stepProgress,
+    accountsProgress,
     publish,
     clearStatus,
   };

@@ -11,9 +11,21 @@ import {
   Backdrop,
   Fade,
   LinearProgress,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  Chip,
 } from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
 import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
+import FacebookIcon from '@mui/icons-material/Facebook';
+import InstagramIcon from '@mui/icons-material/Instagram';
+import XIcon from '@mui/icons-material/X';
+import TelegramIcon from '@mui/icons-material/Telegram';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
+import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import { useConnectedAccounts } from '@/hooks/useConnectedAccounts';
 import { usePublish } from '@/hooks/usePublish';
 import { PostComposer } from '@/components/publish/PostComposer';
@@ -34,7 +46,38 @@ export default function PublishPage() {
   } = useConnectedAccounts();
 
   // Publishing logic
-  const { isPublishing, error, success, results, statusMessage, stepProgress, publish, clearStatus } = usePublish();
+  const { isPublishing, error, success, results, statusMessage, stepProgress, accountsProgress, publish, clearStatus } = usePublish();
+
+  // Platform icon mapping
+  const getPlatformIcon = (platform: string) => {
+    switch (platform) {
+      case 'Facebook':
+        return <FacebookIcon sx={{ color: '#1877f2' }} />;
+      case 'Instagram':
+      case 'Instagram Story':
+        return <InstagramIcon sx={{ color: '#E1306C' }} />;
+      case 'X':
+        return <XIcon sx={{ color: '#000000' }} />;
+      case 'Telegram':
+        return <TelegramIcon sx={{ color: '#0088cc' }} />;
+      default:
+        return null;
+    }
+  };
+
+  // Status icon mapping
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return <CheckCircleIcon sx={{ color: 'success.main', fontSize: 18 }} />;
+      case 'failed':
+        return <ErrorIcon sx={{ color: 'error.main', fontSize: 18 }} />;
+      case 'publishing':
+        return <CircularProgress size={16} sx={{ color: 'info.main' }} />;
+      default:
+        return <HourglassEmptyIcon sx={{ color: 'grey.500', fontSize: 18 }} />;
+    }
+  };
 
   // Calculate overall progress percentage
   const calculateProgress = () => {
@@ -237,21 +280,88 @@ export default function PublishPage() {
             flexDirection: 'column',
             gap: 2,
             backdropFilter: 'blur(8px)',
-            background: 'rgba(0,0,0,0.7)',
+            background: 'rgba(0,0,0,0.85)',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
           open={isPublishing}
         >
-          <RocketLaunchIcon sx={{ fontSize: 56, animation: 'pulse 1.5s infinite' }} />
+          <RocketLaunchIcon sx={{ fontSize: 48, animation: 'pulse 1.5s infinite' }} />
           <Typography variant="h5" fontWeight="medium">
             Publishing your post...
           </Typography>
-          <Box sx={{ width: 320, textAlign: 'center' }}>
-            <Typography
-              variant="body1"
+
+          {/* Per-account progress */}
+          {accountsProgress.length > 0 && (
+            <Paper
               sx={{
-                mb: 2,
-                minHeight: 24,
-                color: 'grey.300',
+                width: 400,
+                maxWidth: '90vw',
+                maxHeight: 300,
+                overflow: 'auto',
+                bgcolor: 'rgba(255,255,255,0.1)',
+                backdropFilter: 'blur(4px)',
+                borderRadius: 2,
+                mt: 1,
+              }}
+            >
+              <List dense sx={{ py: 0.5 }}>
+                {accountsProgress.map((account) => (
+                  <ListItem
+                    key={account.accountId}
+                    sx={{
+                      py: 0.75,
+                      px: 2,
+                      borderBottom: '1px solid rgba(255,255,255,0.1)',
+                      '&:last-child': { borderBottom: 'none' },
+                    }}
+                  >
+                    <ListItemIcon sx={{ minWidth: 36 }}>
+                      {getPlatformIcon(account.platform)}
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Typography variant="body2" sx={{ color: 'white', fontWeight: 500 }}>
+                            {account.accountName}
+                          </Typography>
+                          <Chip
+                            label={account.platform.includes('Story') ? 'Story' : account.platform}
+                            size="small"
+                            sx={{
+                              height: 18,
+                              fontSize: '0.65rem',
+                              bgcolor: 'rgba(255,255,255,0.2)',
+                              color: 'white',
+                            }}
+                          />
+                        </Box>
+                      }
+                      secondary={
+                        account.error && (
+                          <Typography variant="caption" sx={{ color: 'error.light', display: 'block', mt: 0.25 }}>
+                            {account.error}
+                          </Typography>
+                        )
+                      }
+                    />
+                    <Box sx={{ ml: 1 }}>
+                      {getStatusIcon(account.status)}
+                    </Box>
+                  </ListItem>
+                ))}
+              </List>
+            </Paper>
+          )}
+
+          {/* Overall progress */}
+          <Box sx={{ width: 400, maxWidth: '90vw', textAlign: 'center', mt: 1 }}>
+            <Typography
+              variant="body2"
+              sx={{
+                mb: 1,
+                minHeight: 20,
+                color: 'grey.400',
                 transition: 'opacity 0.3s',
               }}
             >
@@ -262,21 +372,21 @@ export default function PublishPage() {
                 variant="determinate"
                 value={calculateProgress()}
                 sx={{
-                  height: 8,
-                  borderRadius: 4,
+                  height: 6,
+                  borderRadius: 3,
                   bgcolor: 'rgba(255,255,255,0.2)',
                   '& .MuiLinearProgress-bar': {
-                    borderRadius: 4,
+                    borderRadius: 3,
                     background: 'linear-gradient(90deg, #1877f2 0%, #E1306C 50%, #F77737 100%)',
                     transition: 'transform 0.3s ease-out',
                   },
                 }}
               />
               {stepProgress && (
-                <Typography variant="caption" sx={{ mt: 1, display: 'block', color: 'grey.400' }}>
+                <Typography variant="caption" sx={{ mt: 0.5, display: 'block', color: 'grey.500' }}>
                   Step {stepProgress.stepIndex} of {stepProgress.totalSteps}
-                  {stepProgress.subProgress && stepProgress.subProgress.total > 0 && (
-                    <> &middot; {stepProgress.subProgress.current} of {stepProgress.subProgress.total} accounts</>
+                  {accountsProgress.length > 0 && (
+                    <> &middot; {accountsProgress.filter(a => a.status === 'completed' || a.status === 'failed').length} of {accountsProgress.length} accounts</>
                   )}
                 </Typography>
               )}
