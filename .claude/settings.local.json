@@ -21,7 +21,10 @@
       "Bash(node --version:*)",
       "Bash(source ~/.nvm/nvm.sh)",
       "Bash(nvm list:*)",
-      "Bash(nvm use:*)"
+      "Bash(nvm use:*)",
+      "Bash(psql:*)",
+      "Bash(source .env)",
+      "Bash(export DATABASE_STRING:*)"
     ]
   }
 }
