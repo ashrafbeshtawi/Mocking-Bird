@@ -51,12 +51,10 @@ export function PlatformVolumeChart({ data, loading }: PlatformVolumeChartProps)
                 data={chartData}
                 cx="50%"
                 cy="50%"
-                innerRadius={60}
-                outerRadius={90}
+                innerRadius={50}
+                outerRadius={80}
                 paddingAngle={2}
                 dataKey="value"
-                label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
-                labelLine={false}
               >
                 {chartData.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={entry.color} />
@@ -70,9 +68,9 @@ export function PlatformVolumeChart({ data, loading }: PlatformVolumeChartProps)
                 }}
               />
               <Legend />
-              <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle">
-                <tspan x="50%" dy="-0.5em" fontSize="24" fontWeight="700">{total}</tspan>
-                <tspan x="50%" dy="1.5em" fontSize="12" fill="#6b7280">Total</tspan>
+              <text x="50%" y="45%" textAnchor="middle" dominantBaseline="middle">
+                <tspan x="50%" dy="-0.3em" fontSize="20" fontWeight="700">{total}</tspan>
+                <tspan x="50%" dy="1.3em" fontSize="11" fill="#6b7280">Total</tspan>
               </text>
             </PieChart>
           </ResponsiveContainer>

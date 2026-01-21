@@ -35,11 +35,11 @@ export function ActivityChart({ data, loading }: ActivityChartProps) {
   })) || [];
 
   return (
-    <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
+    <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider', height: '100%', display: 'flex', flexDirection: 'column' }}>
       <Typography variant="h6" fontWeight={600} sx={{ mb: 2 }}>
         Publishing Activity
       </Typography>
-      <Box sx={{ height: 270 }}>
+      <Box sx={{ flex: 1, minHeight: 200 }}>
         {chartData.length > 0 ? (
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>

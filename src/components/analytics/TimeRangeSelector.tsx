@@ -28,6 +28,7 @@ export function TimeRangeSelector({ value, onChange }: TimeRangeSelectorProps) {
         onChange={handleChange}
         size="small"
         sx={{
+          gap: 1,
           '& .MuiToggleButton-root': {
             px: 2,
             py: 0.75,
