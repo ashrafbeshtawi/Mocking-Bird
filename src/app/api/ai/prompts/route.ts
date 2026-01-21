@@ -24,11 +24,18 @@ export async function GET(req: NextRequest) {
 
     if (promptId) {
       // Read a single prompt
-      query = 'SELECT id, title, prompt, created_at FROM ai_prompts WHERE id = $1 AND user_id = $2';
+      query = `SELECT p.id, p.title, p.prompt, p.provider_id, p.created_at, pr.name as provider_name
+               FROM ai_prompts p
+               LEFT JOIN ai_providers pr ON p.provider_id = pr.id
+               WHERE p.id = $1 AND p.user_id = $2`;
       values = [promptId, userId];
     } else {
       // Read all prompts for the user
-      query = 'SELECT id, title, prompt, created_at FROM ai_prompts WHERE user_id = $1 ORDER BY created_at DESC';
+      query = `SELECT p.id, p.title, p.prompt, p.provider_id, p.created_at, pr.name as provider_name
+               FROM ai_prompts p
+               LEFT JOIN ai_providers pr ON p.provider_id = pr.id
+               WHERE p.user_id = $1
+               ORDER BY p.created_at DESC`;
       values = [userId];
     }
 
@@ -54,15 +61,17 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { title, prompt } = await req.json();
+    const { title, prompt, provider_id } = await req.json();
     if (!title || !prompt) {
       return NextResponse.json({ error: 'Title and prompt are required.' }, { status: 400 });
     }
 
     const client = await pool.connect();
     const result = await client.query(
-      'INSERT INTO ai_prompts (user_id, title, prompt) VALUES ($1, $2, $3) RETURNING id, title, prompt, created_at',
-      [userId, title, prompt]
+      `INSERT INTO ai_prompts (user_id, title, prompt, provider_id)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, title, prompt, provider_id, created_at`,
+      [userId, title, prompt, provider_id || null]
     );
     client.release();
 
@@ -81,15 +90,18 @@ export async function PUT(req: NextRequest) {
   }
 
   try {
-    const { id, title, prompt } = await req.json();
-    if (!id || (!title && !prompt)) {
-      return NextResponse.json({ error: 'Prompt ID and at least one field (title or prompt) are required.' }, { status: 400 });
+    const { id, title, prompt, provider_id } = await req.json();
+    if (!id) {
+      return NextResponse.json({ error: 'Prompt ID is required.' }, { status: 400 });
     }
 
     const client = await pool.connect();
     const result = await client.query(
-      'UPDATE ai_prompts SET title = COALESCE($1, title), prompt = COALESCE($2, prompt) WHERE id = $3 AND user_id = $4 RETURNING id',
-      [title, prompt, id, userId]
+      `UPDATE ai_prompts
+       SET title = COALESCE($1, title), prompt = COALESCE($2, prompt), provider_id = $3
+       WHERE id = $4 AND user_id = $5
+       RETURNING id`,
+      [title, prompt, provider_id !== undefined ? provider_id : null, id, userId]
     );
     client.release();
 
