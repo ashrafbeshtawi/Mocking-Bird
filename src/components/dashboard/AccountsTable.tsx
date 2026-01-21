@@ -97,8 +97,8 @@ export function AccountsTable({
           {emptyMessage}
         </Typography>
       ) : (
-        <TableContainer component={Paper} elevation={3}>
-          <Table>
+        <TableContainer component={Paper} elevation={3} sx={{ overflowX: 'auto' }}>
+          <Table sx={{ minWidth: 600 }}>
             <TableHead>
               <TableRow>
                 <TableCell sx={{ fontWeight: 'bold' }}>Platform</TableCell>

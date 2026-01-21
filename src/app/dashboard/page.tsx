@@ -128,7 +128,7 @@ export default function DashboardPage() {
   };
 
   return (
-    <Box sx={{ flexGrow: 1, p: 3 }}>
+    <Box sx={{ flexGrow: 1, p: { xs: 1, sm: 2, md: 3 } }}>
       <ConnectButtons
         onFacebookConnect={handleFacebookConnect}
         onTwitterConnect={handleTwitterConnect}

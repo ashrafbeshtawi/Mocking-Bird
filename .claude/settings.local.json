@@ -24,7 +24,8 @@
       "Bash(nvm use:*)",
       "Bash(psql:*)",
       "Bash(source .env)",
-      "Bash(export DATABASE_STRING:*)"
+      "Bash(export DATABASE_STRING:*)",
+      "Skill(superpowers:finishing-a-development-branch)"
     ]
   }
 }

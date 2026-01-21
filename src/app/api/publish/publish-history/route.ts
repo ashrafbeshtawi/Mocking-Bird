@@ -141,28 +141,54 @@ export async function GET(req: NextRequest) {
         // Otherwise, proceed with pagination logic
         const page = parseInt(searchParams.get('page') || '1', 10);
         const limit = parseInt(searchParams.get('limit') || '10', 10);
+        const status = searchParams.get('status');
+        const platform = searchParams.get('platform');
+
+        // Validate status if provided
+        const validStatuses = ['success', 'partial_success', 'failed'];
+        const statusFilter = status && validStatuses.includes(status) ? status : null;
+
+        // Validate platform if provided
+        const validPlatforms = ['facebook', 'twitter', 'instagram', 'telegram'];
+        const platformFilter = platform && validPlatforms.includes(platform) ? platform : null;
 
         // Prevent invalid inputs
         const safePage = page > 0 ? page : 1;
         const safeLimit = limit > 0 && limit <= 100 ? limit : 10; // cap to 100 max
         const offset = (safePage - 1) * safeLimit;
 
+        // Build query conditions
+        let whereClause = 'WHERE user_id = $1';
+        const queryParams: (number | string)[] = [parsedUserId];
+
+        if (statusFilter) {
+          queryParams.push(statusFilter);
+          whereClause += ` AND publish_status = $${queryParams.length}`;
+        }
+
+        if (platformFilter) {
+          // Filter by platform - check if publish_report text contains the platform name
+          // The report contains log lines like "[timestamp] Publishing to Facebook..."
+          queryParams.push(`%${platformFilter}%`);
+          whereClause += ` AND LOWER(publish_report) LIKE LOWER($${queryParams.length})`;
+        }
+
         // Count total records for pagination metadata
         const { rows: countRows } = await client.query(
-          'SELECT COUNT(*)::int AS total FROM publish_history WHERE user_id = $1',
-          [parsedUserId]
+          `SELECT COUNT(*)::int AS total FROM publish_history ${whereClause}`,
+          queryParams
         );
         const total = countRows[0]?.total || 0;
         const totalPages = Math.ceil(total / safeLimit);
 
-        // Fetch paginated history
+        // Fetch paginated history with publish_report for expandable rows
         const { rows: history } = await client.query(
-          `SELECT id, content, publish_status, created_at 
-           FROM publish_history 
-           WHERE user_id = $1 
-           ORDER BY created_at DESC 
-           LIMIT $2 OFFSET $3`,
-          [parsedUserId, safeLimit, offset]
+          `SELECT id, content, publish_status, publish_report, created_at
+           FROM publish_history
+           ${whereClause}
+           ORDER BY created_at DESC
+           LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}`,
+          [...queryParams, safeLimit, offset]
         );
 
         // Return paginated response

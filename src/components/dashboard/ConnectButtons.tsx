@@ -25,11 +25,21 @@ export function ConnectButtons({
   twitterLoading,
 }: ConnectButtonsProps) {
   return (
-    <Box sx={{ display: 'flex', gap: 2, mb: 4, flexWrap: 'wrap' }}>
+    <Box
+      sx={{
+        display: 'flex',
+        gap: 2,
+        mb: 4,
+        flexWrap: 'wrap',
+        flexDirection: { xs: 'column', sm: 'row' },
+        px: { xs: 2, sm: 3 },
+      }}
+    >
       <Button
         variant="contained"
         onClick={onFacebookConnect}
         disabled={facebookLoading}
+        fullWidth
         startIcon={
           facebookLoading ? (
             <CircularProgress size={20} color="inherit" />
@@ -45,6 +55,7 @@ export function ConnectButtons({
           '&:hover': {
             background: 'linear-gradient(90deg, #155eaf 0%, #c02a5c 50%, #d96830 100%)',
           },
+          maxWidth: { sm: 'fit-content' },
         }}
       >
         {facebookLoading ? 'Connecting...' : 'Add Meta Account'}
@@ -54,6 +65,7 @@ export function ConnectButtons({
         variant="contained"
         onClick={onTwitterConnect}
         disabled={twitterLoading}
+        fullWidth
         startIcon={
           twitterLoading ? (
             <CircularProgress size={20} color="inherit" />
@@ -61,7 +73,12 @@ export function ConnectButtons({
             <TwitterIcon />
           )
         }
-        sx={{ bgcolor: '#000', '&:hover': { bgcolor: '#222' }, color: '#fff' }}
+        sx={{
+          bgcolor: '#000',
+          '&:hover': { bgcolor: '#222' },
+          color: '#fff',
+          maxWidth: { sm: 'fit-content' },
+        }}
       >
         Add Twitter Account
       </Button>
@@ -69,8 +86,14 @@ export function ConnectButtons({
       <Button
         variant="contained"
         onClick={onTelegramConnect}
+        fullWidth
         startIcon={<TelegramIcon />}
-        sx={{ bgcolor: '#0088cc', '&:hover': { bgcolor: '#006699' }, color: '#fff' }}
+        sx={{
+          bgcolor: '#0088cc',
+          '&:hover': { bgcolor: '#006699' },
+          color: '#fff',
+          maxWidth: { sm: 'fit-content' },
+        }}
       >
         Add Telegram Channel
       </Button>

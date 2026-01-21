@@ -268,7 +268,8 @@ export default function PublishPage() {
       sx={{
         minHeight: '100vh',
         background: 'linear-gradient(180deg, rgba(25,118,210,0.05) 0%, rgba(255,255,255,0) 50%)',
-        py: 4,
+        py: { xs: 2, sm: 3, md: 4 },
+        px: { xs: 1, sm: 0 },
       }}
     >
       <Container maxWidth="md">
@@ -401,6 +402,7 @@ export default function PublishPage() {
               variant="h3"
               fontWeight="bold"
               sx={{
+                fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' },
                 background: 'linear-gradient(90deg, #1877f2, #E1306C, #F77737)',
                 backgroundClip: 'text',
                 WebkitBackgroundClip: 'text',

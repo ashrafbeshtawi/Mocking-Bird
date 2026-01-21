@@ -23,6 +23,18 @@ import {
   Button,
   Snackbar,
   Checkbox,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Collapse,
+  FormControl,
+  Select,
+  MenuItem,
+  InputLabel,
+  SelectChangeEvent,
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
@@ -30,15 +42,17 @@ import WarningIcon from '@mui/icons-material/Warning';
 import DownloadIcon from '@mui/icons-material/Download';
 import DeleteIcon from '@mui/icons-material/Delete';
 import HistoryIcon from '@mui/icons-material/History';
-import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import ArticleIcon from '@mui/icons-material/Article';
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 
 interface PublishHistoryItem {
   id: number;
   content: string;
   publish_status: 'success' | 'partial_success' | 'failed';
+  publish_report?: string;
   created_at: string;
 }
 
@@ -72,264 +86,199 @@ const statusConfig = {
   },
 };
 
-function formatRelativeTime(dateString: string): string {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
-
-  if (diffMins < 1) return 'Just now';
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays < 7) return `${diffDays}d ago`;
-
-  return date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
-  });
-}
-
-function HistoryCard({
+function HistoryRow({
   item,
-  index,
   isSelected,
   onSelect,
   onDelete,
-  onClick,
   onCopy,
+  expandedId,
+  onToggleExpand,
 }: {
   item: PublishHistoryItem;
-  index: number;
   isSelected: boolean;
   onSelect: (id: number, checked: boolean) => void;
   onDelete: (item: PublishHistoryItem) => void;
-  onClick: (item: PublishHistoryItem) => void;
   onCopy: (content: string) => void;
+  expandedId: number | null;
+  onToggleExpand: (id: number) => void;
 }) {
   const status = statusConfig[item.publish_status] || statusConfig.failed;
   const StatusIcon = status.icon;
-
-  const handleCheckboxClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-  };
-
-  const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    onSelect(item.id, e.target.checked);
-  };
-
-  const handleDeleteClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onDelete(item);
-  };
-
-  const handleDownloadClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-  };
-
-  const handleCopyClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onCopy(item.content);
-  };
+  const isExpanded = expandedId === item.id;
 
   return (
-    <Fade in timeout={300 + index * 100}>
-      <Paper
-        elevation={0}
-        onClick={() => onClick(item)}
+    <>
+      <TableRow
         sx={{
-          p: 2.5,
-          borderRadius: 3,
-          border: '1px solid',
-          borderColor: isSelected ? '#E1306C' : 'divider',
-          bgcolor: isSelected ? '#E1306C08' : 'background.paper',
-          transition: 'all 0.2s ease',
-          cursor: 'pointer',
-          '&:hover': {
-            borderColor: isSelected ? '#E1306C' : status.color,
-            boxShadow: `0 4px 20px ${isSelected ? '#E1306C' : status.color}15`,
-            transform: 'translateY(-2px)',
-          },
+          bgcolor: isSelected ? '#E1306C08' : 'transparent',
+          '&:hover': { bgcolor: isSelected ? '#E1306C12' : 'action.hover' },
         }}
       >
-        <Box sx={{ display: 'flex', gap: 2 }}>
-          {/* Checkbox */}
-          <Box
+        <TableCell padding="checkbox">
+          <Checkbox
+            checked={isSelected}
+            onChange={(e) => onSelect(item.id, e.target.checked)}
             sx={{
-              display: 'flex',
-              alignItems: 'center',
-              flexShrink: 0,
+              '&.Mui-checked': {
+                color: '#E1306C',
+              },
             }}
-            onClick={handleCheckboxClick}
-          >
-            <Checkbox
-              checked={isSelected}
-              onChange={handleCheckboxChange}
-              sx={{
-                p: 0.5,
-                '&.Mui-checked': {
-                  color: '#E1306C',
-                },
-              }}
-            />
-          </Box>
-
-          {/* Status indicator */}
-          <Box
+          />
+        </TableCell>
+        <TableCell padding="checkbox">
+          <IconButton size="small" onClick={() => onToggleExpand(item.id)}>
+            {isExpanded ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
+          </IconButton>
+        </TableCell>
+        <TableCell>
+          <Typography variant="body2" color="text.secondary">
+            {new Date(item.created_at).toLocaleDateString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
+          </Typography>
+        </TableCell>
+        <TableCell>
+          <Typography
+            variant="body2"
             sx={{
-              width: 48,
-              height: 48,
-              borderRadius: 2,
+              maxWidth: 350,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {item.content.substring(0, 60) || 'No content'}
+            {item.content.length > 60 && '...'}
+          </Typography>
+        </TableCell>
+        <TableCell>
+          <Chip
+            icon={<StatusIcon sx={{ fontSize: 16 }} />}
+            label={status.label}
+            size="small"
+            sx={{
               bgcolor: status.bgColor,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
+              color: status.color,
+              fontWeight: 600,
+              '& .MuiChip-icon': { color: status.color },
             }}
-          >
-            <StatusIcon sx={{ color: status.color, fontSize: 24 }} />
-          </Box>
-
-          {/* Content */}
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'flex-start',
-                justifyContent: 'space-between',
-                gap: 1,
-                mb: 1,
-              }}
-            >
-              <Typography
-                variant="body1"
+          />
+        </TableCell>
+        <TableCell>
+          <Box sx={{ display: 'flex', gap: 0.5 }}>
+            <Tooltip title="Copy content">
+              <IconButton
+                size="small"
+                onClick={() => onCopy(item.content)}
                 sx={{
-                  fontWeight: 500,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  flex: 1,
+                  color: 'text.secondary',
+                  '&:hover': { color: '#22c55e', bgcolor: '#22c55e10' },
                 }}
               >
-                {item.content.substring(0, 60) || 'No text content'}
-                {item.content.length > 60 && '...'}
-              </Typography>
-              <Chip
-                label={status.label}
+                <ContentCopyIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Download report">
+              <IconButton
                 size="small"
+                href={`/api/publish/download-report?id=${item.id}`}
+                download
                 sx={{
-                  bgcolor: status.bgColor,
-                  color: status.color,
-                  fontWeight: 600,
-                  fontSize: '0.7rem',
-                  height: 24,
-                  flexShrink: 0,
+                  color: 'text.secondary',
+                  '&:hover': { color: 'primary.main' },
                 }}
-              />
-            </Box>
-
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}
-            >
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <AccessTimeIcon
-                  sx={{ fontSize: 14, color: 'text.secondary' }}
-                />
-                <Tooltip title={new Date(item.created_at).toLocaleString()}>
-                  <Typography variant="caption" color="text.secondary">
-                    {formatRelativeTime(item.created_at)}
-                  </Typography>
-                </Tooltip>
-              </Box>
-
-              <Box sx={{ display: 'flex', gap: 0.5 }}>
-                <Tooltip title="Copy content">
-                  <IconButton
-                    size="small"
-                    onClick={handleCopyClick}
-                    sx={{
-                      color: 'text.secondary',
-                      '&:hover': { color: '#22c55e', bgcolor: '#22c55e10' },
-                    }}
-                  >
-                    <ContentCopyIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-                <Tooltip title="Download report">
-                  <IconButton
-                    size="small"
-                    href={`/api/publish/download-report?id=${item.id}`}
-                    download
-                    onClick={handleDownloadClick}
-                    sx={{
-                      color: 'text.secondary',
-                      '&:hover': { color: 'primary.main' },
-                    }}
-                  >
-                    <DownloadIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-                <Tooltip title="Delete report">
-                  <IconButton
-                    size="small"
-                    onClick={handleDeleteClick}
-                    sx={{
-                      color: 'text.secondary',
-                      '&:hover': { color: '#ef4444', bgcolor: '#ef444410' },
-                    }}
-                  >
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-              </Box>
-            </Box>
+              >
+                <DownloadIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Delete report">
+              <IconButton
+                size="small"
+                onClick={() => onDelete(item)}
+                sx={{
+                  color: 'text.secondary',
+                  '&:hover': { color: '#ef4444', bgcolor: '#ef444410' },
+                }}
+              >
+                <DeleteIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
           </Box>
-        </Box>
-      </Paper>
-    </Fade>
+        </TableCell>
+      </TableRow>
+      <TableRow>
+        <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={6}>
+          <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+            <Box sx={{ py: 2, px: 1 }}>
+              <Typography variant="subtitle2" gutterBottom fontWeight={600}>
+                Full Content
+              </Typography>
+              <Typography variant="body2" sx={{ mb: 2, whiteSpace: 'pre-wrap' }}>
+                {item.content || 'No content'}
+              </Typography>
+              {item.publish_report && (
+                <>
+                  <Typography variant="subtitle2" gutterBottom fontWeight={600}>
+                    Publish Report
+                  </Typography>
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      p: 2,
+                      bgcolor: 'grey.50',
+                      borderRadius: 2,
+                      maxHeight: 200,
+                      overflow: 'auto',
+                    }}
+                  >
+                    <Typography
+                      variant="body2"
+                      component="pre"
+                      sx={{ fontFamily: 'monospace', fontSize: '0.75rem', whiteSpace: 'pre-wrap' }}
+                    >
+                      {item.publish_report}
+                    </Typography>
+                  </Paper>
+                </>
+              )}
+            </Box>
+          </Collapse>
+        </TableCell>
+      </TableRow>
+    </>
   );
 }
 
 function LoadingSkeleton() {
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+    <TableBody>
       {[1, 2, 3, 4, 5].map((i) => (
-        <Paper
-          key={i}
-          elevation={0}
-          sx={{
-            p: 2.5,
-            borderRadius: 3,
-            border: '1px solid',
-            borderColor: 'divider',
-          }}
-        >
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            <Skeleton variant="rounded" width={24} height={24} />
-            <Skeleton variant="rounded" width={48} height={48} />
-            <Box sx={{ flex: 1 }}>
-              <Box
-                sx={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  mb: 1,
-                }}
-              >
-                <Skeleton variant="text" width="60%" height={24} />
-                <Skeleton variant="rounded" width={60} height={24} />
-              </Box>
-              <Skeleton variant="text" width="30%" height={20} />
-            </Box>
-          </Box>
-        </Paper>
+        <TableRow key={i}>
+          <TableCell padding="checkbox">
+            <Skeleton variant="circular" width={24} height={24} />
+          </TableCell>
+          <TableCell padding="checkbox">
+            <Skeleton variant="circular" width={24} height={24} />
+          </TableCell>
+          <TableCell>
+            <Skeleton variant="text" width={100} />
+          </TableCell>
+          <TableCell>
+            <Skeleton variant="text" width={200} />
+          </TableCell>
+          <TableCell>
+            <Skeleton variant="rounded" width={80} height={24} />
+          </TableCell>
+          <TableCell>
+            <Skeleton variant="rounded" width={100} height={24} />
+          </TableCell>
+        </TableRow>
       ))}
-    </Box>
+    </TableBody>
   );
 }
 
@@ -338,6 +287,8 @@ export default function PublishHistoryPage() {
   const searchParams = useSearchParams();
 
   const initialPage = parseInt(searchParams.get('page') || '1', 10);
+  const initialStatus = searchParams.get('status') || 'all';
+  const initialPlatform = searchParams.get('platform') || 'all';
 
   const [history, setHistory] = useState<PublishHistoryItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -345,10 +296,13 @@ export default function PublishHistoryPage() {
   const [page, setPage] = useState<number>(initialPage);
   const [totalPages, setTotalPages] = useState<number>(1);
   const [total, setTotal] = useState<number>(0);
+  const [statusFilter, setStatusFilter] = useState<string>(initialStatus);
+  const [platformFilter, setPlatformFilter] = useState<string>(initialPlatform);
   const limit = 10;
 
   // Selection state
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [expandedId, setExpandedId] = useState<number | null>(null);
 
   // Delete dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -367,14 +321,20 @@ export default function PublishHistoryPage() {
     severity: 'success',
   });
 
-  const fetchPublishHistory = useCallback(async (pageNumber: number) => {
+  const fetchPublishHistory = useCallback(async (pageNumber: number, status: string, platform: string) => {
     setLoading(true);
     setError(null);
-    setSelectedIds(new Set()); // Clear selection on page change
+    setSelectedIds(new Set());
+    setExpandedId(null);
     try {
-      const response = await fetch(
-        `/api/publish/publish-history?page=${pageNumber}&limit=${limit}`
-      );
+      let url = `/api/publish/publish-history?page=${pageNumber}&limit=${limit}`;
+      if (status !== 'all') {
+        url += `&status=${status}`;
+      }
+      if (platform !== 'all') {
+        url += `&platform=${platform}`;
+      }
+      const response = await fetch(url);
 
       if (!response.ok) {
         if (response.status === 401) {
@@ -382,9 +342,7 @@ export default function PublishHistoryPage() {
           return;
         }
         const errorData = await response.json();
-        throw new Error(
-          errorData.error || `Backend error: ${response.statusText}`
-        );
+        throw new Error(errorData.error || `Backend error: ${response.statusText}`);
       }
 
       const result: PaginatedResponse = await response.json();
@@ -393,25 +351,41 @@ export default function PublishHistoryPage() {
       setTotal(result.total || 0);
     } catch (err: unknown) {
       console.error('Error fetching publish history:', err);
-      setError(
-        (err as Error)?.message ||
-          'An unexpected error occurred while fetching publish history.'
-      );
+      setError((err as Error)?.message || 'An unexpected error occurred while fetching publish history.');
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchPublishHistory(page);
-  }, [fetchPublishHistory, page]);
+    fetchPublishHistory(page, statusFilter, platformFilter);
+  }, [fetchPublishHistory, page, statusFilter, platformFilter]);
 
-  const handlePageChange = (
-    _event: React.ChangeEvent<unknown>,
-    value: number
-  ) => {
+  const buildUrlParams = (newPage: number, newStatus: string, newPlatform: string) => {
+    const params = new URLSearchParams();
+    params.set('page', newPage.toString());
+    if (newStatus !== 'all') params.set('status', newStatus);
+    if (newPlatform !== 'all') params.set('platform', newPlatform);
+    return params.toString();
+  };
+
+  const handlePageChange = (_event: React.ChangeEvent<unknown>, value: number) => {
     setPage(value);
-    router.push(`/history?page=${value}`, { scroll: false });
+    router.push(`/history?${buildUrlParams(value, statusFilter, platformFilter)}`, { scroll: false });
+  };
+
+  const handleStatusFilterChange = (event: SelectChangeEvent) => {
+    const newStatus = event.target.value;
+    setStatusFilter(newStatus);
+    setPage(1);
+    router.push(`/history?${buildUrlParams(1, newStatus, platformFilter)}`, { scroll: false });
+  };
+
+  const handlePlatformFilterChange = (event: SelectChangeEvent) => {
+    const newPlatform = event.target.value;
+    setPlatformFilter(newPlatform);
+    setPage(1);
+    router.push(`/history?${buildUrlParams(1, statusFilter, newPlatform)}`, { scroll: false });
   };
 
   // Selection handlers
@@ -435,13 +409,12 @@ export default function PublishHistoryPage() {
     }
   };
 
+  const handleToggleExpand = (id: number) => {
+    setExpandedId((prev) => (prev === id ? null : id));
+  };
+
   const isAllSelected = history.length > 0 && selectedIds.size === history.length;
   const isSomeSelected = selectedIds.size > 0 && selectedIds.size < history.length;
-
-  // Card click handler - navigate to report detail
-  const handleCardClick = (item: PublishHistoryItem) => {
-    router.push(`/history/report?id=${item.id}&page=${page}`);
-  };
 
   // Copy handler
   const handleCopyContent = async (content: string) => {
@@ -523,9 +496,7 @@ export default function PublishHistoryPage() {
       }
 
       // If current page is now empty and not the first page, go to previous page
-      const remainingItems = bulkDeleteMode
-        ? history.length - selectedIds.size
-        : history.length - 1;
+      const remainingItems = bulkDeleteMode ? history.length - selectedIds.size : history.length - 1;
 
       if (remainingItems === 0 && page > 1) {
         setPage(page - 1);
@@ -560,12 +531,11 @@ export default function PublishHistoryPage() {
     <Box
       sx={{
         minHeight: '100vh',
-        background:
-          'linear-gradient(180deg, rgba(25,118,210,0.05) 0%, rgba(255,255,255,0) 50%)',
+        background: 'linear-gradient(180deg, rgba(25,118,210,0.05) 0%, rgba(255,255,255,0) 50%)',
         py: 4,
       }}
     >
-      <Container maxWidth="md">
+      <Container maxWidth="lg">
         {/* Header */}
         <Fade in timeout={600}>
           <Box sx={{ mb: 4 }}>
@@ -576,8 +546,7 @@ export default function PublishHistoryPage() {
                     width: 48,
                     height: 48,
                     borderRadius: 2,
-                    background:
-                      'linear-gradient(135deg, #1877f2 0%, #E1306C 100%)',
+                    background: 'linear-gradient(135deg, #1877f2 0%, #E1306C 100%)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -590,8 +559,8 @@ export default function PublishHistoryPage() {
                     variant="h4"
                     fontWeight="bold"
                     sx={{
-                      background:
-                        'linear-gradient(90deg, #1877f2, #E1306C, #F77737)',
+                      fontSize: { xs: '1.75rem', sm: '2.125rem' },
+                      background: 'linear-gradient(90deg, #1877f2, #E1306C, #F77737)',
                       backgroundClip: 'text',
                       WebkitBackgroundClip: 'text',
                       WebkitTextFillColor: 'transparent',
@@ -600,9 +569,7 @@ export default function PublishHistoryPage() {
                     Publish History
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    {total > 0
-                      ? `${total} post${total !== 1 ? 's' : ''} published`
-                      : 'Your publishing activity'}
+                    {total > 0 ? `${total} post${total !== 1 ? 's' : ''} published` : 'Your publishing activity'}
                   </Typography>
                 </Box>
               </Box>
@@ -619,132 +586,164 @@ export default function PublishHistoryPage() {
         )}
 
         {/* Content */}
-        {loading ? (
-          <LoadingSkeleton />
-        ) : history.length === 0 ? (
-          <Fade in timeout={800}>
-            <Paper
-              elevation={0}
-              sx={{
-                p: 6,
-                textAlign: 'center',
-                borderRadius: 4,
-                border: '2px dashed',
-                borderColor: 'divider',
-                bgcolor: 'background.paper',
-              }}
-            >
-              <ArticleIcon
-                sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }}
-              />
-              <Typography variant="h6" color="text.secondary" gutterBottom>
-                No publishing history yet
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Your published posts will appear here. Head to the Publish page
-                to create your first post.
-              </Typography>
-            </Paper>
-          </Fade>
-        ) : (
-          <Fade in timeout={800}>
-            <Box>
-              {/* Selection toolbar */}
-              <Paper
-                elevation={0}
-                sx={{
-                  p: 2,
-                  mb: 2,
-                  borderRadius: 3,
-                  border: '1px solid',
-                  borderColor: 'divider',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                }}
-              >
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                  <Checkbox
-                    checked={isAllSelected}
-                    indeterminate={isSomeSelected}
-                    onChange={(e) => handleSelectAll(e.target.checked)}
-                    sx={{
-                      '&.Mui-checked, &.MuiCheckbox-indeterminate': {
-                        color: '#E1306C',
-                      },
-                    }}
-                  />
-                  <Typography variant="body2" color="text.secondary">
-                    {selectedIds.size > 0
-                      ? `${selectedIds.size} selected`
-                      : 'Select all'}
-                  </Typography>
-                </Box>
-
-                {selectedIds.size > 0 && (
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    startIcon={<DeleteSweepIcon />}
-                    onClick={handleBulkDeleteClick}
-                    sx={{
-                      borderRadius: 2,
-                      textTransform: 'none',
-                      borderColor: '#ef444450',
-                      color: '#ef4444',
-                      '&:hover': {
-                        borderColor: '#ef4444',
-                        bgcolor: '#ef444410',
-                      },
-                    }}
-                  >
-                    Delete {selectedIds.size} report{selectedIds.size > 1 ? 's' : ''}
-                  </Button>
-                )}
-              </Paper>
-
-              {/* History List */}
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {history.map((item, index) => (
-                  <HistoryCard
-                    key={item.id}
-                    item={item}
-                    index={index}
-                    isSelected={selectedIds.has(item.id)}
-                    onSelect={handleSelectItem}
-                    onDelete={handleDeleteClick}
-                    onClick={handleCardClick}
-                    onCopy={handleCopyContent}
-                  />
-                ))}
-              </Box>
-
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <Box
+        <Paper
+          elevation={0}
+          sx={{
+            borderRadius: 3,
+            border: '1px solid',
+            borderColor: 'divider',
+            overflow: 'hidden',
+          }}
+        >
+          {/* Toolbar */}
+          <Box
+            sx={{
+              p: 2,
+              borderBottom: '1px solid',
+              borderColor: 'divider',
+              display: 'flex',
+              alignItems: { xs: 'stretch', sm: 'center' },
+              justifyContent: 'space-between',
+              flexDirection: { xs: 'column', sm: 'row' },
+              gap: 2,
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Checkbox
+                  checked={isAllSelected}
+                  indeterminate={isSomeSelected}
+                  onChange={(e) => handleSelectAll(e.target.checked)}
+                  disabled={history.length === 0}
                   sx={{
-                    display: 'flex',
-                    justifyContent: 'center',
-                    mt: 4,
+                    '&.Mui-checked, &.MuiCheckbox-indeterminate': {
+                      color: '#E1306C',
+                    },
+                  }}
+                />
+                <Typography variant="body2" color="text.secondary">
+                  {selectedIds.size > 0 ? `${selectedIds.size} selected` : 'Select all'}
+                </Typography>
+              </Box>
+              {selectedIds.size > 0 && (
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<DeleteSweepIcon />}
+                  onClick={handleBulkDeleteClick}
+                  sx={{
+                    borderRadius: 2,
+                    textTransform: 'none',
+                    borderColor: '#ef444450',
+                    color: '#ef4444',
+                    '&:hover': {
+                      borderColor: '#ef4444',
+                      bgcolor: '#ef444410',
+                    },
                   }}
                 >
-                  <Pagination
-                    count={totalPages}
-                    page={page}
-                    onChange={handlePageChange}
-                    color="primary"
-                    shape="rounded"
-                    sx={{
-                      '& .MuiPaginationItem-root': {
-                        borderRadius: 2,
-                      },
-                    }}
-                  />
-                </Box>
+                  Delete {selectedIds.size}
+                </Button>
               )}
             </Box>
-          </Fade>
-        )}
+
+            <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', sm: 'row' } }}>
+              <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 130 } }}>
+                <InputLabel>Platform</InputLabel>
+                <Select value={platformFilter} onChange={handlePlatformFilterChange} label="Platform">
+                  <MenuItem value="all">All Platforms</MenuItem>
+                  <MenuItem value="facebook">Facebook</MenuItem>
+                  <MenuItem value="twitter">Twitter/X</MenuItem>
+                  <MenuItem value="instagram">Instagram</MenuItem>
+                  <MenuItem value="telegram">Telegram</MenuItem>
+                </Select>
+              </FormControl>
+              <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 130 } }}>
+                <InputLabel>Status</InputLabel>
+                <Select value={statusFilter} onChange={handleStatusFilterChange} label="Status">
+                  <MenuItem value="all">All Status</MenuItem>
+                  <MenuItem value="success">Published</MenuItem>
+                  <MenuItem value="partial_success">Partial</MenuItem>
+                  <MenuItem value="failed">Failed</MenuItem>
+                </Select>
+              </FormControl>
+            </Box>
+          </Box>
+
+          {/* Table */}
+          <TableContainer sx={{ overflowX: 'auto' }}>
+            <Table sx={{ minWidth: 650 }}>
+              <TableHead>
+                <TableRow sx={{ bgcolor: 'grey.50' }}>
+                  <TableCell padding="checkbox" />
+                  <TableCell padding="checkbox" />
+                  <TableCell sx={{ fontWeight: 600 }}>Date</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Content</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              {loading ? (
+                <LoadingSkeleton />
+              ) : history.length === 0 ? (
+                <TableBody>
+                  <TableRow>
+                    <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
+                      <ArticleIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 1 }} />
+                      <Typography variant="h6" color="text.secondary" gutterBottom>
+                        No publishing history yet
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Your published posts will appear here. Head to the Publish page to create your first post.
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              ) : (
+                <TableBody>
+                  {history.map((item) => (
+                    <HistoryRow
+                      key={item.id}
+                      item={item}
+                      isSelected={selectedIds.has(item.id)}
+                      onSelect={handleSelectItem}
+                      onDelete={handleDeleteClick}
+                      onCopy={handleCopyContent}
+                      expandedId={expandedId}
+                      onToggleExpand={handleToggleExpand}
+                    />
+                  ))}
+                </TableBody>
+              )}
+            </Table>
+          </TableContainer>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <Box
+              sx={{
+                p: 2,
+                display: 'flex',
+                justifyContent: 'center',
+                borderTop: '1px solid',
+                borderColor: 'divider',
+              }}
+            >
+              <Pagination
+                count={totalPages}
+                page={page}
+                onChange={handlePageChange}
+                color="primary"
+                shape="rounded"
+                sx={{
+                  '& .MuiPaginationItem-root': {
+                    borderRadius: 2,
+                  },
+                }}
+              />
+            </Box>
+          )}
+        </Paper>
       </Container>
 
       {/* Delete Confirmation Dialog */}
@@ -771,16 +770,10 @@ export default function PublishHistoryPage() {
                 justifyContent: 'center',
               }}
             >
-              {bulkDeleteMode ? (
-                <DeleteSweepIcon sx={{ color: '#ef4444' }} />
-              ) : (
-                <DeleteIcon sx={{ color: '#ef4444' }} />
-              )}
+              {bulkDeleteMode ? <DeleteSweepIcon sx={{ color: '#ef4444' }} /> : <DeleteIcon sx={{ color: '#ef4444' }} />}
             </Box>
             <Typography variant="h6" fontWeight={600}>
-              {bulkDeleteMode
-                ? `Delete ${selectedIds.size} Report${selectedIds.size > 1 ? 's' : ''}`
-                : 'Delete Report'}
+              {bulkDeleteMode ? `Delete ${selectedIds.size} Report${selectedIds.size > 1 ? 's' : ''}` : 'Delete Report'}
             </Typography>
           </Box>
         </DialogTitle>
@@ -818,58 +811,9 @@ export default function PublishHistoryPage() {
               </Typography>
             </Paper>
           )}
-          {bulkDeleteMode && (
-            <Paper
-              elevation={0}
-              sx={{
-                mt: 2,
-                p: 2,
-                bgcolor: 'grey.50',
-                borderRadius: 2,
-                border: '1px solid',
-                borderColor: 'divider',
-                maxHeight: 150,
-                overflow: 'auto',
-              }}
-            >
-              {history
-                .filter((item) => selectedIds.has(item.id))
-                .map((item) => (
-                  <Box
-                    key={item.id}
-                    sx={{
-                      py: 0.5,
-                      borderBottom: '1px solid',
-                      borderColor: 'divider',
-                      '&:last-child': { borderBottom: 'none' },
-                    }}
-                  >
-                    <Typography
-                      variant="body2"
-                      sx={{
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {item.content.substring(0, 60) || 'No text content'}
-                      {item.content.length > 60 && '...'}
-                    </Typography>
-                  </Box>
-                ))}
-            </Paper>
-          )}
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 3 }}>
-          <Button
-            onClick={handleDeleteCancel}
-            disabled={deleting}
-            sx={{
-              borderRadius: 2,
-              textTransform: 'none',
-              px: 3,
-            }}
-          >
+          <Button onClick={handleDeleteCancel} disabled={deleting} sx={{ borderRadius: 2, textTransform: 'none', px: 3 }}>
             Cancel
           </Button>
           <Button
@@ -886,27 +830,14 @@ export default function PublishHistoryPage() {
               },
             }}
           >
-            {deleting
-              ? 'Deleting...'
-              : bulkDeleteMode
-              ? `Delete ${selectedIds.size} Report${selectedIds.size > 1 ? 's' : ''}`
-              : 'Delete'}
+            {deleting ? 'Deleting...' : bulkDeleteMode ? `Delete ${selectedIds.size} Report${selectedIds.size > 1 ? 's' : ''}` : 'Delete'}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* Snackbar for feedback */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={4000}
-        onClose={handleSnackbarClose}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert
-          onClose={handleSnackbarClose}
-          severity={snackbar.severity}
-          sx={{ borderRadius: 2 }}
-        >
+      <Snackbar open={snackbar.open} autoHideDuration={4000} onClose={handleSnackbarClose} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+        <Alert onClose={handleSnackbarClose} severity={snackbar.severity} sx={{ borderRadius: 2 }}>
           {snackbar.message}
         </Alert>
       </Snackbar>

@@ -8,36 +8,16 @@ import { SummaryCards } from '@/components/analytics/SummaryCards';
 import { ActivityChart } from '@/components/analytics/ActivityChart';
 import { PlatformVolumeChart } from '@/components/analytics/PlatformVolumeChart';
 import { PlatformReliabilityChart } from '@/components/analytics/PlatformReliabilityChart';
-import { PostsTable } from '@/components/analytics/PostsTable';
 import { useAnalytics } from '@/hooks/useAnalytics';
-import { useAnalyticsPosts } from '@/hooks/useAnalyticsPosts';
 import type { TimeRange } from '@/types/analytics';
 
 export default function AnalyticsPage() {
   const [range, setRange] = useState<TimeRange>('30d');
-  const [filters, setFilters] = useState({ platform: 'all', status: 'all' });
-  const [postsPage, setPostsPage] = useState(1);
 
   const { data, loading, error } = useAnalytics(range);
-  const {
-    posts,
-    pagination,
-    loading: postsLoading,
-  } = useAnalyticsPosts({
-    range,
-    platform: filters.platform,
-    status: filters.status,
-    page: postsPage,
-  });
 
   const handleRangeChange = (newRange: TimeRange) => {
     setRange(newRange);
-    setPostsPage(1);
-  };
-
-  const handleFilterChange = (key: 'platform' | 'status', value: string) => {
-    setFilters((prev) => ({ ...prev, [key]: value }));
-    setPostsPage(1);
   };
 
   return (
@@ -72,6 +52,7 @@ export default function AnalyticsPage() {
                     variant="h4"
                     fontWeight="bold"
                     sx={{
+                      fontSize: { xs: '1.75rem', sm: '2.125rem' },
                       background: 'linear-gradient(90deg, #1877f2, #E1306C, #F77737)',
                       backgroundClip: 'text',
                       WebkitBackgroundClip: 'text',
@@ -116,19 +97,6 @@ export default function AnalyticsPage() {
           </Box>
         </Fade>
 
-        {/* Posts Table */}
-        <Fade in timeout={900}>
-          <Box>
-            <PostsTable
-              posts={posts}
-              loading={postsLoading}
-              pagination={{ page: pagination.page, totalPages: pagination.totalPages, total: pagination.total }}
-              filters={filters}
-              onFilterChange={handleFilterChange}
-              onPageChange={setPostsPage}
-            />
-          </Box>
-        </Fade>
       </Container>
     </Box>
   );

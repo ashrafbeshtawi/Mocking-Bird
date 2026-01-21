@@ -35,8 +35,6 @@ import BarChartIcon from '@mui/icons-material/BarChart';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import InfoIcon from '@mui/icons-material/Info';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
-import SettingsIcon from '@mui/icons-material/Settings';
-import ChatIcon from '@mui/icons-material/Chat';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import LoginIcon from '@mui/icons-material/Login';
@@ -57,14 +55,7 @@ const getNavLinks = (isLoggedIn: boolean): NavLink[] =>
         { href: '/publish', label: 'Publish', icon: RocketLaunchIcon },
         { href: '/history', label: 'History', icon: HistoryIcon },
         { href: '/analytics', label: 'Analytics', icon: BarChartIcon },
-        {
-          label: 'AI Tools',
-          icon: AutoAwesomeIcon,
-          children: [
-            { href: '/ai/providers', label: 'Providers', icon: SettingsIcon },
-            { href: '/ai/prompts', label: 'Prompts', icon: ChatIcon },
-          ],
-        },
+        { href: '/ai', label: 'AI Tools', icon: AutoAwesomeIcon },
         { href: '/about', label: 'About', icon: InfoIcon },
       ]
     : [
