@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import pool from '@/lib/db';
-import type { TimeRange, AnalyticsResponse } from '@/types/analytics';
+import type { TimeRange, AnalyticsResponse, PlatformVolume, PlatformReliability } from '@/types/analytics';
 
 function getDateFilter(range: TimeRange): string {
   switch (range) {
@@ -62,7 +62,7 @@ export async function GET(req: NextRequest) {
       [userId]
     );
 
-    const platformCounts: Record<string, number> = { facebook: 0, twitter: 0, instagram: 0, telegram: 0 };
+    const platformCounts: PlatformVolume = { facebook: 0, twitter: 0, instagram: 0, telegram: 0 };
     for (const row of platformResult.rows) {
       const report = row.publish_report?.toLowerCase() || '';
       if (report.includes('facebook')) platformCounts.facebook++;
@@ -118,9 +118,9 @@ export async function GET(req: NextRequest) {
     const platformVolume = { ...platformCounts };
 
     // Platform reliability (success rate per platform)
-    const platformReliability: Record<string, number> = { facebook: 0, twitter: 0, instagram: 0, telegram: 0 };
-    const platformTotal: Record<string, number> = { facebook: 0, twitter: 0, instagram: 0, telegram: 0 };
-    const platformSuccess: Record<string, number> = { facebook: 0, twitter: 0, instagram: 0, telegram: 0 };
+    const platformReliability: PlatformReliability = { facebook: 0, twitter: 0, instagram: 0, telegram: 0 };
+    const platformTotal: PlatformVolume = { facebook: 0, twitter: 0, instagram: 0, telegram: 0 };
+    const platformSuccess: PlatformVolume = { facebook: 0, twitter: 0, instagram: 0, telegram: 0 };
 
     const reliabilityResult = await pool.query(
       `SELECT publish_report, publish_status FROM publish_history
@@ -150,7 +150,8 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    for (const platform of Object.keys(platformReliability)) {
+    const platforms: (keyof PlatformReliability)[] = ['facebook', 'twitter', 'instagram', 'telegram'];
+    for (const platform of platforms) {
       platformReliability[platform] = platformTotal[platform] > 0
         ? (platformSuccess[platform] / platformTotal[platform]) * 100
         : 0;
