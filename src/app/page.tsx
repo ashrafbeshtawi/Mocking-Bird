@@ -19,12 +19,13 @@ import TelegramIcon from '@mui/icons-material/Telegram';
 import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import SpeedIcon from '@mui/icons-material/Speed';
-import SecurityIcon from '@mui/icons-material/Security';
 import HistoryIcon from '@mui/icons-material/History';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import FormatQuoteIcon from '@mui/icons-material/FormatQuote';
+import BarChartIcon from '@mui/icons-material/BarChart';
+import PsychologyIcon from '@mui/icons-material/Psychology';
 
 const FACEBOOK_COLOR = '#1877f2';
 const INSTAGRAM_COLOR = '#E1306C';
@@ -414,24 +415,24 @@ export default function LandingPage() {
           <Grid size={{ xs: 12, md: 4 }}>
             <FeatureCard
               icon={HistoryIcon}
-              title="Complete History"
-              description="Access your full publishing history with detailed logs. Track what worked and optimize your content strategy."
+              title="Publishing History"
+              description="Track all your posts with detailed logs, filter by platform or status, and manage your content with bulk actions."
               color="#8b5cf6"
             />
           </Grid>
           <Grid size={{ xs: 12, md: 4 }}>
             <FeatureCard
-              icon={SecurityIcon}
-              title="Secure & Private"
-              description="Your credentials are encrypted and stored securely. We never post without your explicit permission."
+              icon={BarChartIcon}
+              title="Analytics Dashboard"
+              description="Visualize your publishing activity with charts showing volume, success rates, and platform performance over time."
               color="#22c55e"
             />
           </Grid>
           <Grid size={{ xs: 12, md: 4 }}>
             <FeatureCard
-              icon={AutoAwesomeIcon}
-              title="Smart Optimization"
-              description="Character limits, hashtags, and media formats are automatically handled for each platform's requirements."
+              icon={PsychologyIcon}
+              title="AI Content Tools"
+              description="Transform your content with AI-powered prompts. Configure multiple providers and create custom prompts for each platform."
               color="#ec4899"
             />
           </Grid>

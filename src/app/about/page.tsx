@@ -23,6 +23,10 @@ import SecurityIcon from '@mui/icons-material/Security';
 import SpeedIcon from '@mui/icons-material/Speed';
 import EmojiObjectsIcon from '@mui/icons-material/EmojiObjects';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import BarChartIcon from '@mui/icons-material/BarChart';
+import PsychologyIcon from '@mui/icons-material/Psychology';
+import HistoryIcon from '@mui/icons-material/History';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 
 const FACEBOOK_COLOR = '#1877f2';
 const INSTAGRAM_COLOR = '#E1306C';
@@ -225,8 +229,8 @@ export default function AboutPage() {
             color="text.secondary"
             sx={{ maxWidth: 700, mx: 'auto', lineHeight: 1.6, fontWeight: 400 }}
           >
-            We&apos;re on a mission to simplify social media publishing for creators,
-            businesses, and everyone in between.
+            Simplifying social media publishing with powerful tools for analytics,
+            history tracking, and AI-powered content optimization.
           </Typography>
         </Container>
       </Box>
@@ -257,8 +261,9 @@ export default function AboutPage() {
             </Typography>
             <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.8 }}>
               Mockingbird was built to solve this problem. With just one click, you can share
-              your message with your entire audience, no matter where they are. Our goal is
-              to give you back hours of your week while helping you reach more people.
+              your message with your entire audience, no matter where they are. Plus, with our
+              analytics dashboard, publishing history, and AI-powered content tools, you have
+              everything you need to optimize your social media strategy.
             </Typography>
           </Grid>
           <Grid size={{ xs: 12, md: 6 }}>
@@ -313,8 +318,57 @@ export default function AboutPage() {
         </Grid>
       </Container>
 
-      {/* Values Section */}
+      {/* Features Section */}
       <Box sx={{ bgcolor: 'grey.50', py: { xs: 8, md: 12 } }}>
+        <Container maxWidth="lg">
+          <Box sx={{ textAlign: 'center', mb: 8 }}>
+            <Typography variant="h3" fontWeight={700} sx={{ mb: 2 }}>
+              Powerful Features
+            </Typography>
+            <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 600, mx: 'auto' }}>
+              Everything you need to manage and optimize your social media presence
+            </Typography>
+          </Box>
+
+          <Grid container spacing={4}>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <ValueCard
+                icon={CloudUploadIcon}
+                title="Cross-Platform Publishing"
+                description="Write once, publish everywhere. Share your content across Facebook, Instagram, X, and Telegram simultaneously."
+                color={FACEBOOK_COLOR}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <ValueCard
+                icon={HistoryIcon}
+                title="Publishing History"
+                description="Track all your posts with detailed logs. Filter by platform or status, download reports, and manage with bulk actions."
+                color="#8b5cf6"
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <ValueCard
+                icon={BarChartIcon}
+                title="Analytics Dashboard"
+                description="Visualize your publishing activity with interactive charts showing volume, success rates, and platform performance."
+                color="#22c55e"
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <ValueCard
+                icon={PsychologyIcon}
+                title="AI Content Tools"
+                description="Transform your content with AI-powered prompts. Configure multiple AI providers and create custom prompts for each platform."
+                color={INSTAGRAM_COLOR}
+              />
+            </Grid>
+          </Grid>
+        </Container>
+      </Box>
+
+      {/* Values Section */}
+      <Box sx={{ py: { xs: 8, md: 12 } }}>
         <Container maxWidth="lg">
           <Box sx={{ textAlign: 'center', mb: 8 }}>
             <Typography variant="h3" fontWeight={700} sx={{ mb: 2 }}>
@@ -392,7 +446,7 @@ export default function AboutPage() {
           <TimelineItem
             year="Today"
             title="Growing Together"
-            description="We continue to improve Mockingbird based on user feedback, adding new features and refining the experience every day."
+            description="We've added powerful features including analytics dashboards, comprehensive publishing history with filtering, and AI-powered content tools. And we're just getting started."
             isLast
           />
         </Box>
