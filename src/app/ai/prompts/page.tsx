@@ -23,33 +23,45 @@ import {
   DialogContent,
   DialogContentText,
   DialogTitle,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Chip,
 } from '@mui/material';
+import Link from 'next/link';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import SaveIcon from '@mui/icons-material/Save';
 import { fetchWithAuth } from '@/lib/fetch';
+import { useAiProviders } from '@/hooks/useAiProviders';
 
 // Interface for a single AI prompt
 interface AiPrompt {
   id: number;
   title: string;
   prompt: string;
+  provider_id: number | null;
+  provider_name?: string | null;
   created_at: string;
 }
 
 export default function AiPromptsPage() {
   const theme = useTheme();
+  const { providers } = useAiProviders();
   const [prompts, setPrompts] = useState<AiPrompt[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [addPromptDialogOpen, setAddPromptDialogOpen] = useState<boolean>(false);
   const [newPromptTitle, setNewPromptTitle] = useState<string>('');
   const [newPromptContent, setNewPromptContent] = useState<string>('');
+  const [newPromptProviderId, setNewPromptProviderId] = useState<number | null>(null);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [editingPromptId, setEditingPromptId] = useState<number | null>(null);
   const [editedTitle, setEditedTitle] = useState<string>('');
   const [editedPrompt, setEditedPrompt] = useState<string>('');
+  const [editedProviderId, setEditedProviderId] = useState<number | null>(null);
   const [openConfirmDialog, setOpenConfirmDialog] = useState<boolean>(false);
   const [promptToDeleteId, setPromptToDeleteId] = useState<number | null>(null);
   const [promptToDeleteTitle, setPromptToDeleteTitle] = useState<string>('');
@@ -85,6 +97,7 @@ export default function AiPromptsPage() {
     setAddPromptDialogOpen(true);
     setNewPromptTitle('');
     setNewPromptContent('');
+    setNewPromptProviderId(null);
     setError(null);
   };
 
@@ -105,7 +118,7 @@ export default function AiPromptsPage() {
       const response = await fetchWithAuth('/api/ai/prompts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: newPromptTitle, prompt: newPromptContent }),
+        body: JSON.stringify({ title: newPromptTitle, prompt: newPromptContent, provider_id: newPromptProviderId }),
       });
 
       if (!response.ok) {
@@ -167,6 +180,7 @@ export default function AiPromptsPage() {
     setEditingPromptId(prompt.id);
     setEditedTitle(prompt.title);
     setEditedPrompt(prompt.prompt);
+    setEditedProviderId(prompt.provider_id);
   };
 
   const handleSaveEdit = async () => {
@@ -179,7 +193,7 @@ export default function AiPromptsPage() {
       const response = await fetchWithAuth('/api/ai/prompts', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: editingPromptId, title: editedTitle, prompt: editedPrompt }),
+        body: JSON.stringify({ id: editingPromptId, title: editedTitle, prompt: editedPrompt, provider_id: editedProviderId }),
       });
 
       if (!response.ok) {
@@ -219,6 +233,13 @@ export default function AiPromptsPage() {
         <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
           These saved AI prompts can be used to configure custom content for specific pages/accounts, where the original post is transformed using an AI model according to your prompt. For example, you can create a prompt to &quot;Summarize the content in 100 characters&quot; or &quot;Rewrite the post in a professional tone.&quot;
         </Typography>
+
+      {providers.length === 0 && (
+        <Alert severity="info" sx={{ mb: 3 }}>
+          <AlertTitle>No AI Providers</AlertTitle>
+          Add an AI provider first to enable content transformation. <Link href="/ai/providers" style={{ color: 'inherit' }}>Configure providers</Link>
+        </Alert>
+      )}
 
       {/* "Add Prompt" Button - Top Left Position */}
       <Box sx={{ display: 'flex', justifyContent: 'flex-start', mb: 4 }}>
@@ -266,6 +287,21 @@ export default function AiPromptsPage() {
                       variant="outlined"
                       sx={{ mb: 2 }}
                     />
+                    <FormControl fullWidth sx={{ mb: 2 }}>
+                      <InputLabel>AI Provider</InputLabel>
+                      <Select
+                        value={editedProviderId || ''}
+                        label="AI Provider"
+                        onChange={(e) => setEditedProviderId(e.target.value ? Number(e.target.value) : null)}
+                      >
+                        <MenuItem value="">None (Template only)</MenuItem>
+                        {providers.map((p) => (
+                          <MenuItem key={p.id} value={p.id}>
+                            {p.name} ({p.model})
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
                     <Button
                       variant="contained"
                       color="primary"
@@ -302,9 +338,16 @@ export default function AiPromptsPage() {
                   >
                     <ListItemText
                       primary={
-                        <Typography variant="subtitle1" fontWeight="bold">
-                          {prompt.title}
-                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Typography variant="subtitle1" fontWeight="bold">
+                            {prompt.title}
+                          </Typography>
+                          {prompt.provider_name ? (
+                            <Chip label={prompt.provider_name} size="small" color="primary" variant="outlined" />
+                          ) : (
+                            <Chip label="No provider" size="small" color="warning" variant="outlined" />
+                          )}
+                        </Box>
                       }
                       secondary={
                         <Typography
@@ -354,6 +397,21 @@ export default function AiPromptsPage() {
             value={newPromptContent}
             onChange={(e) => setNewPromptContent(e.target.value)}
           />
+          <FormControl fullWidth sx={{ mt: 2 }}>
+            <InputLabel>AI Provider</InputLabel>
+            <Select
+              value={newPromptProviderId || ''}
+              label="AI Provider"
+              onChange={(e) => setNewPromptProviderId(e.target.value ? Number(e.target.value) : null)}
+            >
+              <MenuItem value="">None (Template only)</MenuItem>
+              {providers.map((p) => (
+                <MenuItem key={p.id} value={p.id}>
+                  {p.name} ({p.model})
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
           {error && (
             <Alert severity="error" sx={{ mt: 2 }}>
               {error}
