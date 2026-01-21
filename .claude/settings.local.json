@@ -11,7 +11,17 @@
       "WebFetch(domain:github.com)",
       "WebFetch(domain:medium.com)",
       "WebFetch(domain:www.getphyllo.com)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Skill(superpowers:brainstorming)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Skill(superpowers:writing-plans)",
+      "Skill(superpowers:subagent-driven-development)",
+      "Bash(npm ls:*)",
+      "Bash(node --version:*)",
+      "Bash(source ~/.nvm/nvm.sh)",
+      "Bash(nvm list:*)",
+      "Bash(nvm use:*)"
     ]
   }
 }
