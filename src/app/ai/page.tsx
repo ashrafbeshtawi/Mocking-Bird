@@ -7,7 +7,7 @@ import {
   Box,
   Typography,
   Paper,
-  Grid2 as Grid,
+  Grid,
   useTheme,
 } from '@mui/material';
 import SettingsIcon from '@mui/icons-material/Settings';
