@@ -31,6 +31,7 @@ import HomeIcon from '@mui/icons-material/Home';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
 import HistoryIcon from '@mui/icons-material/History';
+import BarChartIcon from '@mui/icons-material/BarChart';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import InfoIcon from '@mui/icons-material/Info';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
@@ -55,6 +56,7 @@ const getNavLinks = (isLoggedIn: boolean): NavLink[] =>
         { href: '/dashboard', label: 'Dashboard', icon: DashboardIcon },
         { href: '/publish', label: 'Publish', icon: RocketLaunchIcon },
         { href: '/history', label: 'History', icon: HistoryIcon },
+        { href: '/analytics', label: 'Analytics', icon: BarChartIcon },
         {
           label: 'AI Tools',
           icon: AutoAwesomeIcon,
