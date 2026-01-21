@@ -61,8 +61,8 @@ const getNavLinks = (isLoggedIn: boolean): NavLink[] =>
           label: 'AI Tools',
           icon: AutoAwesomeIcon,
           children: [
-            { href: '/ai/openai-config', label: 'OpenAI Config', icon: SettingsIcon },
-            { href: '/ai/prompts', label: 'AI Prompts', icon: ChatIcon },
+            { href: '/ai/providers', label: 'Providers', icon: SettingsIcon },
+            { href: '/ai/prompts', label: 'Prompts', icon: ChatIcon },
           ],
         },
         { href: '/about', label: 'About', icon: InfoIcon },
