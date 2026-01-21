@@ -23,6 +23,9 @@ import {
   Telegram as TelegramIcon,
 } from '@mui/icons-material';
 import type { AccountData, Platform } from '@/types/accounts';
+import { useAiPrompts } from '@/hooks/useAiPrompts';
+import { usePromptMatching } from '@/hooks/usePromptMatching';
+import { PromptSelector } from '@/components/ai';
 
 interface AccountsTableProps {
   title: string;
@@ -30,6 +33,7 @@ interface AccountsTableProps {
   emptyMessage: string;
   loadingId: string | null;
   onDelete: (account: AccountData) => void;
+  showPromptSelector?: boolean;
 }
 
 const platformConfig: Record<Platform, { label: string; icon: typeof FacebookIcon; color: string }> = {
@@ -61,7 +65,23 @@ export function AccountsTable({
   emptyMessage,
   loadingId,
   onDelete,
+  showPromptSelector = false,
 }: AccountsTableProps) {
+  const { prompts, loading: promptsLoading } = useAiPrompts();
+  const facebookMatching = usePromptMatching('facebook');
+  const twitterMatching = usePromptMatching('twitter');
+  const instagramMatching = usePromptMatching('instagram');
+  const telegramMatching = usePromptMatching('telegram');
+
+  const getMatchingHook = (platform: Platform) => {
+    switch (platform) {
+      case 'facebook': return facebookMatching;
+      case 'twitter': return twitterMatching;
+      case 'instagram': return instagramMatching;
+      case 'telegram': return telegramMatching;
+    }
+  };
+
   return (
     <>
       <Typography
@@ -83,6 +103,9 @@ export function AccountsTable({
               <TableRow>
                 <TableCell sx={{ fontWeight: 'bold' }}>Platform</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Name</TableCell>
+                {showPromptSelector && (
+                  <TableCell sx={{ fontWeight: 'bold', width: 220 }}>AI Prompt</TableCell>
+                )}
                 <TableCell sx={{ fontWeight: 'bold' }}>ID</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', width: 100 }}>Actions</TableCell>
               </TableRow>
@@ -114,6 +137,17 @@ export function AccountsTable({
                         </Typography>
                       )}
                     </TableCell>
+                    {showPromptSelector && (
+                      <TableCell>
+                        <PromptSelector
+                          prompts={prompts}
+                          selectedPromptId={getMatchingHook(account.platform).getMatchingForAccount(account.id)?.prompt_id || null}
+                          onChange={(promptId) => getMatchingHook(account.platform).setMatching(account.id, promptId)}
+                          loading={promptsLoading}
+                          size="small"
+                        />
+                      </TableCell>
+                    )}
                     <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>
                       {account.id}
                     </TableCell>

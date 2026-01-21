@@ -168,6 +168,7 @@ export default function DashboardPage() {
             emptyMessage="No accounts connected yet. Use the buttons above to connect your social media accounts."
             loadingId={deletingId}
             onDelete={promptDelete}
+            showPromptSelector={true}
           />
         )}
       </Container>
