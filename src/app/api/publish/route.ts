@@ -6,7 +6,6 @@ import { processCloudinaryMedia, validateMediaMix } from '@/lib/publish/validato
 import { fetchAllTokens, validateMissingAccounts, formatMissingAccounts, hasMissingAccounts } from '@/lib/publish/services/tokenService';
 import { createReportLogger, buildAndSaveResponse, buildErrorResponse } from '@/lib/publish/services/reportService';
 import { executePublish } from '@/lib/publish/orchestrator';
-import { cleanupCloudinaryMedia } from '@/lib/services/cloudinaryService';
 
 const logger = createLogger('PublishAPI');
 
@@ -195,12 +194,6 @@ export async function POST(req: NextRequest) {
 
     if (failed.length > 0) {
       reportLogger.add(`Partial success - some posts failed`);
-      // Clean up Cloudinary media even on partial success (media was used)
-      if (cloudinaryMedia.length > 0) {
-        cleanupCloudinaryMedia(cloudinaryMedia).catch((err) => {
-          reportLogger.add(`Warning: Failed to cleanup Cloudinary media: ${err.message}`);
-        });
-      }
       return await buildAndSaveResponse({
         pool,
         userId,
@@ -215,12 +208,6 @@ export async function POST(req: NextRequest) {
     }
 
     reportLogger.add(`All posts published successfully`);
-    // Clean up Cloudinary media after successful publish
-    if (cloudinaryMedia.length > 0) {
-      cleanupCloudinaryMedia(cloudinaryMedia).catch((err) => {
-        reportLogger.add(`Warning: Failed to cleanup Cloudinary media: ${err.message}`);
-      });
-    }
     return await buildAndSaveResponse({
       pool,
       userId,

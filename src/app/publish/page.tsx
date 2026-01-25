@@ -16,8 +16,11 @@ import {
   ListItemIcon,
   ListItemText,
   Chip,
+  Snackbar,
+  Alert,
 } from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
+import QueueIcon from '@mui/icons-material/Queue';
 import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
 import FacebookIcon from '@mui/icons-material/Facebook';
 import InstagramIcon from '@mui/icons-material/Instagram';
@@ -106,6 +109,14 @@ export default function PublishPage() {
     Record<string, InstagramSelection>
   >({});
   const [selectedTelegramChannels, setSelectedTelegramChannels] = useState<string[]>([]);
+
+  // Queue state
+  const [isQueueing, setIsQueueing] = useState(false);
+  const [queueSnackbar, setQueueSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
+    open: false,
+    message: '',
+    severity: 'success'
+  });
 
   // Initialize selections when accounts load
   useEffect(() => {
@@ -226,6 +237,89 @@ export default function PublishPage() {
     }
   };
 
+  const handleQueuePost = async () => {
+    setIsQueueing(true);
+
+    // Process Instagram selections
+    const instagramPublishAccounts: string[] = [];
+    const instagramStoryAccounts: string[] = [];
+
+    Object.entries(selectedInstagramAccounts).forEach(([accountId, types]) => {
+      if (types.publish) {
+        instagramPublishAccounts.push(accountId);
+      }
+      if (types.story) {
+        instagramStoryAccounts.push(accountId);
+      }
+    });
+
+    const payload = {
+      text: postText,
+      facebookPages: selectedFacebookPages,
+      xAccounts: selectedXAccounts,
+      instagramPublishAccounts,
+      instagramStoryAccounts,
+      telegramChannels: selectedTelegramChannels,
+      cloudinaryMedia: uploadedMedia.map((media) => ({
+        publicId: media.publicId,
+        publicUrl: media.publicUrl,
+        resourceType: media.resourceType,
+        format: media.format,
+        width: media.width,
+        height: media.height,
+        originalFilename: media.originalFilename,
+      })),
+    };
+
+    try {
+      const response = await fetch('/api/publish/queue', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+        credentials: 'include',
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setQueueSnackbar({
+          open: true,
+          message: `Post added to queue (${data.destinations_count} destinations)`,
+          severity: 'success'
+        });
+
+        // Clear form
+        setPostText('');
+        setUploadedMedia([]);
+        setSelectedFacebookPages(facebookPages.map((p) => p.page_id));
+        setSelectedXAccounts(xAccounts.map((a) => a.id));
+        setSelectedTelegramChannels(telegramChannels.map((c) => c.channel_id));
+
+        const resetInstagram: Record<string, InstagramSelection> = {};
+        instagramAccounts.forEach((a) => {
+          resetInstagram[a.id] = { publish: false, story: false };
+        });
+        setSelectedInstagramAccounts(resetInstagram);
+      } else {
+        setQueueSnackbar({
+          open: true,
+          message: data.error || 'Failed to queue post',
+          severity: 'error'
+        });
+      }
+    } catch (err) {
+      setQueueSnackbar({
+        open: true,
+        message: (err as Error).message || 'An error occurred',
+        severity: 'error'
+      });
+    } finally {
+      setIsQueueing(false);
+    }
+  };
+
   // Computed values
   const charCount = postText.length;
   const showTwitterWarning = charCount > TWITTER_CHAR_LIMIT && selectedXAccounts.length > 0;
@@ -236,6 +330,7 @@ export default function PublishPage() {
   );
   const canPublish =
     !isPublishing &&
+    !isQueueing &&
     (postText.trim() !== '' || uploadedMedia.length > 0) &&
     (selectedFacebookPages.length > 0 ||
       selectedXAccounts.length > 0 ||
@@ -502,13 +597,15 @@ export default function PublishPage() {
                 />
               </Paper>
 
-              {/* Publish Button */}
+              {/* Publish Buttons */}
               <Box
                 sx={{
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
                   mt: 2,
+                  flexWrap: 'wrap',
+                  gap: 2,
                 }}
               >
                 <Typography variant="body2" color="text.secondary">
@@ -516,39 +613,80 @@ export default function PublishPage() {
                     ? `Publishing to ${selectedCount} destination${selectedCount > 1 ? 's' : ''}`
                     : 'Select at least one account'}
                 </Typography>
-                <Button
-                  variant="contained"
-                  size="large"
-                  onClick={handlePublish}
-                  disabled={!canPublish}
-                  endIcon={<SendIcon />}
-                  sx={{
-                    px: 4,
-                    py: 1.5,
-                    borderRadius: 3,
-                    textTransform: 'none',
-                    fontSize: '1rem',
-                    fontWeight: 600,
-                    background: canPublish
-                      ? 'linear-gradient(90deg, #1877f2 0%, #E1306C 50%, #F77737 100%)'
-                      : undefined,
-                    '&:hover': {
+                <Box sx={{ display: 'flex', gap: 2 }}>
+                  <Button
+                    variant="outlined"
+                    size="large"
+                    onClick={handleQueuePost}
+                    disabled={!canPublish}
+                    endIcon={isQueueing ? <CircularProgress size={20} /> : <QueueIcon />}
+                    sx={{
+                      px: 3,
+                      py: 1.5,
+                      borderRadius: 3,
+                      textTransform: 'none',
+                      fontSize: '1rem',
+                      fontWeight: 600,
+                      borderColor: canPublish ? 'primary.main' : undefined,
+                      color: canPublish ? 'primary.main' : undefined,
+                      '&:hover': {
+                        borderColor: canPublish ? 'primary.dark' : undefined,
+                        backgroundColor: canPublish ? 'rgba(25, 118, 210, 0.04)' : undefined,
+                      },
+                    }}
+                  >
+                    {isQueueing ? 'Queueing...' : 'Queue Post'}
+                  </Button>
+                  <Button
+                    variant="contained"
+                    size="large"
+                    onClick={handlePublish}
+                    disabled={!canPublish}
+                    endIcon={<SendIcon />}
+                    sx={{
+                      px: 4,
+                      py: 1.5,
+                      borderRadius: 3,
+                      textTransform: 'none',
+                      fontSize: '1rem',
+                      fontWeight: 600,
                       background: canPublish
-                        ? 'linear-gradient(90deg, #155eaf 0%, #c02a5c 50%, #d96830 100%)'
+                        ? 'linear-gradient(90deg, #1877f2 0%, #E1306C 50%, #F77737 100%)'
                         : undefined,
-                    },
-                    '&.Mui-disabled': {
-                      background: 'action.disabledBackground',
-                    },
-                  }}
-                >
-                  Publish Now
-                </Button>
+                      '&:hover': {
+                        background: canPublish
+                          ? 'linear-gradient(90deg, #155eaf 0%, #c02a5c 50%, #d96830 100%)'
+                          : undefined,
+                      },
+                      '&.Mui-disabled': {
+                        background: 'action.disabledBackground',
+                      },
+                    }}
+                  >
+                    Publish Now
+                  </Button>
+                </Box>
               </Box>
             </Box>
           </Fade>
         )}
       </Container>
+
+      {/* Queue Snackbar */}
+      <Snackbar
+        open={queueSnackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setQueueSnackbar(prev => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setQueueSnackbar(prev => ({ ...prev, open: false }))}
+          severity={queueSnackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {queueSnackbar.message}
+        </Alert>
+      </Snackbar>
 
       {/* Keyframes for animations */}
       <style jsx global>{`

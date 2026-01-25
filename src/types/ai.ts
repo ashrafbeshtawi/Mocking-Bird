@@ -43,7 +43,8 @@ export interface PromptMatching {
 export const COMMON_BASE_URLS = [
   { label: 'OpenAI', value: 'https://api.openai.com/v1' },
   { label: 'Anthropic (Claude)', value: 'https://api.anthropic.com/v1' },
-  { label: 'Google (Gemini)', value: 'https://generativelanguage.googleapis.com/v1beta/openai' },
+  { label: 'Google (Gemini)', value: 'https://generativelanguage.googleapis.com/v1beta' },
+  { label: 'Mistral AI', value: 'https://api.mistral.ai/v1' },
   { label: 'Ollama (local)', value: 'http://localhost:11434/v1' },
   { label: 'Custom', value: '' },
 ];

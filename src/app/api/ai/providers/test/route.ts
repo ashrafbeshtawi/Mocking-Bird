@@ -1,5 +1,137 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// Helper to detect provider type from base_url
+function getProviderType(baseUrl: string): 'gemini' | 'mistral' | 'openai-compatible' {
+  if (baseUrl.includes('generativelanguage.googleapis.com')) {
+    return 'gemini';
+  }
+  if (baseUrl.includes('api.mistral.ai')) {
+    return 'mistral';
+  }
+  return 'openai-compatible';
+}
+
+// Test Gemini API connection
+async function testGeminiConnection(apiKey: string, model: string) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      contents: [{
+        parts: [{ text: 'Say "Connection successful!" in exactly those words.' }]
+      }]
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    let errorMessage = `API returned ${response.status}`;
+    try {
+      const errorJson = JSON.parse(errorText);
+      errorMessage = errorJson.error?.message || errorJson.message || errorMessage;
+    } catch {
+      if (errorText.length < 200) {
+        errorMessage = errorText;
+      }
+    }
+    return { success: false, error: errorMessage };
+  }
+
+  const data = await response.json();
+  const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+  if (!content) {
+    return { success: false, error: 'No response from model' };
+  }
+
+  return { success: true, message: 'Connection successful', response: content.trim() };
+}
+
+// Test Mistral API connection
+async function testMistralConnection(apiKey: string, model: string) {
+  const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: 'user', content: 'Say "Connection successful!" in exactly those words.' },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    let errorMessage = `API returned ${response.status}`;
+    try {
+      const errorJson = JSON.parse(errorText);
+      errorMessage = errorJson.error?.message || errorJson.message || errorMessage;
+    } catch {
+      if (errorText.length < 200) {
+        errorMessage = errorText;
+      }
+    }
+    return { success: false, error: errorMessage };
+  }
+
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content;
+
+  if (!content) {
+    return { success: false, error: 'No response from model' };
+  }
+
+  return { success: true, message: 'Connection successful', response: content.trim() };
+}
+
+// Test OpenAI-compatible API connection
+async function testOpenAICompatibleConnection(apiKey: string, baseUrl: string, model: string) {
+  const response = await fetch(`${baseUrl}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: 'user', content: 'Say "Connection successful!" in exactly those words.' },
+      ],
+      max_tokens: 20,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    let errorMessage = `API returned ${response.status}`;
+    try {
+      const errorJson = JSON.parse(errorText);
+      errorMessage = errorJson.error?.message || errorJson.message || errorMessage;
+    } catch {
+      if (errorText.length < 200) {
+        errorMessage = errorText;
+      }
+    }
+    return { success: false, error: errorMessage };
+  }
+
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content;
+
+  if (!content) {
+    return { success: false, error: 'No response from model' };
+  }
+
+  return { success: true, message: 'Connection successful', response: content.trim() };
+}
+
 // POST: Test a provider connection
 export async function POST(req: NextRequest) {
   const userId = req.headers.get('x-user-id');
@@ -14,44 +146,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'api_key, base_url, and model are required' }, { status: 400 });
     }
 
-    // Make a simple test request to the provider
-    const response = await fetch(`${base_url}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${api_key}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: 'user', content: 'Say "Connection successful!" in exactly those words.' },
-        ],
-        max_tokens: 20,
-      }),
-    });
+    const providerType = getProviderType(base_url);
+    let result;
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      let errorMessage = `API returned ${response.status}`;
-      try {
-        const errorJson = JSON.parse(errorText);
-        errorMessage = errorJson.error?.message || errorJson.message || errorMessage;
-      } catch {
-        if (errorText.length < 200) {
-          errorMessage = errorText;
-        }
-      }
-      return NextResponse.json({ success: false, error: errorMessage }, { status: 200 });
+    switch (providerType) {
+      case 'gemini':
+        result = await testGeminiConnection(api_key, model);
+        break;
+      case 'mistral':
+        result = await testMistralConnection(api_key, model);
+        break;
+      default:
+        result = await testOpenAICompatibleConnection(api_key, base_url, model);
     }
 
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content;
-
-    if (!content) {
-      return NextResponse.json({ success: false, error: 'No response from model' }, { status: 200 });
-    }
-
-    return NextResponse.json({ success: true, message: 'Connection successful', response: content.trim() });
+    return NextResponse.json(result, { status: 200 });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json({ success: false, error: message }, { status: 200 });

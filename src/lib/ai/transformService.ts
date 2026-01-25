@@ -18,6 +18,17 @@ interface PromptConfig {
   provider_id: number;
 }
 
+// Helper to detect provider type from base_url
+function getProviderType(baseUrl: string): 'gemini' | 'mistral' | 'openai-compatible' {
+  if (baseUrl.includes('generativelanguage.googleapis.com')) {
+    return 'gemini';
+  }
+  if (baseUrl.includes('api.mistral.ai')) {
+    return 'mistral';
+  }
+  return 'openai-compatible';
+}
+
 export async function getPromptForDestination(
   userId: number,
   platform: 'facebook' | 'twitter' | 'instagram' | 'telegram',
@@ -56,41 +67,130 @@ export async function getPromptForDestination(
   }
 }
 
+// Transform content using Gemini API
+async function transformWithGemini(
+  content: string,
+  promptText: string,
+  provider: ProviderConfig
+): Promise<TransformResult> {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${provider.model}:generateContent?key=${provider.api_key}`;
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      contents: [{
+        parts: [{ text: `${promptText}\n\nContent to transform:\n${content}` }]
+      }]
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    return { success: false, error: `API error: ${response.status} - ${errorText}` };
+  }
+
+  const data = await response.json();
+  const transformedContent = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+  if (!transformedContent) {
+    return { success: false, error: 'No content in API response' };
+  }
+
+  return { success: true, content: transformedContent.trim() };
+}
+
+// Transform content using Mistral API
+async function transformWithMistral(
+  content: string,
+  promptText: string,
+  provider: ProviderConfig
+): Promise<TransformResult> {
+  const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${provider.api_key}`,
+    },
+    body: JSON.stringify({
+      model: provider.model,
+      messages: [
+        { role: 'system', content: promptText },
+        { role: 'user', content: content },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    return { success: false, error: `API error: ${response.status} - ${errorText}` };
+  }
+
+  const data = await response.json();
+  const transformedContent = data.choices?.[0]?.message?.content;
+
+  if (!transformedContent) {
+    return { success: false, error: 'No content in API response' };
+  }
+
+  return { success: true, content: transformedContent.trim() };
+}
+
+// Transform content using OpenAI-compatible API
+async function transformWithOpenAICompatible(
+  content: string,
+  promptText: string,
+  provider: ProviderConfig
+): Promise<TransformResult> {
+  const response = await fetch(`${provider.base_url}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${provider.api_key}`,
+    },
+    body: JSON.stringify({
+      model: provider.model,
+      messages: [
+        { role: 'system', content: promptText },
+        { role: 'user', content: content },
+      ],
+      max_tokens: 2000,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    return { success: false, error: `API error: ${response.status} - ${errorText}` };
+  }
+
+  const data = await response.json();
+  const transformedContent = data.choices?.[0]?.message?.content;
+
+  if (!transformedContent) {
+    return { success: false, error: 'No content in API response' };
+  }
+
+  return { success: true, content: transformedContent.trim() };
+}
+
 export async function transformContent(
   content: string,
   promptText: string,
   provider: ProviderConfig
 ): Promise<TransformResult> {
   try {
-    const response = await fetch(`${provider.base_url}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${provider.api_key}`,
-      },
-      body: JSON.stringify({
-        model: provider.model,
-        messages: [
-          { role: 'system', content: promptText },
-          { role: 'user', content: content },
-        ],
-        max_tokens: 2000,
-      }),
-    });
+    const providerType = getProviderType(provider.base_url);
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      return { success: false, error: `API error: ${response.status} - ${errorText}` };
+    switch (providerType) {
+      case 'gemini':
+        return await transformWithGemini(content, promptText, provider);
+      case 'mistral':
+        return await transformWithMistral(content, promptText, provider);
+      default:
+        return await transformWithOpenAICompatible(content, promptText, provider);
     }
-
-    const data = await response.json();
-    const transformedContent = data.choices?.[0]?.message?.content;
-
-    if (!transformedContent) {
-      return { success: false, error: 'No content in API response' };
-    }
-
-    return { success: true, content: transformedContent.trim() };
   } catch (error) {
     return { success: false, error: `Transform failed: ${(error as Error).message}` };
   }

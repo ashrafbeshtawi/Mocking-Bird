@@ -6,7 +6,6 @@ import { processCloudinaryMedia, validateMediaMix } from '@/lib/publish/validato
 import { fetchAllTokens, validateMissingAccounts, formatMissingAccounts, hasMissingAccounts } from '@/lib/publish/services/tokenService';
 import { createReportLogger, savePublishReport, determinePublishStatus } from '@/lib/publish/services/reportService';
 import { executePublishWithProgress, type ProgressCallback, type AccountProgressCallback, type AccountProgress } from '@/lib/publish/orchestrator';
-import { cleanupCloudinaryMedia } from '@/lib/services/cloudinaryService';
 
 const logger = createLogger('PublishStreamAPI');
 
@@ -193,20 +192,6 @@ export async function POST(req: NextRequest) {
         stepIndex: STEPS.FINALIZING.index,
         totalSteps: STEPS.FINALIZING.total
       });
-
-      // Clean up Cloudinary media after publishing completes
-      // By this point, all platforms have already fetched the media:
-      // - Instagram: container created and processed (waits for FINISHED status)
-      // - Facebook/Twitter: media uploaded during publish call
-      // - Telegram: URL sent and processed by Telegram servers
-      if (cloudinaryMedia.length > 0 && successful.length > 0) {
-        try {
-          await cleanupCloudinaryMedia(cloudinaryMedia);
-        } catch (err) {
-          // Log but don't fail the publish - media will be cleaned up eventually
-          logger.error('Failed to cleanup Cloudinary media', err);
-        }
-      }
 
       // Save to history
       const publishStatus = determinePublishStatus(successful, failed);
