@@ -55,20 +55,28 @@ export async function GET(req: NextRequest) {
     const totalPosts = parseInt(total_posts) || 0;
     const successRate = totalPosts > 0 ? (parseInt(success_count) / totalPosts) * 100 : 0;
 
-    // Most used platform (parse from publish_report)
+    // Most used platform (using publish_destinations JSONB column)
     const platformResult = await pool.query(
-      `SELECT publish_report FROM publish_history
-       WHERE user_id = $1 AND ${dateFilter} AND publish_report IS NOT NULL`,
+      `SELECT publish_destinations FROM publish_history
+       WHERE user_id = $1 AND ${dateFilter} AND publish_destinations IS NOT NULL`,
       [userId]
     );
 
     const platformCounts: PlatformVolume = { facebook: 0, twitter: 0, instagram: 0, telegram: 0 };
     for (const row of platformResult.rows) {
-      const report = row.publish_report?.toLowerCase() || '';
-      if (report.includes('facebook')) platformCounts.facebook++;
-      if (report.includes('twitter') || report.includes('x account')) platformCounts.twitter++;
-      if (report.includes('instagram')) platformCounts.instagram++;
-      if (report.includes('telegram')) platformCounts.telegram++;
+      const destinations = row.publish_destinations || [];
+      // Count unique platforms per publish (a single publish to multiple facebook pages counts once)
+      const platformsInPost = new Set<string>();
+      for (const dest of destinations) {
+        if (dest.platform) {
+          platformsInPost.add(dest.platform);
+        }
+      }
+      for (const platform of platformsInPost) {
+        if (platform in platformCounts) {
+          platformCounts[platform as keyof PlatformVolume]++;
+        }
+      }
     }
 
     const mostUsedPlatform = Object.entries(platformCounts)
@@ -117,36 +125,27 @@ export async function GET(req: NextRequest) {
     // Platform volume
     const platformVolume = { ...platformCounts };
 
-    // Platform reliability (success rate per platform)
+    // Platform reliability (success rate per platform using publish_destinations)
     const platformReliability: PlatformReliability = { facebook: 0, twitter: 0, instagram: 0, telegram: 0 };
     const platformTotal: PlatformVolume = { facebook: 0, twitter: 0, instagram: 0, telegram: 0 };
     const platformSuccess: PlatformVolume = { facebook: 0, twitter: 0, instagram: 0, telegram: 0 };
 
     const reliabilityResult = await pool.query(
-      `SELECT publish_report, publish_status FROM publish_history
-       WHERE user_id = $1 AND ${dateFilter} AND publish_report IS NOT NULL`,
+      `SELECT publish_destinations FROM publish_history
+       WHERE user_id = $1 AND ${dateFilter} AND publish_destinations IS NOT NULL`,
       [userId]
     );
 
     for (const row of reliabilityResult.rows) {
-      const report = row.publish_report?.toLowerCase() || '';
-      const isSuccess = row.publish_status === 'success';
-
-      if (report.includes('facebook')) {
-        platformTotal.facebook++;
-        if (isSuccess) platformSuccess.facebook++;
-      }
-      if (report.includes('twitter') || report.includes('x account')) {
-        platformTotal.twitter++;
-        if (isSuccess) platformSuccess.twitter++;
-      }
-      if (report.includes('instagram')) {
-        platformTotal.instagram++;
-        if (isSuccess) platformSuccess.instagram++;
-      }
-      if (report.includes('telegram')) {
-        platformTotal.telegram++;
-        if (isSuccess) platformSuccess.telegram++;
+      const destinations = row.publish_destinations || [];
+      for (const dest of destinations) {
+        const platform = dest.platform as keyof PlatformVolume;
+        if (platform && platform in platformTotal) {
+          platformTotal[platform]++;
+          if (dest.success) {
+            platformSuccess[platform]++;
+          }
+        }
       }
     }
 

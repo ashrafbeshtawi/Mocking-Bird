@@ -13,6 +13,109 @@ import { createLogger } from '@/lib/logger';
 const logger = createLogger('ReportService');
 
 /**
+ * Represents a publish destination for storage
+ */
+export interface PublishDestination {
+  platform: 'facebook' | 'twitter' | 'instagram' | 'telegram';
+  account_id: string;
+  account_name?: string;
+  post_type?: 'feed' | 'story';
+  success: boolean;
+}
+
+/**
+ * Normalizes platform name to standard format
+ */
+function normalizePlatform(platform: string): PublishDestination['platform'] {
+  const normalized = platform.toLowerCase();
+  if (normalized === 'x' || normalized === 'twitter') {
+    return 'twitter';
+  }
+  if (normalized === 'facebook' || normalized === 'instagram' || normalized === 'telegram') {
+    return normalized as PublishDestination['platform'];
+  }
+  // Default fallback - log unknown platforms
+  logger.warn(`Unknown platform: ${platform}`);
+  return 'facebook'; // fallback, shouldn't happen
+}
+
+/**
+ * Extracts account ID from a publish result based on platform
+ */
+function extractAccountId(result: SuccessfulPublishResult | FailedPublishResult): string {
+  // Try all possible account ID fields
+  return (
+    result.page_id ||
+    result.account_id ||
+    result.instagram_account_id ||
+    result.telegram_channel_id ||
+    ''
+  );
+}
+
+/**
+ * Extracts publish destinations from successful and failed results
+ */
+export function extractPublishDestinations(
+  successful: SuccessfulPublishResult[],
+  failed: FailedPublishResult[]
+): PublishDestination[] {
+  const destinations: PublishDestination[] = [];
+
+  logger.info(`Extracting destinations from ${successful.length} successful and ${failed.length} failed results`);
+
+  // Process successful results
+  for (const result of successful) {
+    const platform = normalizePlatform(result.platform);
+    const accountId = extractAccountId(result);
+
+    logger.info(`Processing successful result: platform=${result.platform}, normalized=${platform}, accountId=${accountId}`);
+
+    if (accountId) {
+      const destination: PublishDestination = {
+        platform,
+        account_id: accountId,
+        success: true
+      };
+
+      // Add post_type for Instagram
+      if (platform === 'instagram' && result.post_type) {
+        destination.post_type = result.post_type;
+      }
+
+      destinations.push(destination);
+    }
+  }
+
+  // Process failed results
+  for (const result of failed) {
+    const platform = normalizePlatform(result.platform);
+    const accountId = extractAccountId(result);
+
+    logger.info(`Processing failed result: platform=${result.platform}, normalized=${platform}, accountId=${accountId}`);
+
+    if (accountId) {
+      const destination: PublishDestination = {
+        platform,
+        account_id: accountId,
+        success: false
+      };
+
+      // Add post_type for Instagram
+      if (platform === 'instagram' && result.post_type) {
+        destination.post_type = result.post_type;
+      }
+
+      destinations.push(destination);
+    }
+  }
+
+  logger.info(`Extracted ${destinations.length} destinations: ${JSON.stringify(destinations)}`);
+
+  return destinations;
+}
+
+/**
  * Creates a report logger that accumulates messages
  */
 export function createReportLogger(): ReportLogger {
@@ -51,19 +154,22 @@ export async function savePublishReport(
   userId: string,
   content: string,
   report: string[],
-  status: PublishStatus
+  status: PublishStatus,
+  destinations: PublishDestination[] = []
 ): Promise<void> {
   const client = await pool.connect();
   try {
-    report.push(`Saving publish result to database`);
+    report.push(`Saving publish result to database with ${destinations.length} destinations`);
+    logger.info(`Saving publish report: userId=${userId}, status=${status}, destinations=${JSON.stringify(destinations)}`);
 
     await client.query(
-      'INSERT INTO publish_history (user_id, content, publish_report, publish_status) VALUES ($1, $2, $3, $4)',
+      'INSERT INTO publish_history (user_id, content, publish_report, publish_status, publish_destinations) VALUES ($1, $2, $3, $4, $5)',
       [
         parseInt(userId),
         content,
         report.join('\n'),
-        status
+        status,
+        JSON.stringify(destinations)
       ]
     );
 
@@ -114,7 +220,14 @@ export async function buildAndSaveResponse(
   const publishStatus = determinePublishStatus(successful, failed);
   report.push(`Overall publish status: ${publishStatus}`);
 
-  await savePublishReport(pool, userId, contentToStore, report, publishStatus);
+  // Log successful and failed arrays for debugging
+  logger.info(`buildAndSaveResponse: successful=${JSON.stringify(successful)}`);
+  logger.info(`buildAndSaveResponse: failed=${JSON.stringify(failed)}`);
+
+  // Extract destinations from successful and failed results
+  const destinations = extractPublishDestinations(successful, failed);
+
+  await savePublishReport(pool, userId, contentToStore, report, publishStatus, destinations);
 
   const responseData: PublishResponseData = {
     successful,

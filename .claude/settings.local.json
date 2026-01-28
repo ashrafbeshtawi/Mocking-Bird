@@ -25,7 +25,9 @@
       "Bash(psql:*)",
       "Bash(source .env)",
       "Bash(export DATABASE_STRING:*)",
-      "Skill(superpowers:finishing-a-development-branch)"
+      "Skill(superpowers:finishing-a-development-branch)",
+      "Bash(echo:*)",
+      "Bash(grep:*)"
     ]
   }
 }

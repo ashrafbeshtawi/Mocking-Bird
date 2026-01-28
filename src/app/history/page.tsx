@@ -47,14 +47,34 @@ import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
+import FacebookIcon from '@mui/icons-material/Facebook';
+import TwitterIcon from '@mui/icons-material/Twitter';
+import InstagramIcon from '@mui/icons-material/Instagram';
+import TelegramIcon from '@mui/icons-material/Telegram';
+
+interface PublishDestination {
+  platform: 'facebook' | 'twitter' | 'instagram' | 'telegram';
+  account_id: string;
+  account_name?: string;
+  post_type?: 'feed' | 'story';
+  success: boolean;
+}
 
 interface PublishHistoryItem {
   id: number;
   content: string;
   publish_status: 'success' | 'partial_success' | 'failed';
   publish_report?: string;
+  publish_destinations?: PublishDestination[];
   created_at: string;
 }
+
+const platformConfig = {
+  facebook: { icon: FacebookIcon, color: '#1877f2', label: 'Facebook' },
+  twitter: { icon: TwitterIcon, color: '#1da1f2', label: 'Twitter/X' },
+  instagram: { icon: InstagramIcon, color: '#E1306C', label: 'Instagram' },
+  telegram: { icon: TelegramIcon, color: '#0088cc', label: 'Telegram' },
+};
 
 interface PaginatedResponse {
   success: boolean;
@@ -145,15 +165,56 @@ function HistoryRow({
           <Typography
             variant="body2"
             sx={{
-              maxWidth: 350,
+              maxWidth: 300,
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
             }}
           >
-            {item.content.substring(0, 60) || 'No content'}
-            {item.content.length > 60 && '...'}
+            {item.content.substring(0, 50) || 'No content'}
+            {item.content.length > 50 && '...'}
           </Typography>
+        </TableCell>
+        <TableCell>
+          <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+            {item.publish_destinations && item.publish_destinations.length > 0 ? (
+              // Get unique platforms
+              [...new Set(item.publish_destinations.map(d => d.platform))].map((platform) => {
+                const config = platformConfig[platform];
+                if (!config) return null;
+                const PlatformIcon = config.icon;
+                const destinationsForPlatform = item.publish_destinations!.filter(d => d.platform === platform);
+                const allSuccess = destinationsForPlatform.every(d => d.success);
+                const someSuccess = destinationsForPlatform.some(d => d.success);
+                return (
+                  <Tooltip
+                    key={platform}
+                    title={`${config.label}: ${destinationsForPlatform.length} destination${destinationsForPlatform.length > 1 ? 's' : ''} (${allSuccess ? 'all success' : someSuccess ? 'partial' : 'failed'})`}
+                  >
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: 28,
+                        height: 28,
+                        borderRadius: 1,
+                        bgcolor: allSuccess ? `${config.color}15` : someSuccess ? '#f59e0b15' : '#ef444415',
+                        border: '1px solid',
+                        borderColor: allSuccess ? `${config.color}30` : someSuccess ? '#f59e0b30' : '#ef444430',
+                      }}
+                    >
+                      <PlatformIcon sx={{ fontSize: 16, color: allSuccess ? config.color : someSuccess ? '#f59e0b' : '#ef4444' }} />
+                    </Box>
+                  </Tooltip>
+                );
+              })
+            ) : (
+              <Typography variant="body2" color="text.disabled" sx={{ fontSize: '0.75rem' }}>
+                —
+              </Typography>
+            )}
+          </Box>
         </TableCell>
         <TableCell>
           <Chip
@@ -211,7 +272,7 @@ function HistoryRow({
         </TableCell>
       </TableRow>
       <TableRow>
-        <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={6}>
+        <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={7}>
           <Collapse in={isExpanded} timeout="auto" unmountOnExit>
             <Box sx={{ py: 2, px: 1 }}>
               <Typography variant="subtitle2" gutterBottom fontWeight={600}>
@@ -269,6 +330,12 @@ function LoadingSkeleton() {
           </TableCell>
           <TableCell>
             <Skeleton variant="text" width={200} />
+          </TableCell>
+          <TableCell>
+            <Box sx={{ display: 'flex', gap: 0.5 }}>
+              <Skeleton variant="rounded" width={28} height={28} />
+              <Skeleton variant="rounded" width={28} height={28} />
+            </Box>
           </TableCell>
           <TableCell>
             <Skeleton variant="rounded" width={80} height={24} />
@@ -679,6 +746,7 @@ export default function PublishHistoryPage() {
                   <TableCell padding="checkbox" />
                   <TableCell sx={{ fontWeight: 600 }}>Date</TableCell>
                   <TableCell sx={{ fontWeight: 600 }}>Content</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Platforms</TableCell>
                   <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
                   <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
                 </TableRow>
@@ -688,7 +756,7 @@ export default function PublishHistoryPage() {
               ) : history.length === 0 ? (
                 <TableBody>
                   <TableRow>
-                    <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
+                    <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
                       <ArticleIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 1 }} />
                       <Typography variant="h6" color="text.secondary" gutterBottom>
                         No publishing history yet

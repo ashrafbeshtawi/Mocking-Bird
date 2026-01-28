@@ -44,11 +44,10 @@ export async function GET(req: NextRequest) {
       paramIndex++;
     }
 
-    // Platform filter (search in publish_report)
+    // Platform filter (using publish_destinations JSONB column)
     if (platform && platform !== 'all') {
-      const platformSearch = platform === 'twitter' ? '(twitter|x account)' : platform;
-      whereClause += ` AND publish_report ~* $${paramIndex}`;
-      params.push(platformSearch);
+      whereClause += ` AND publish_destinations @> ANY(ARRAY[jsonb_build_object('platform', $${paramIndex}::text)])`;
+      params.push(platform);
       paramIndex++;
     }
 
@@ -61,7 +60,7 @@ export async function GET(req: NextRequest) {
 
     // Get paginated posts
     const postsResult = await pool.query(
-      `SELECT id, created_at, content, publish_status, publish_report
+      `SELECT id, created_at, content, publish_status, publish_report, publish_destinations
        FROM publish_history
        WHERE ${whereClause}
        ORDER BY created_at DESC

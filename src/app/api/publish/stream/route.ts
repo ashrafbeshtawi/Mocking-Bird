@@ -4,7 +4,7 @@ import { createLogger } from '@/lib/logger';
 import { validateUserId, validateTextContent, validateAccountArrays, parsePublishRequest } from '@/lib/publish/validators/requestValidator';
 import { processCloudinaryMedia, validateMediaMix } from '@/lib/publish/validators/mediaValidator';
 import { fetchAllTokens, validateMissingAccounts, formatMissingAccounts, hasMissingAccounts } from '@/lib/publish/services/tokenService';
-import { createReportLogger, savePublishReport, determinePublishStatus } from '@/lib/publish/services/reportService';
+import { createReportLogger, savePublishReport, determinePublishStatus, extractPublishDestinations } from '@/lib/publish/services/reportService';
 import { executePublishWithProgress, type ProgressCallback, type AccountProgressCallback, type AccountProgress } from '@/lib/publish/orchestrator';
 
 const logger = createLogger('PublishStreamAPI');
@@ -195,7 +195,8 @@ export async function POST(req: NextRequest) {
 
       // Save to history
       const publishStatus = determinePublishStatus(successful, failed);
-      await savePublishReport(pool, userId, contentToStore, reportLogger.getReport(), publishStatus);
+      const destinations = extractPublishDestinations(successful, failed);
+      await savePublishReport(pool, userId, contentToStore, reportLogger.getReport(), publishStatus, destinations);
 
       // Send final result
       await sendEvent('complete', {

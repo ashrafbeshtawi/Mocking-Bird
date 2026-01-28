@@ -126,8 +126,8 @@ export async function GET(req: NextRequest) {
         }
 
         const { rows } = await client.query(
-          `SELECT id, content, publish_status, created_at, publish_report 
-           FROM publish_history 
+          `SELECT id, content, publish_status, created_at, publish_report, publish_destinations
+           FROM publish_history
            WHERE id = $1 AND user_id = $2`,
           [parsedReportId, parsedUserId]
         );
@@ -167,10 +167,10 @@ export async function GET(req: NextRequest) {
         }
 
         if (platformFilter) {
-          // Filter by platform - check if publish_report text contains the platform name
-          // The report contains log lines like "[timestamp] Publishing to Facebook..."
-          queryParams.push(`%${platformFilter}%`);
-          whereClause += ` AND LOWER(publish_report) LIKE LOWER($${queryParams.length})`;
+          // Filter by platform using the JSONB publish_destinations column
+          // Check if any destination in the array has the matching platform
+          queryParams.push(platformFilter);
+          whereClause += ` AND publish_destinations @> ANY(ARRAY[jsonb_build_object('platform', $${queryParams.length}::text)])`;
         }
 
         // Count total records for pagination metadata
@@ -181,9 +181,9 @@ export async function GET(req: NextRequest) {
         const total = countRows[0]?.total || 0;
         const totalPages = Math.ceil(total / safeLimit);
 
-        // Fetch paginated history with publish_report for expandable rows
+        // Fetch paginated history with publish_report and publish_destinations for expandable rows
         const { rows: history } = await client.query(
-          `SELECT id, content, publish_status, publish_report, created_at
+          `SELECT id, content, publish_status, publish_report, publish_destinations, created_at
            FROM publish_history
            ${whereClause}
            ORDER BY created_at DESC
