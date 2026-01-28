@@ -24,10 +24,13 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // Check for session token
+  // Check for session token - Auth.js v5 uses different cookie names
   const token = await getToken({
     req: request,
     secret: process.env.NEXTAUTH_SECRET,
+    cookieName: process.env.NODE_ENV === "production"
+      ? "__Secure-authjs.session-token"
+      : "authjs.session-token",
   })
 
   // Redirect to auth if not logged in
