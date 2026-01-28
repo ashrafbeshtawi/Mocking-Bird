@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import pool from '@/lib/db';
 import type { TimeRange, AnalyticsResponse, PlatformVolume, PlatformReliability } from '@/types/analytics';
 import { getAuthUserId } from '@/lib/api-auth';
+import { createLogger } from '@/lib/logger';
+
+const logger = createLogger('Analytics');
 
 function getDateFilter(range: TimeRange): string {
   switch (range) {
@@ -167,7 +170,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(response);
   } catch (error) {
-    console.error('Analytics API error:', error);
+    logger.error('Failed to fetch analytics', error);
     return NextResponse.json({ error: 'Failed to fetch analytics' }, { status: 500 });
   }
 }

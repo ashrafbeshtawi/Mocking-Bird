@@ -3,6 +3,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import pool from '@/lib/db';
 import { getAuthUserId } from '@/lib/api-auth';
+import { createLogger } from '@/lib/logger';
+
+const logger = createLogger('PublishHistory');
 
 export async function DELETE(req: Request) {
   try {
@@ -10,13 +13,13 @@ export async function DELETE(req: Request) {
     const userId = await getAuthUserId();
 
     if (!userId) {
-      console.error('[DeletePublishHistory API Error] User ID not found in session.');
+      logger.error('User ID not found in session');
       return NextResponse.json({ error: 'Authentication required: User ID not provided.' }, { status: 401 });
     }
 
     const parsedUserId = parseInt(userId, 10);
     if (isNaN(parsedUserId)) {
-      console.error(`[DeletePublishHistory API Error] Invalid user ID format: ${userId}`);
+      logger.error('Invalid user ID format', { userId });
       return NextResponse.json({ error: 'Invalid user ID format.' }, { status: 400 });
     }
 
@@ -50,7 +53,7 @@ export async function DELETE(req: Request) {
 
     // 3. Connect to database and delete
     const client = await pool.connect();
-    console.log(`Deleting ${reportIds.length} report(s) for user ${parsedUserId}: [${reportIds.join(', ')}]`);
+    logger.info('Deleting reports', { count: reportIds.length, userId: parsedUserId, reportIds });
 
     try {
       // First verify all reports belong to this user
@@ -74,7 +77,7 @@ export async function DELETE(req: Request) {
       );
 
       const deletedCount = foundIds.length;
-      console.log(`${deletedCount} report(s) deleted successfully.`);
+      logger.info('Reports deleted', { count: deletedCount });
 
       return NextResponse.json({
         success: true,
@@ -87,7 +90,7 @@ export async function DELETE(req: Request) {
       client.release();
     }
   } catch (error) {
-    console.error('[DeletePublishHistory API Error]', error);
+    logger.error('Delete operation failed', error);
     return NextResponse.json({ error: 'Internal Server Error.' }, { status: 500 });
   }
 }
@@ -99,14 +102,14 @@ export async function GET(req: NextRequest) {
 
     // Safeguard check for userId
     if (!userId) {
-      console.error('[GetPublishHistory API Error] User ID not found in session.');
+      logger.error('User ID not found in session');
       return NextResponse.json({ error: 'Authentication required: User ID not provided.' }, { status: 401 });
     }
 
     // 2. Ensure userId is a valid integer
     const parsedUserId = parseInt(userId, 10);
     if (isNaN(parsedUserId)) {
-      console.error(`[GetPublishHistory API Error] Invalid user ID format in header: ${userId}`);
+      logger.error('Invalid user ID format', { userId });
       return NextResponse.json({ error: 'Invalid user ID format.' }, { status: 400 });
     }
 
@@ -116,7 +119,7 @@ export async function GET(req: NextRequest) {
 
     // 4. Connect to the database
     const client = await pool.connect();
-    console.log(`Connected to database for user ${parsedUserId} to retrieve publish history.`);
+    logger.info('Retrieving publish history', { userId: parsedUserId });
 
     try {
       if (reportId) {
@@ -206,7 +209,7 @@ export async function GET(req: NextRequest) {
       client.release(); // Always release the client back to the pool
     }
   } catch (error) {
-    console.error('[GetPublishHistory API Error]', error);
+    logger.error('Get operation failed', error);
     return NextResponse.json({ error: 'Internal Server Error.' }, { status: 500 });
   }
 }
