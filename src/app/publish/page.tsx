@@ -28,11 +28,8 @@ import {
 import SendIcon from '@mui/icons-material/Send';
 import ScheduleSendIcon from '@mui/icons-material/ScheduleSend';
 import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
-import FacebookIcon from '@mui/icons-material/Facebook';
-import InstagramIcon from '@mui/icons-material/Instagram';
-import XIcon from '@mui/icons-material/X';
-import TelegramIcon from '@mui/icons-material/Telegram';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import { getPlatformConfig } from '@/lib/platformConfig';
 import ErrorIcon from '@mui/icons-material/Error';
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
@@ -81,19 +78,10 @@ export default function PublishPage() {
 
   // Platform icon mapping
   const getPlatformIcon = (platform: string) => {
-    switch (platform) {
-      case 'Facebook':
-        return <FacebookIcon sx={{ color: '#1877f2' }} />;
-      case 'Instagram':
-      case 'Instagram Story':
-        return <InstagramIcon sx={{ color: '#E1306C' }} />;
-      case 'X':
-        return <XIcon sx={{ color: '#000000' }} />;
-      case 'Telegram':
-        return <TelegramIcon sx={{ color: '#0088cc' }} />;
-      default:
-        return null;
-    }
+    const config = getPlatformConfig(platform);
+    if (!config) return null;
+    const Icon = config.icon;
+    return <Icon sx={{ color: config.color }} />;
   };
 
   // Status icon mapping
@@ -937,16 +925,6 @@ export default function PublishPage() {
           ) : (
             <List sx={{ py: 0 }}>
               {transformResults.map((result, index) => {
-                const getPlatformIcon = (platform: string) => {
-                  switch (platform) {
-                    case 'facebook': return <FacebookIcon sx={{ color: '#1877f2' }} />;
-                    case 'instagram': return <InstagramIcon sx={{ color: '#E1306C' }} />;
-                    case 'twitter': return <XIcon sx={{ color: '#000000' }} />;
-                    case 'telegram': return <TelegramIcon sx={{ color: '#0088cc' }} />;
-                    default: return null;
-                  }
-                };
-
                 return (
                   <Paper
                     key={`${result.platform}-${result.account_id}`}

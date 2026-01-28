@@ -15,13 +15,8 @@ import {
   Tooltip,
   Chip,
 } from '@mui/material';
-import {
-  Delete as DeleteIcon,
-  Facebook as FacebookIcon,
-  Instagram as InstagramIcon,
-  Twitter as TwitterIcon,
-  Telegram as TelegramIcon,
-} from '@mui/icons-material';
+import { Delete as DeleteIcon } from '@mui/icons-material';
+import { PLATFORM_CONFIG } from '@/lib/platformConfig';
 import type { AccountData, Platform } from '@/types/accounts';
 import { useAiPrompts } from '@/hooks/useAiPrompts';
 import { usePromptMatching } from '@/hooks/usePromptMatching';
@@ -36,28 +31,6 @@ interface AccountsTableProps {
   showPromptSelector?: boolean;
 }
 
-const platformConfig: Record<Platform, { label: string; icon: typeof FacebookIcon; color: string }> = {
-  facebook: {
-    label: 'Facebook',
-    icon: FacebookIcon,
-    color: '#1877f2',
-  },
-  instagram: {
-    label: 'Instagram',
-    icon: InstagramIcon,
-    color: '#E1306C',
-  },
-  twitter: {
-    label: 'X',
-    icon: TwitterIcon,
-    color: '#000',
-  },
-  telegram: {
-    label: 'Telegram',
-    icon: TelegramIcon,
-    color: '#0088cc',
-  },
-};
 
 export function AccountsTable({
   title,
@@ -112,7 +85,7 @@ export function AccountsTable({
             </TableHead>
             <TableBody>
               {data.map((account) => {
-                const config = platformConfig[account.platform];
+                const config = PLATFORM_CONFIG[account.platform];
                 const PlatformIcon = config.icon;
 
                 return (

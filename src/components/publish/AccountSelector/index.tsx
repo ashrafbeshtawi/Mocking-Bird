@@ -13,11 +13,8 @@ import {
   ListItemSecondaryAction,
   Tooltip,
 } from '@mui/material';
-import FacebookIcon from '@mui/icons-material/Facebook';
-import InstagramIcon from '@mui/icons-material/Instagram';
-import XIcon from '@mui/icons-material/X';
-import TelegramIcon from '@mui/icons-material/Telegram';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
+import { PLATFORM_CONFIG } from '@/lib/platformConfig';
 import type {
   ConnectedPage,
   ConnectedXAccount,
@@ -50,12 +47,6 @@ interface AccountSelectorProps {
   aiEnabledAccounts?: AiEnabledAccounts;
 }
 
-const PLATFORM_CONFIG = {
-  facebook: { icon: FacebookIcon, color: '#1877f2', label: 'Facebook' },
-  instagram: { icon: InstagramIcon, color: '#E1306C', label: 'Instagram' },
-  x: { icon: XIcon, color: '#000000', label: 'X' },
-  telegram: { icon: TelegramIcon, color: '#0088cc', label: 'Telegram' },
-};
 
 export function AccountSelector({
   facebookPages,
@@ -158,7 +149,7 @@ export function AccountSelector({
 
         {/* X Accounts */}
         {xAccounts.map((account) => {
-          const config = PLATFORM_CONFIG.x;
+          const config = PLATFORM_CONFIG.twitter;
           const Icon = config.icon;
           const isSelected = selectedXAccounts.includes(account.id);
           const hasAi = aiEnabledAccounts?.twitter?.includes(account.id);
