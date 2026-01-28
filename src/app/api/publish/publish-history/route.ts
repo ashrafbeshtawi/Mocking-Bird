@@ -156,6 +156,29 @@ export async function GET(req: NextRequest) {
         const validPlatforms = ['facebook', 'twitter', 'instagram', 'telegram'];
         const platformFilter = platform && validPlatforms.includes(platform) ? platform : null;
 
+        // Cursor-based pagination (preferred for large datasets)
+        const cursor = searchParams.get('cursor');
+        const useCursorMode = cursor !== null; // cursor param exists (even if empty for first page)
+        let cursorData: { created_at: string; id: number } | null = null;
+
+        if (cursor && cursor !== '') {
+          // Validate cursor size to prevent DoS via large base64 strings
+          if (cursor.length > 500) {
+            return NextResponse.json({ error: 'Invalid cursor format.' }, { status: 400 });
+          }
+          try {
+            const decoded = Buffer.from(cursor, 'base64').toString('utf-8');
+            const parsed = JSON.parse(decoded);
+            // Validate cursor structure has required fields
+            if (!parsed.created_at || typeof parsed.id !== 'number') {
+              return NextResponse.json({ error: 'Invalid cursor format.' }, { status: 400 });
+            }
+            cursorData = parsed;
+          } catch {
+            return NextResponse.json({ error: 'Invalid cursor format.' }, { status: 400 });
+          }
+        }
+
         // Prevent invalid inputs
         const safePage = page > 0 ? page : 1;
         const safeLimit = limit > 0 && limit <= 100 ? limit : 10; // cap to 100 max
@@ -177,33 +200,90 @@ export async function GET(req: NextRequest) {
           whereClause += ` AND publish_destinations @> ANY(ARRAY[jsonb_build_object('platform', $${queryParams.length}::text)])`;
         }
 
-        // Count total records for pagination metadata
-        const { rows: countRows } = await client.query(
-          `SELECT COUNT(*)::int AS total FROM publish_history ${whereClause}`,
-          queryParams
-        );
-        const total = countRows[0]?.total || 0;
-        const totalPages = Math.ceil(total / safeLimit);
+        // Fetch paginated history
+        let history: Array<{
+          id: number;
+          content: string;
+          publish_status: string;
+          publish_report: unknown;
+          publish_destinations: unknown;
+          created_at: string;
+        }>;
 
-        // Fetch paginated history with publish_report and publish_destinations for expandable rows
-        const { rows: history } = await client.query(
-          `SELECT id, content, publish_status, publish_report, publish_destinations, created_at
-           FROM publish_history
-           ${whereClause}
-           ORDER BY created_at DESC
-           LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}`,
-          [...queryParams, safeLimit, offset]
-        );
+        if (useCursorMode) {
+          // Cursor-based pagination: O(1) performance for large datasets
+          let historyQuery: string;
+          let historyParams: (number | string)[];
 
-        // Return paginated response
-        return NextResponse.json({
-          success: true,
-          page: safePage,
-          limit: safeLimit,
-          total,
-          totalPages,
-          history,
-        });
+          if (cursorData) {
+            // Fetch items after the cursor position
+            const cursorWhereClause = whereClause +
+              ` AND (created_at < $${queryParams.length + 1} OR (created_at = $${queryParams.length + 1} AND id < $${queryParams.length + 2}))`;
+
+            historyQuery = `SELECT id, content, publish_status, publish_report, publish_destinations, created_at
+               FROM publish_history
+               ${cursorWhereClause}
+               ORDER BY created_at DESC, id DESC
+               LIMIT $${queryParams.length + 3}`;
+            historyParams = [...queryParams, cursorData.created_at, cursorData.id, safeLimit + 1];
+          } else {
+            // First page of cursor-based pagination (no cursor yet)
+            historyQuery = `SELECT id, content, publish_status, publish_report, publish_destinations, created_at
+               FROM publish_history
+               ${whereClause}
+               ORDER BY created_at DESC, id DESC
+               LIMIT $${queryParams.length + 1}`;
+            historyParams = [...queryParams, safeLimit + 1];
+          }
+
+          const { rows } = await client.query(historyQuery, historyParams);
+          history = rows;
+
+          // Cursor-based response
+          const hasMore = history.length > safeLimit;
+          const items = hasMore ? history.slice(0, -1) : history;
+          const lastItem = items[items.length - 1];
+          const nextCursor = hasMore && lastItem
+            ? Buffer.from(JSON.stringify({ created_at: lastItem.created_at, id: lastItem.id })).toString('base64')
+            : null;
+
+          return NextResponse.json({
+            success: true,
+            history: items,
+            nextCursor,
+            hasMore,
+          });
+        } else {
+          // Offset-based pagination (backward compatible)
+          // Count total records for pagination metadata
+          const { rows: countRows } = await client.query(
+            `SELECT COUNT(*)::int AS total FROM publish_history ${whereClause}`,
+            queryParams
+          );
+          const total = countRows[0]?.total || 0;
+          const totalPages = Math.ceil(total / safeLimit);
+
+          // Fetch paginated history with publish_report and publish_destinations for expandable rows
+          const { rows } = await client.query(
+            `SELECT id, content, publish_status, publish_report, publish_destinations, created_at
+             FROM publish_history
+             ${whereClause}
+             ORDER BY created_at DESC
+             LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}`,
+            [...queryParams, safeLimit, offset]
+          );
+          history = rows;
+
+          // Return paginated response (backward compatible format)
+          return NextResponse.json({
+            success: true,
+            page: safePage,
+            limit: safeLimit,
+            total,
+            totalPages,
+            history,
+          });
+        }
       }
     } finally {
       client.release(); // Always release the client back to the pool
