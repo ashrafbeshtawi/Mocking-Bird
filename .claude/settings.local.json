@@ -30,7 +30,13 @@
       "Bash(grep:*)",
       "Bash(/opt/homebrew/bin/psql:*)",
       "Bash(npm test:*)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(git -C /Users/ashraf.beshtawi/Desktop/Mocking-Bird add:*)",
+      "Bash(git -C /Users/ashraf.beshtawi/Desktop/Mocking-Bird commit -m \"$\\(cat <<''EOF''\nperf\\(hooks\\): memoize normalizedAccounts in useConnectedAccounts\n\nPrevents unnecessary array recreation on every render.\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git -C /Users/ashraf.beshtawi/Desktop/Mocking-Bird status)",
+      "Bash(git -C /Users/ashraf.beshtawi/Desktop/Mocking-Bird diff)",
+      "Bash(git -C /Users/ashraf.beshtawi/Desktop/Mocking-Bird log --oneline -5)",
+      "Bash(git -C /Users/ashraf.beshtawi/Desktop/Mocking-Bird commit -m \"$\\(cat <<''EOF''\nrefactor\\(api\\): migrate console.* to createLogger\n\nStandardizes logging in analytics and publish-history routes\nusing the shared logger utility for consistent formatting.\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
     ]
   }
 }
