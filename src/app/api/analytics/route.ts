@@ -56,29 +56,25 @@ export async function GET(req: NextRequest) {
     const totalPosts = parseInt(total_posts) || 0;
     const successRate = totalPosts > 0 ? (parseInt(success_count) / totalPosts) * 100 : 0;
 
-    // Most used platform (using publish_destinations JSONB column)
+    // Most used platform - aggregate in SQL using JSONB functions
     const platformResult = await pool.query(
-      `SELECT publish_destinations FROM publish_history
-       WHERE user_id = $1 AND ${dateFilter} AND publish_destinations IS NOT NULL`,
+      `WITH platform_posts AS (
+        SELECT DISTINCT ON (ph.id, d->>'platform')
+          d->>'platform' as platform
+        FROM publish_history ph,
+             jsonb_array_elements(publish_destinations) as d
+        WHERE user_id = $1 AND ${dateFilter} AND publish_destinations IS NOT NULL
+      )
+      SELECT
+        COALESCE(SUM(CASE WHEN platform = 'facebook' THEN 1 ELSE 0 END), 0)::int as facebook,
+        COALESCE(SUM(CASE WHEN platform = 'twitter' THEN 1 ELSE 0 END), 0)::int as twitter,
+        COALESCE(SUM(CASE WHEN platform = 'instagram' THEN 1 ELSE 0 END), 0)::int as instagram,
+        COALESCE(SUM(CASE WHEN platform = 'telegram' THEN 1 ELSE 0 END), 0)::int as telegram
+      FROM platform_posts`,
       [userId]
     );
 
-    const platformCounts: PlatformVolume = { facebook: 0, twitter: 0, instagram: 0, telegram: 0 };
-    for (const row of platformResult.rows) {
-      const destinations = row.publish_destinations || [];
-      // Count unique platforms per publish (a single publish to multiple facebook pages counts once)
-      const platformsInPost = new Set<string>();
-      for (const dest of destinations) {
-        if (dest.platform) {
-          platformsInPost.add(dest.platform);
-        }
-      }
-      for (const platform of platformsInPost) {
-        if (platform in platformCounts) {
-          platformCounts[platform as keyof PlatformVolume]++;
-        }
-      }
-    }
+    const platformCounts: PlatformVolume = platformResult.rows[0] || { facebook: 0, twitter: 0, instagram: 0, telegram: 0 };
 
     const mostUsedPlatform = Object.entries(platformCounts)
       .sort(([, a], [, b]) => b - a)[0];
@@ -126,35 +122,34 @@ export async function GET(req: NextRequest) {
     // Platform volume
     const platformVolume = { ...platformCounts };
 
-    // Platform reliability (success rate per platform using publish_destinations)
-    const platformReliability: PlatformReliability = { facebook: 0, twitter: 0, instagram: 0, telegram: 0 };
-    const platformTotal: PlatformVolume = { facebook: 0, twitter: 0, instagram: 0, telegram: 0 };
-    const platformSuccess: PlatformVolume = { facebook: 0, twitter: 0, instagram: 0, telegram: 0 };
-
+    // Platform reliability - aggregate success rates in SQL
     const reliabilityResult = await pool.query(
-      `SELECT publish_destinations FROM publish_history
-       WHERE user_id = $1 AND ${dateFilter} AND publish_destinations IS NOT NULL`,
+      `WITH destination_stats AS (
+        SELECT
+          d->>'platform' as platform,
+          (d->>'success')::boolean as success
+        FROM publish_history ph,
+             jsonb_array_elements(publish_destinations) as d
+        WHERE user_id = $1 AND ${dateFilter} AND publish_destinations IS NOT NULL
+      )
+      SELECT
+        platform,
+        COUNT(*) as total,
+        COUNT(*) FILTER (WHERE success = true) as success_count
+      FROM destination_stats
+      WHERE platform IN ('facebook', 'twitter', 'instagram', 'telegram')
+      GROUP BY platform`,
       [userId]
     );
 
+    const platformReliability: PlatformReliability = { facebook: 0, twitter: 0, instagram: 0, telegram: 0 };
     for (const row of reliabilityResult.rows) {
-      const destinations = row.publish_destinations || [];
-      for (const dest of destinations) {
-        const platform = dest.platform as keyof PlatformVolume;
-        if (platform && platform in platformTotal) {
-          platformTotal[platform]++;
-          if (dest.success) {
-            platformSuccess[platform]++;
-          }
-        }
+      const platform = row.platform as keyof PlatformReliability;
+      if (platform in platformReliability) {
+        platformReliability[platform] = row.total > 0
+          ? (parseInt(row.success_count) / parseInt(row.total)) * 100
+          : 0;
       }
-    }
-
-    const platforms: (keyof PlatformReliability)[] = ['facebook', 'twitter', 'instagram', 'telegram'];
-    for (const platform of platforms) {
-      platformReliability[platform] = platformTotal[platform] > 0
-        ? (platformSuccess[platform] / platformTotal[platform]) * 100
-        : 0;
     }
 
     const response: AnalyticsResponse = {
