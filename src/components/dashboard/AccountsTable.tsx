@@ -19,7 +19,7 @@ import { Delete as DeleteIcon } from '@mui/icons-material';
 import { PLATFORM_CONFIG } from '@/lib/platformConfig';
 import type { AccountData, Platform } from '@/types/accounts';
 import { useAiPrompts } from '@/hooks/useAiPrompts';
-import { usePromptMatching } from '@/hooks/usePromptMatching';
+import { useAllPromptMatchings } from '@/hooks/useAllPromptMatchings';
 import { PromptSelector } from '@/components/ai';
 
 interface AccountsTableProps {
@@ -41,17 +41,26 @@ export function AccountsTable({
   showPromptSelector = false,
 }: AccountsTableProps) {
   const { prompts, loading: promptsLoading } = useAiPrompts();
-  const facebookMatching = usePromptMatching('facebook');
-  const twitterMatching = usePromptMatching('twitter');
-  const instagramMatching = usePromptMatching('instagram');
-  const telegramMatching = usePromptMatching('telegram');
+  const { matchings, loading: matchingsLoading, refetch: refetchMatchings } = useAllPromptMatchings();
 
-  const getMatchingHook = (platform: Platform) => {
-    switch (platform) {
-      case 'facebook': return facebookMatching;
-      case 'twitter': return twitterMatching;
-      case 'instagram': return instagramMatching;
-      case 'telegram': return telegramMatching;
+  const getMatchingForAccount = (platform: Platform, accountId: string) => {
+    const platformMatchings = matchings[platform];
+    return platformMatchings.find((m) => String(m.account_id) === String(accountId));
+  };
+
+  const setMatching = async (platform: Platform, accountId: string, promptId: number | null) => {
+    try {
+      const response = await fetch(`/api/ai/prompt-matching/${platform}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ account_id: accountId, prompt_id: promptId }),
+      });
+      if (response.ok) {
+        refetchMatchings();
+      }
+    } catch (err) {
+      console.error('Failed to set matching:', err);
     }
   };
 
@@ -114,9 +123,9 @@ export function AccountsTable({
                       <TableCell>
                         <PromptSelector
                           prompts={prompts}
-                          selectedPromptId={getMatchingHook(account.platform).getMatchingForAccount(account.id)?.prompt_id || null}
-                          onChange={(promptId) => getMatchingHook(account.platform).setMatching(account.id, promptId)}
-                          loading={promptsLoading}
+                          selectedPromptId={getMatchingForAccount(account.platform, account.id)?.prompt_id || null}
+                          onChange={(promptId) => setMatching(account.platform, account.id, promptId)}
+                          loading={promptsLoading || matchingsLoading}
                           size="small"
                         />
                       </TableCell>
