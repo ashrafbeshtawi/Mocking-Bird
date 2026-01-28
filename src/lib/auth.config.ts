@@ -5,6 +5,7 @@ import Discord from "next-auth/providers/discord"
 
 // Edge-compatible config (no Node.js-only imports like pg adapter)
 export const authConfig: NextAuthConfig = {
+  trustHost: true,
   session: { strategy: "jwt" },
   providers: [
     Google({
@@ -36,31 +37,6 @@ export const authConfig: NextAuthConfig = {
         session.user.id = token.userId as string
       }
       return session
-    },
-    authorized({ auth, request: { nextUrl } }) {
-      const isLoggedIn = !!auth?.user
-      const isAuthPage = nextUrl.pathname === "/auth"
-      const isPublicPath = ["/", "/about", "/privacy", "/error", "/terms"].some(
-        path => nextUrl.pathname === path || nextUrl.pathname.startsWith(path + "/")
-      )
-      const isAuthApi = nextUrl.pathname.startsWith("/api/auth")
-
-      // Allow auth API routes
-      if (isAuthApi) return true
-
-      // Allow public paths
-      if (isPublicPath) return true
-
-      // Redirect logged-in users away from auth page
-      if (isAuthPage && isLoggedIn) {
-        return Response.redirect(new URL("/dashboard", nextUrl))
-      }
-
-      // Allow auth page for non-logged-in users
-      if (isAuthPage) return true
-
-      // Require login for everything else
-      return isLoggedIn
     },
   },
 }
