@@ -195,3 +195,31 @@ export async function transformContent(
     return { success: false, error: `Transform failed: ${(error as Error).message}` };
   }
 }
+
+/**
+ * Transform content for a specific destination (platform + account).
+ * Returns the transformed text or null if no prompt is configured.
+ */
+export async function transformForDestination(
+  userId: number,
+  platform: 'facebook' | 'twitter' | 'instagram' | 'telegram',
+  accountId: string,
+  content: string
+): Promise<string | null> {
+  // Get the prompt config for this destination
+  const config = await getPromptForDestination(userId, platform, accountId);
+
+  if (!config) {
+    // No AI prompt configured for this destination
+    return null;
+  }
+
+  // Transform the content
+  const result = await transformContent(content, config.prompt.prompt, config.provider);
+
+  if (!result.success) {
+    throw new Error(result.error || 'Transformation failed');
+  }
+
+  return result.content || null;
+}
