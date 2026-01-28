@@ -447,8 +447,8 @@ export default function AiPage() {
                         },
                       }}
                     >
-                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, minWidth: 0, flex: 1 }}>
                           <Box
                             sx={{
                               width: 40,
@@ -458,23 +458,34 @@ export default function AiPage() {
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
+                              flexShrink: 0,
                             }}
                           >
                             <SettingsIcon sx={{ color: '#E1306C', fontSize: 20 }} />
                           </Box>
-                          <Box>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <Typography variant="subtitle1" fontWeight={600}>
+                          <Box sx={{ minWidth: 0, flex: 1 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                              <Typography variant="subtitle1" fontWeight={600} noWrap>
                                 {provider.name}
                               </Typography>
                               <Chip label={provider.model} size="small" sx={{ height: 22, fontSize: '0.7rem' }} />
                             </Box>
-                            <Typography variant="caption" color="text.secondary">
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              sx={{
+                                display: 'block',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                                maxWidth: '100%',
+                              }}
+                            >
                               {provider.base_url}
                             </Typography>
                           </Box>
                         </Box>
-                        <Box>
+                        <Box sx={{ flexShrink: 0, display: 'flex' }}>
                           <Tooltip title="Edit">
                             <IconButton size="small" onClick={() => handleOpenProviderDialog(provider)}>
                               <EditIcon fontSize="small" />
