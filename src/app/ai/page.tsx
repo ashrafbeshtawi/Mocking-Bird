@@ -37,6 +37,7 @@ import ChatIcon from '@mui/icons-material/Chat';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import ScienceIcon from '@mui/icons-material/Science';
 import { useAiProviders } from '@/hooks/useAiProviders';
 import { useAiPrompts } from '@/hooks/useAiPrompts';
 import { COMMON_BASE_URLS } from '@/types/ai';
@@ -79,6 +80,13 @@ export default function AiPage() {
   const [isSavingPrompt, setIsSavingPrompt] = useState(false);
   const [confirmDeletePrompt, setConfirmDeletePrompt] = useState<{ open: boolean; prompt: AiPrompt | null }>({ open: false, prompt: null });
   const [promptError, setPromptError] = useState<string | null>(null);
+
+  // Test prompt state
+  const [testPromptDialog, setTestPromptDialog] = useState<{ open: boolean; prompt: AiPrompt | null }>({ open: false, prompt: null });
+  const [testInput, setTestInput] = useState('');
+  const [testOutput, setTestOutput] = useState('');
+  const [isTestingPrompt, setIsTestingPrompt] = useState(false);
+  const [testPromptError, setTestPromptError] = useState<string | null>(null);
 
   // Provider handlers
   const handleOpenProviderDialog = (provider?: AiProvider) => {
@@ -234,6 +242,52 @@ export default function AiPage() {
       setPromptError((err as Error).message);
     } finally {
       setConfirmDeletePrompt({ open: false, prompt: null });
+    }
+  };
+
+  // Test prompt handlers
+  const handleOpenTestPromptDialog = (prompt: AiPrompt) => {
+    setTestPromptDialog({ open: true, prompt });
+    setTestInput('');
+    setTestOutput('');
+    setTestPromptError(null);
+  };
+
+  const handleCloseTestPromptDialog = () => {
+    setTestPromptDialog({ open: false, prompt: null });
+    setTestInput('');
+    setTestOutput('');
+    setTestPromptError(null);
+  };
+
+  const handleTestPrompt = async () => {
+    if (!testPromptDialog.prompt || !testInput.trim()) return;
+
+    setIsTestingPrompt(true);
+    setTestPromptError(null);
+    setTestOutput('');
+
+    try {
+      const response = await fetchWithAuth('/api/ai/prompts/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt_id: testPromptDialog.prompt.id,
+          input: testInput.trim(),
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to test prompt');
+      }
+
+      setTestOutput(data.result);
+    } catch (err) {
+      setTestPromptError((err as Error).message);
+    } finally {
+      setIsTestingPrompt(false);
     }
   };
 
@@ -569,6 +623,18 @@ export default function AiPage() {
                           </Box>
                         </Box>
                         <Box sx={{ flexShrink: 0 }}>
+                          <Tooltip title={prompt.provider_id ? "Test Prompt" : "No provider - cannot test"}>
+                            <span>
+                              <IconButton
+                                size="small"
+                                onClick={() => handleOpenTestPromptDialog(prompt)}
+                                disabled={!prompt.provider_id}
+                                sx={{ color: prompt.provider_id ? '#10b981' : undefined }}
+                              >
+                                <ScienceIcon fontSize="small" />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
                           <Tooltip title="Edit">
                             <IconButton size="small" onClick={() => handleOpenPromptDialog(prompt)}>
                               <EditIcon fontSize="small" />
@@ -845,6 +911,99 @@ export default function AiPage() {
           </Button>
           <Button onClick={handleDeletePrompt} variant="contained" sx={{ borderRadius: 2, textTransform: 'none', bgcolor: '#ef4444', '&:hover': { bgcolor: '#dc2626' } }}>
             Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Test Prompt Dialog */}
+      <Dialog
+        open={testPromptDialog.open}
+        onClose={handleCloseTestPromptDialog}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 3 } }}
+      >
+        <DialogTitle sx={{ pb: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Box
+              sx={{
+                width: 40,
+                height: 40,
+                borderRadius: 2,
+                bgcolor: '#10b98115',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <ScienceIcon sx={{ color: '#10b981' }} />
+            </Box>
+            <Box>
+              <Typography variant="h6" fontWeight={600}>
+                Test Prompt
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {testPromptDialog.prompt?.title}
+              </Typography>
+            </Box>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ mb: 2, p: 2, bgcolor: 'grey.50', borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+              Prompt Template:
+            </Typography>
+            <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+              {testPromptDialog.prompt?.prompt}
+            </Typography>
+          </Box>
+
+          <TextField
+            label="Your Input"
+            fullWidth
+            multiline
+            rows={4}
+            variant="outlined"
+            value={testInput}
+            onChange={(e) => setTestInput(e.target.value)}
+            placeholder="Enter the content you want to transform with this prompt..."
+            sx={{ mb: 2 }}
+          />
+
+          {testPromptError && (
+            <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
+              {testPromptError}
+            </Alert>
+          )}
+
+          {testOutput && (
+            <Box sx={{ p: 2, bgcolor: '#10b98110', borderRadius: 2, border: '1px solid', borderColor: '#10b98130' }}>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                AI Output:
+              </Typography>
+              <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                {testOutput}
+              </Typography>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 3 }}>
+          <Button onClick={handleCloseTestPromptDialog} sx={{ borderRadius: 2, textTransform: 'none' }}>
+            Close
+          </Button>
+          <Button
+            onClick={handleTestPrompt}
+            variant="contained"
+            disabled={isTestingPrompt || !testInput.trim()}
+            startIcon={isTestingPrompt ? <CircularProgress size={18} color="inherit" /> : <PlayArrowIcon />}
+            sx={{
+              borderRadius: 2,
+              textTransform: 'none',
+              bgcolor: '#10b981',
+              '&:hover': { bgcolor: '#059669' },
+            }}
+          >
+            {isTestingPrompt ? 'Testing...' : 'Run Test'}
           </Button>
         </DialogActions>
       </Dialog>
