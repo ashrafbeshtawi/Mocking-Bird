@@ -1,21 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import pool from '@/lib/db';
+import { getAuthUserId } from '@/lib/api-auth';
 
-// Utility to get and validate user ID from headers
-const getUserId = (req: NextRequest): number | null => {
-  const userId = req.headers.get('x-user-id');
+// Utility to get and validate user ID from session
+const getUserId = async (): Promise<number | null> => {
+  const userId = await getAuthUserId();
   const parsedUserId = userId ? parseInt(userId, 10) : null;
   return parsedUserId && !isNaN(parsedUserId) ? parsedUserId : null;
 };
 
 // GET: Read all prompts for a user, or a single prompt by ID
 export async function GET(req: NextRequest) {
-  const userId = getUserId(req);
+  const userId = await getUserId();
   if (!userId) {
     return NextResponse.json({ error: 'Authentication required: User ID not provided.' }, { status: 401 });
   }
 
-  const { searchParams } = new URL(req.url);
+  const { searchParams } = req.nextUrl;
   const promptId = searchParams.get('id');
 
   try {
@@ -54,8 +55,8 @@ export async function GET(req: NextRequest) {
 }
 
 // POST: Create a new prompt
-export async function POST(req: NextRequest) {
-  const userId = getUserId(req);
+export async function POST(req: Request) {
+  const userId = await getUserId();
   if (!userId) {
     return NextResponse.json({ error: 'Authentication required: User ID not provided.' }, { status: 401 });
   }
@@ -83,8 +84,8 @@ export async function POST(req: NextRequest) {
 }
 
 // PUT: Update an existing prompt
-export async function PUT(req: NextRequest) {
-  const userId = getUserId(req);
+export async function PUT(req: Request) {
+  const userId = await getUserId();
   if (!userId) {
     return NextResponse.json({ error: 'Authentication required: User ID not provided.' }, { status: 401 });
   }
@@ -117,8 +118,8 @@ export async function PUT(req: NextRequest) {
 }
 
 // DELETE: Delete a prompt
-export async function DELETE(req: NextRequest) {
-  const userId = getUserId(req);
+export async function DELETE(req: Request) {
+  const userId = await getUserId();
   if (!userId) {
     return NextResponse.json({ error: 'Authentication required: User ID not provided.' }, { status: 401 });
   }

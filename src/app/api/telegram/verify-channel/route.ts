@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import pool from '@/lib/db';
 import { TelegramPublisher } from '@/lib/publishers/telegram';
 import crypto from 'crypto';
+import { getAuthUserId } from '@/lib/api-auth';
 
 // Store pending verifications in memory (in production, use Redis or database)
 const pendingVerifications = new Map<string, {
@@ -29,9 +30,9 @@ function cleanupExpired() {
 /**
  * POST: Start verification process - generates a code for the user to post
  */
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
   try {
-    const userId = req.headers.get('x-user-id');
+    const userId = await getAuthUserId();
     if (!userId) {
       return NextResponse.json(
         { error: 'Authentication required' },
@@ -112,9 +113,9 @@ export async function POST(req: NextRequest) {
 /**
  * PUT: Check if verification code was posted in channel, then connect
  */
-export async function PUT(req: NextRequest) {
+export async function PUT(req: Request) {
   try {
-    const userId = req.headers.get('x-user-id');
+    const userId = await getAuthUserId();
     if (!userId) {
       return NextResponse.json(
         { error: 'Authentication required' },

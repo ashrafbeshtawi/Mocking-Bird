@@ -40,9 +40,11 @@ export async function middleware(request: NextRequest) {
   }
 
   // For API routes, add user ID header
-  if (pathname.startsWith("/api/") && token.userId) {
+  // Check both userId (custom) and sub (default NextAuth user ID)
+  const userId = token.userId || token.sub
+  if (pathname.startsWith("/api/") && userId) {
     const requestHeaders = new Headers(request.headers)
-    requestHeaders.set("x-user-id", String(token.userId))
+    requestHeaders.set("x-user-id", String(userId))
     return NextResponse.next({
       request: { headers: requestHeaders },
     })

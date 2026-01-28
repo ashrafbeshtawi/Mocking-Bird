@@ -1,9 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import pool from '@/lib/db';
+import { auth } from '@/lib/auth';
 
 
-export async function GET(req: NextRequest) {
-  const userId = req.headers.get('x-user-id');
+export async function GET() {
+  const session = await auth();
+  const userId = session?.user?.id;
 
   if (!userId) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 });

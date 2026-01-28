@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
+import { getAuthUserId } from '@/lib/api-auth';
 
 // Helper to detect provider type from base_url
 function getProviderType(baseUrl: string): 'gemini' | 'mistral' | 'openai-compatible' {
@@ -133,8 +134,8 @@ async function testOpenAICompatibleConnection(apiKey: string, baseUrl: string, m
 }
 
 // POST: Test a provider connection
-export async function POST(req: NextRequest) {
-  const userId = req.headers.get('x-user-id');
+export async function POST(req: Request) {
+  const userId = await getAuthUserId();
   if (!userId) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
   }

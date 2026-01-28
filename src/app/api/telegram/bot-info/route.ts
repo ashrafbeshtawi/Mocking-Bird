@@ -1,10 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import pool from '@/lib/db';
 import { TelegramPublisher } from '@/lib/publishers/telegram';
+import { getAuthUserId } from '@/lib/api-auth';
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
-    const userId = req.headers.get('x-user-id');
+    const userId = await getAuthUserId();
     if (!userId) {
       return NextResponse.json(
         { error: 'Authentication required' },

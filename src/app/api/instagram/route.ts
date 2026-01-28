@@ -1,8 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import pool from '@/lib/db';
+import { getAuthUserId } from '@/lib/api-auth';
+
 // GET /api/instagram - Get all connected Instagram accounts for the current user
-export async function GET(req: NextRequest) {
-  const userId = req.headers.get('x-user-id');
+export async function GET() {
+  const userId = await getAuthUserId();
 
   if (!userId) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
@@ -51,8 +53,8 @@ export async function GET(req: NextRequest) {
 }
 
 // DELETE /api/instagram - Disconnect an Instagram account
-export async function DELETE(req: NextRequest) {
-  const userId = req.headers.get('x-user-id');
+export async function DELETE(req: Request) {
+  const userId = await getAuthUserId();
 
   if (!userId) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 });

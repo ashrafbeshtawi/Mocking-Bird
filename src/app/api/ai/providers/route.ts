@@ -1,15 +1,16 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import pool from '@/lib/db';
+import { getAuthUserId } from '@/lib/api-auth';
 
-const getUserId = (req: NextRequest): number | null => {
-  const userId = req.headers.get('x-user-id');
+const getUserId = async (): Promise<number | null> => {
+  const userId = await getAuthUserId();
   const parsedUserId = userId ? parseInt(userId, 10) : null;
   return parsedUserId && !isNaN(parsedUserId) ? parsedUserId : null;
 };
 
 // GET: List all providers for user (without api_key)
-export async function GET(req: NextRequest) {
-  const userId = getUserId(req);
+export async function GET() {
+  const userId = await getUserId();
   if (!userId) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
   }
@@ -33,8 +34,8 @@ export async function GET(req: NextRequest) {
 }
 
 // POST: Create a new provider
-export async function POST(req: NextRequest) {
-  const userId = getUserId(req);
+export async function POST(req: Request) {
+  const userId = await getUserId();
   if (!userId) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
   }
@@ -63,8 +64,8 @@ export async function POST(req: NextRequest) {
 }
 
 // PUT: Update an existing provider
-export async function PUT(req: NextRequest) {
-  const userId = getUserId(req);
+export async function PUT(req: Request) {
+  const userId = await getUserId();
   if (!userId) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
   }
@@ -127,8 +128,8 @@ export async function PUT(req: NextRequest) {
 }
 
 // DELETE: Remove a provider
-export async function DELETE(req: NextRequest) {
-  const userId = getUserId(req);
+export async function DELETE(req: Request) {
+  const userId = await getUserId();
   if (!userId) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
   }

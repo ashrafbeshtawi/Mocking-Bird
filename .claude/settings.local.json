@@ -28,7 +28,9 @@
       "Skill(superpowers:finishing-a-development-branch)",
       "Bash(echo:*)",
       "Bash(grep:*)",
-      "Bash(/opt/homebrew/bin/psql:*)"
+      "Bash(/opt/homebrew/bin/psql:*)",
+      "Bash(npm test:*)",
+      "Bash(npm run:*)"
     ]
   }
 }

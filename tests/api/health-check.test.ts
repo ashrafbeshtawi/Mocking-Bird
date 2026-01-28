@@ -1,14 +1,23 @@
 import { GET } from '../../src/app/api/health-check/route';
-import { NextRequest } from 'next/server';
+
+// Mock the auth module
+jest.mock('../../src/lib/api-auth', () => ({
+  getAuthUserId: jest.fn(),
+}));
+
+import { getAuthUserId } from '../../src/lib/api-auth';
+
+const mockGetAuthUserId = getAuthUserId as jest.MockedFunction<typeof getAuthUserId>;
 
 describe('Health Check API', () => {
-  it('should return a 200 status, loggedIn: false, and null userId for an unauthenticated user', async () => {
-    const request = {
-      url: 'http://localhost:3000/api/health-check',
-      headers: new Headers(),
-    } as unknown as NextRequest;
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
-    const response = await GET(request);
+  it('should return a 200 status, loggedIn: false, and null userId for an unauthenticated user', async () => {
+    mockGetAuthUserId.mockResolvedValue(null);
+
+    const response = await GET();
 
     expect(response.status).toBe(200);
     const data = await response.json();
@@ -16,12 +25,9 @@ describe('Health Check API', () => {
   });
 
   it('should return a 200 status, loggedIn: true, and user ID for an authenticated user', async () => {
-    const request = {
-      url: 'http://localhost:3000/api/health-check',
-      headers: new Headers({ 'x-user-id': 'test-user-id' }),
-    } as unknown as NextRequest;
+    mockGetAuthUserId.mockResolvedValue('test-user-id');
 
-    const response = await GET(request);
+    const response = await GET();
 
     expect(response.status).toBe(200);
     const data = await response.json();

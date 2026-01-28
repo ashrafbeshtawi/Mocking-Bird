@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import pool from '@/lib/db';
 import type { TimeRange, AnalyticsResponse, PlatformVolume, PlatformReliability } from '@/types/analytics';
+import { getAuthUserId } from '@/lib/api-auth';
 
 function getDateFilter(range: TimeRange): string {
   switch (range) {
@@ -29,7 +30,7 @@ function getGroupByInterval(range: TimeRange): string {
 }
 
 export async function GET(req: NextRequest) {
-  const userId = req.headers.get('x-user-id');
+  const userId = await getAuthUserId();
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

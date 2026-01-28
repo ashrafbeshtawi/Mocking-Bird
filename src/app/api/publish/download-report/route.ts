@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import pool from '@/lib/db';
+import { getAuthUserId } from '@/lib/api-auth';
 
 
 export async function GET(req: NextRequest) {
   try {
-    const userId = req.headers.get('x-user-id');
+    const userId = await getAuthUserId();
     if (!userId) {
-      console.error('[DownloadReport API Error] User ID not found in headers.');
+      console.error('[DownloadReport API Error] User ID not found in session.');
       return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
     }
 
-    const { searchParams } = new URL(req.url);
+    const { searchParams } = req.nextUrl;
     const historyId = searchParams.get('id');
 
     if (!historyId) {

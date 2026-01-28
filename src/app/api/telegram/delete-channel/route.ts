@@ -1,9 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import pool from '@/lib/db';
+import { getAuthUserId } from '@/lib/api-auth';
 
-export async function DELETE(req: NextRequest) {
+export async function DELETE(req: Request) {
   try {
-    const userId = req.headers.get('x-user-id');
+    const userId = await getAuthUserId();
     if (!userId) {
       return NextResponse.json(
         { error: 'Authentication required' },

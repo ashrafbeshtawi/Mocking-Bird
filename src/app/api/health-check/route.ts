@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
+import { getAuthUserId } from '@/lib/api-auth';
 
-export async function GET(req: Request) {
-  const userId = req.headers.get('x-user-id');
+export async function GET() {
+  const userId = await getAuthUserId();
 
   if (userId) {
     return NextResponse.json({ status: 'ok', loggedIn: true, userId: userId }, { status: 200 });

@@ -31,13 +31,16 @@ export const authConfig: NextAuthConfig = {
   callbacks: {
     jwt({ token, user }) {
       if (user) {
+        // Store user ID in both userId and sub for compatibility
         token.userId = user.id
+        token.sub = user.id
       }
       return token
     },
     session({ session, token }) {
-      if (session.user && token.userId) {
-        session.user.id = token.userId as string
+      if (session.user) {
+        // Use userId or fall back to sub
+        session.user.id = (token.userId || token.sub) as string
       }
       return session
     },

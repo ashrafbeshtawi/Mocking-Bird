@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import pool from '@/lib/db';
+import { getAuthUserId } from '@/lib/api-auth';
 
 type Platform = 'facebook' | 'twitter' | 'instagram' | 'telegram';
 
@@ -30,18 +31,18 @@ const PLATFORM_CONFIG: Record<Platform, { table: string; accountIdColumn: string
   },
 };
 
-const getUserId = (req: NextRequest): number | null => {
-  const userId = req.headers.get('x-user-id');
+const getUserId = async (): Promise<number | null> => {
+  const userId = await getAuthUserId();
   const parsedUserId = userId ? parseInt(userId, 10) : null;
   return parsedUserId && !isNaN(parsedUserId) ? parsedUserId : null;
 };
 
 // GET: Get all prompt matchings for a platform
 export async function GET(
-  req: NextRequest,
+  _req: Request,
   { params }: { params: Promise<{ platform: string }> }
 ) {
-  const userId = getUserId(req);
+  const userId = await getUserId();
   if (!userId) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
   }
@@ -74,10 +75,10 @@ export async function GET(
 
 // POST: Set/update a prompt matching for an account
 export async function POST(
-  req: NextRequest,
+  req: Request,
   { params }: { params: Promise<{ platform: string }> }
 ) {
-  const userId = getUserId(req);
+  const userId = await getUserId();
   if (!userId) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
   }
@@ -128,10 +129,10 @@ export async function POST(
 
 // DELETE: Remove a prompt matching
 export async function DELETE(
-  req: NextRequest,
+  req: Request,
   { params }: { params: Promise<{ platform: string }> }
 ) {
-  const userId = getUserId(req);
+  const userId = await getUserId();
   if (!userId) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
   }

@@ -1,7 +1,8 @@
 // app/api/save-page/route.ts
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import pool from '@/lib/db';
+import { getAuthUserId } from '@/lib/api-auth';
 
 // Define the expected structure of the request body
 type RequestBody = {
@@ -19,12 +20,12 @@ interface PagesResponse {
   data: Page[];
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
   try {
-    const userId = req.headers.get('x-user-id');
+    const userId = await getAuthUserId();
 
     if (!userId) {
-      console.error('[SavePage API Error] User ID not found in headers.');
+      console.error('[SavePage API Error] User ID not found in session.');
       return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
     }
 

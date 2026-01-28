@@ -1,25 +1,26 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import pool from '@/lib/db';
 import { createLogger } from '@/lib/logger';
-import { validateUserId, validateTextContent, validateAccountArrays, parsePublishRequest } from '@/lib/publish/validators/requestValidator';
+import { validateTextContent, validateAccountArrays, parsePublishRequest } from '@/lib/publish/validators/requestValidator';
 import { processCloudinaryMedia, validateMediaMix } from '@/lib/publish/validators/mediaValidator';
 import { fetchAllTokens, validateMissingAccounts, formatMissingAccounts, hasMissingAccounts } from '@/lib/publish/services/tokenService';
 import { createReportLogger, buildAndSaveResponse, buildErrorResponse } from '@/lib/publish/services/reportService';
 import { executePublish } from '@/lib/publish/orchestrator';
+import { getAuthUserId } from '@/lib/api-auth';
 
 const logger = createLogger('PublishAPI');
 
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
   const requestId = Math.random().toString(36).substring(2, 11);
   const reportLogger = createReportLogger();
 
   reportLogger.add(`Starting new publish request [${requestId}]`);
 
   // 1. Validate user ID
-  const userId = validateUserId(req.headers);
+  const userId = await getAuthUserId();
   if (!userId) {
-    reportLogger.add(`ERROR: User ID not found in headers`);
-    return NextResponse.json({ error: 'User ID not found in headers' }, { status: 401 });
+    reportLogger.add(`ERROR: User ID not found in session`);
+    return NextResponse.json({ error: 'User ID not found in session' }, { status: 401 });
   }
 
   reportLogger.add(`Processing request for user: ${userId}`);
@@ -226,7 +227,7 @@ export async function POST(req: NextRequest) {
     logger.error(`Request processing failed`, err);
     return await buildAndSaveResponse({
       pool,
-      userId: req.headers.get('x-user-id') || 'unknown',
+      userId: userId || 'unknown',
       report: reportLogger.getReport(),
       contentToStore: '',
       successful: [],

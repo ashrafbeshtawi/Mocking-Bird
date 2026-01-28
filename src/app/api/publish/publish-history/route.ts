@@ -2,14 +2,15 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import pool from '@/lib/db';
+import { getAuthUserId } from '@/lib/api-auth';
 
-export async function DELETE(req: NextRequest) {
+export async function DELETE(req: Request) {
   try {
-    // 1. Get user_id from the custom 'x-user-id' header set by the middleware
-    const userId = req.headers.get('x-user-id');
+    // 1. Get user_id from the session
+    const userId = await getAuthUserId();
 
     if (!userId) {
-      console.error('[DeletePublishHistory API Error] User ID not found in headers.');
+      console.error('[DeletePublishHistory API Error] User ID not found in session.');
       return NextResponse.json({ error: 'Authentication required: User ID not provided.' }, { status: 401 });
     }
 
@@ -93,12 +94,12 @@ export async function DELETE(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   try {
-    // 1. Get user_id from the custom 'x-user-id' header set by the middleware
-    const userId = req.headers.get('x-user-id');
+    // 1. Get user_id from the session
+    const userId = await getAuthUserId();
 
     // Safeguard check for userId
     if (!userId) {
-      console.error('[GetPublishHistory API Error] User ID not found in headers. Middleware might be missing or failed.');
+      console.error('[GetPublishHistory API Error] User ID not found in session.');
       return NextResponse.json({ error: 'Authentication required: User ID not provided.' }, { status: 401 });
     }
 
