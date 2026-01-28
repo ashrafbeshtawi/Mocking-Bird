@@ -1,105 +1,87 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { SessionProvider, useSession, signOut } from 'next-auth/react';
 import { useRouter, usePathname } from 'next/navigation';
+import { useEffect, createContext, useContext } from 'react';
+
+// Public routes that don't require authentication
+const PUBLIC_ROUTES = ['/', '/about', '/auth', '/privacy', '/error', '/terms'];
 
 interface AuthContextType {
   isLoggedIn: boolean;
   isLoading: boolean;
-  userId: string | number | null;
-  checkAuth: () => Promise<void>;
+  user: {
+    id?: string;
+    name?: string | null;
+    email?: string | null;
+    image?: string | null;
+  } | null;
+  userId: string | null;
   logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const PUBLIC_ROUTES = ['/', '/about', '/login', '/register', '/privacy', '/error'];
-
-export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [userId, setUserId] = useState<string | number | null>(null);
+// Inner component that uses useSession
+function AuthProviderInner({ children }: { children: React.ReactNode }) {
+  const { data: session, status } = useSession();
   const router = useRouter();
   const pathname = usePathname();
 
-  // Check authentication status via API
-  const checkAuth = useCallback(async () => {
-    try {
-      const response = await fetch('/api/auth/check', {
-        method: 'GET',
-        credentials: 'include', // Important: send cookies
-      });
-
-      const data = await response.json();
-
-      if (data.authenticated) {
-        setIsLoggedIn(true);
-        setUserId(data.userId);
-      } else {
-        setIsLoggedIn(false);
-        setUserId(null);
-      }
-    } catch (error) {
-      console.error('Auth check failed:', error);
-      setIsLoggedIn(false);
-      setUserId(null);
-    }
-  }, []);
-
-  // Logout function
-  const logout = useCallback(async () => {
-    try {
-      await fetch('/api/logout', {
-        method: 'POST',
-        credentials: 'include',
-      });
-    } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
-      setIsLoggedIn(false);
-      setUserId(null);
-      router.push('/login');
-    }
-  }, [router]);
-
-  // Check auth on mount and pathname change
-  useEffect(() => {
-    const performAuthCheck = async () => {
-      setIsLoading(true);
-      await checkAuth();
-      setIsLoading(false);
-    };
-
-    performAuthCheck();
-  }, [checkAuth]);
+  const isLoading = status === 'loading';
+  const isLoggedIn = !!session;
 
   // Redirect unauthenticated users from protected routes
   useEffect(() => {
     if (isLoading) return;
 
-    const isPublicRoute = PUBLIC_ROUTES.includes(pathname);
+    const isPublicRoute = PUBLIC_ROUTES.some(
+      route => pathname === route || pathname.startsWith(route + '/')
+    );
 
     if (!isLoggedIn && !isPublicRoute) {
-      router.push('/login');
+      router.push('/auth');
     }
   }, [isLoggedIn, isLoading, pathname, router]);
 
-  // Show nothing while loading (or could show a spinner)
+  const logout = async () => {
+    await signOut({ callbackUrl: '/auth' });
+  };
+
+  const value: AuthContextType = {
+    isLoggedIn,
+    isLoading,
+    user: session?.user ?? null,
+    userId: session?.user?.id ?? null,
+    logout,
+  };
+
+  // Show nothing while loading (prevents flash)
   if (isLoading) {
     return null;
   }
 
   return (
-    <AuthContext.Provider value={{ isLoggedIn, isLoading, userId, checkAuth, logout }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
-};
+}
 
-export const useAuth = () => {
+// Main provider that wraps with SessionProvider
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  return (
+    <SessionProvider>
+      <AuthProviderInner>{children}</AuthProviderInner>
+    </SessionProvider>
+  );
+}
+
+// Hook to access auth context
+export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {
     throw new Error('useAuth must be used within AuthProvider');
   }
   return context;
-};
+}

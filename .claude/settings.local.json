@@ -27,7 +27,8 @@
       "Bash(export DATABASE_STRING:*)",
       "Skill(superpowers:finishing-a-development-branch)",
       "Bash(echo:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(/opt/homebrew/bin/psql:*)"
     ]
   }
 }

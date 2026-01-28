@@ -25,7 +25,7 @@ export function useAnalytics(range: TimeRange): UseAnalyticsReturn {
 
       if (!response.ok) {
         if (response.status === 401) {
-          window.location.href = '/login';
+          window.location.href = '/auth';
           return;
         }
         const errorData = await response.json();

@@ -2,19 +2,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
 import pool from '@/lib/db';
-import { verifyAuthToken } from '@/lib/auth-utils';
+import { auth } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
   try {
     const url = new URL(req.url);
     const code = url.searchParams.get('code');
-    const jwt = req.cookies.get('temp_jwt')?.value;
 
-    if (!code || !jwt) {
-      return NextResponse.json({ error: 'Missing code or JWT' }, { status: 400 });
+    if (!code) {
+      return NextResponse.json({ error: 'Missing authorization code' }, { status: 400 });
     }
 
-    const userId = await verifyAuthToken(jwt);
+    // Get user ID from NextAuth session
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const userId = session.user.id;
+
     console.log('OAuth2 code received:', code, 'for user:', userId);
 
     const codeVerifier = req.cookies.get('twitter_pkce_verifier')?.value;

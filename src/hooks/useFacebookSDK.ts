@@ -111,7 +111,7 @@ export async function initiateTwitterAuth(): Promise<void> {
   });
 
   if (response.status === 401) {
-    window.location.href = '/login';
+    window.location.href = '/auth';
     throw new Error('Unauthorized');
   }
 

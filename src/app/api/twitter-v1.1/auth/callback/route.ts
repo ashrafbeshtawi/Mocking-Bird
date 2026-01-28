@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { oauth } from '@/lib/twitter-auth/twitter-client';
-import { verifyAuthToken } from '@/lib/auth-utils';
+import { auth } from '@/lib/auth';
 import pool from '@/lib/db';
 
 
@@ -9,17 +9,20 @@ export async function GET(req: NextRequest) {
   const oauthToken = searchParams.get('oauth_token');
   const oauthVerifier = searchParams.get('oauth_verifier');
 
-  
+
   // Retrieve the oauth_token_secret you stored earlier
   const oauthTokenSecret = req.cookies.get('twitter_oauth_secret')?.value;
-  const tempJwt = req.cookies.get('temp_jwt')?.value;
 
-
-
-  if (!oauthToken || !oauthVerifier || !oauthTokenSecret || !tempJwt) {
-    return NextResponse.redirect(new URL('/error?statusCode=500&message=Missing parameters (oauth_token, oauth_verifier, oauth_token_secret, temp_jwt)', req.url));
+  if (!oauthToken || !oauthVerifier || !oauthTokenSecret) {
+    return NextResponse.redirect(new URL('/error?statusCode=500&message=Missing parameters (oauth_token, oauth_verifier, oauth_token_secret)', req.url));
   }
-   const userId = await verifyAuthToken(tempJwt);
+
+  // Get user ID from NextAuth session
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.redirect(new URL('/error?statusCode=401&message=Unauthorized', req.url));
+  }
+  const userId = session.user.id;
 
   const requestData = {
     url: 'https://api.twitter.com/oauth/access_token',
@@ -46,7 +49,7 @@ export async function GET(req: NextRequest) {
 
     const text = await response.text();
     const params = new URLSearchParams(text);
-    
+
     const accessToken = params.get('oauth_token');
     const accessTokenSecret = params.get('oauth_token_secret');
     const xUserId = params.get('user_id'); // Renamed to avoid conflict with app userId

@@ -405,7 +405,7 @@ export default function PublishHistoryPage() {
 
       if (!response.ok) {
         if (response.status === 401) {
-          window.location.href = '/login';
+          window.location.href = '/auth';
           return;
         }
         const errorData = await response.json();
