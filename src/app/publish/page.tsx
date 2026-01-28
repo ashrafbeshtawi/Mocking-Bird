@@ -463,18 +463,34 @@ export default function PublishPage() {
     telegram: aiMatchings.telegram.filter(m => m.provider_name).map(m => m.account_id),
   }), [aiMatchings]);
 
-  // Check if any selected account has AI transformation
+  // Precompute account lookup maps to avoid O(n) finds in getSelectedAiDestinations
+  const accountMaps = useMemo(() => ({
+    facebook: new Map(facebookPages.map(p => [p.page_id, p])),
+    twitter: new Map(xAccounts.map(a => [a.id, a])),
+    instagram: new Map(instagramAccounts.map(a => [a.id, a])),
+    telegram: new Map(telegramChannels.map(c => [c.channel_id, c])),
+  }), [facebookPages, xAccounts, instagramAccounts, telegramChannels]);
+
+  // Precompute AI-enabled sets for O(1) lookups
+  const aiEnabledSets = useMemo(() => ({
+    facebook: new Set(aiEnabledAccounts.facebook),
+    twitter: new Set(aiEnabledAccounts.twitter),
+    instagram: new Set(aiEnabledAccounts.instagram),
+    telegram: new Set(aiEnabledAccounts.telegram),
+  }), [aiEnabledAccounts]);
+
+  // Check if any selected account has AI transformation - O(n) with Set lookups
   const hasSelectedAiAccount = useMemo(() => {
-    const hasFacebookAi = selectedFacebookPages.some(id => aiEnabledAccounts.facebook.includes(id));
-    const hasTwitterAi = selectedXAccounts.some(id => aiEnabledAccounts.twitter.includes(id));
+    const hasFacebookAi = selectedFacebookPages.some(id => aiEnabledSets.facebook.has(id));
+    const hasTwitterAi = selectedXAccounts.some(id => aiEnabledSets.twitter.has(id));
     const hasInstagramAi = Object.entries(selectedInstagramAccounts)
       .filter(([, s]) => s.publish || s.story)
-      .some(([id]) => aiEnabledAccounts.instagram.includes(id));
-    const hasTelegramAi = selectedTelegramChannels.some(id => aiEnabledAccounts.telegram.includes(id));
+      .some(([id]) => aiEnabledSets.instagram.has(id));
+    const hasTelegramAi = selectedTelegramChannels.some(id => aiEnabledSets.telegram.has(id));
     return hasFacebookAi || hasTwitterAi || hasInstagramAi || hasTelegramAi;
-  }, [selectedFacebookPages, selectedXAccounts, selectedInstagramAccounts, selectedTelegramChannels, aiEnabledAccounts]);
+  }, [selectedFacebookPages, selectedXAccounts, selectedInstagramAccounts, selectedTelegramChannels, aiEnabledSets]);
 
-  // Get selected AI destinations for transformation
+  // Get selected AI destinations for transformation - O(n) instead of O(n²)
   const getSelectedAiDestinations = useCallback(() => {
     const destinations: Array<{
       platform: 'facebook' | 'twitter' | 'instagram' | 'telegram';
@@ -482,50 +498,48 @@ export default function PublishPage() {
       account_name: string;
     }> = [];
 
-    // Facebook
-    selectedFacebookPages.forEach(id => {
-      if (aiEnabledAccounts.facebook.includes(id)) {
-        const page = facebookPages.find(p => p.page_id === id);
+    // Facebook - O(n) with Set and Map lookups
+    for (const id of selectedFacebookPages) {
+      if (aiEnabledSets.facebook.has(id)) {
+        const page = accountMaps.facebook.get(id);
         if (page) {
           destinations.push({ platform: 'facebook', account_id: id, account_name: page.page_name });
         }
       }
-    });
+    }
 
     // Twitter/X
-    selectedXAccounts.forEach(id => {
-      if (aiEnabledAccounts.twitter.includes(id)) {
-        const account = xAccounts.find(a => a.id === id);
+    for (const id of selectedXAccounts) {
+      if (aiEnabledSets.twitter.has(id)) {
+        const account = accountMaps.twitter.get(id);
         if (account) {
           destinations.push({ platform: 'twitter', account_id: id, account_name: `@${account.name}` });
         }
       }
-    });
+    }
 
     // Instagram
-    Object.entries(selectedInstagramAccounts)
-      .filter(([, s]) => s.publish || s.story)
-      .forEach(([id]) => {
-        if (aiEnabledAccounts.instagram.includes(id)) {
-          const account = instagramAccounts.find(a => a.id === id);
-          if (account) {
-            destinations.push({ platform: 'instagram', account_id: id, account_name: `@${account.username}` });
-          }
+    for (const [id, selection] of Object.entries(selectedInstagramAccounts)) {
+      if ((selection.publish || selection.story) && aiEnabledSets.instagram.has(id)) {
+        const account = accountMaps.instagram.get(id);
+        if (account) {
+          destinations.push({ platform: 'instagram', account_id: id, account_name: `@${account.username}` });
         }
-      });
+      }
+    }
 
     // Telegram
-    selectedTelegramChannels.forEach(id => {
-      if (aiEnabledAccounts.telegram.includes(id)) {
-        const channel = telegramChannels.find(c => c.channel_id === id);
+    for (const id of selectedTelegramChannels) {
+      if (aiEnabledSets.telegram.has(id)) {
+        const channel = accountMaps.telegram.get(id);
         if (channel) {
           destinations.push({ platform: 'telegram', account_id: id, account_name: channel.channel_title });
         }
       }
-    });
+    }
 
     return destinations;
-  }, [selectedFacebookPages, selectedXAccounts, selectedInstagramAccounts, selectedTelegramChannels, aiEnabledAccounts, facebookPages, xAccounts, instagramAccounts, telegramChannels]);
+  }, [selectedFacebookPages, selectedXAccounts, selectedInstagramAccounts, selectedTelegramChannels, aiEnabledSets, accountMaps]);
 
   // Computed values
   const charCount = postText.length;
