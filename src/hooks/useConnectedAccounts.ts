@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { fetchWithAuth } from '@/lib/fetch';
 import type {
   ConnectedPage,
@@ -93,8 +93,8 @@ export function useConnectedAccounts(): UseConnectedAccountsReturn {
     fetchAllAccounts();
   }, [fetchAllAccounts]);
 
-  // Normalize accounts for dashboard display
-  const normalizedAccounts = {
+  // Normalize accounts for dashboard display - memoized to prevent re-creation on every render
+  const normalizedAccounts = useMemo(() => ({
     facebook: facebookPages.map((p) => ({
       id: p.page_id,
       name: p.page_name,
@@ -116,7 +116,7 @@ export function useConnectedAccounts(): UseConnectedAccountsReturn {
       details: c.channel_username ? `@${c.channel_username}` : undefined,
       platform: 'telegram' as const,
     })),
-  };
+  }), [facebookPages, instagramAccounts, xAccounts, telegramChannels]);
 
   return {
     facebookPages,
