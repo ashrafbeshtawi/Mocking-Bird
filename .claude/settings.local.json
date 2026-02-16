@@ -37,7 +37,10 @@
       "Bash(git -C /Users/ashraf.beshtawi/Desktop/Mocking-Bird diff)",
       "Bash(git -C /Users/ashraf.beshtawi/Desktop/Mocking-Bird log --oneline -5)",
       "Bash(git -C /Users/ashraf.beshtawi/Desktop/Mocking-Bird commit -m \"$\\(cat <<''EOF''\nrefactor\\(api\\): migrate console.* to createLogger\n\nStandardizes logging in analytics and publish-history routes\nusing the shared logger utility for consistent formatting.\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(git -C /Users/ashraf.beshtawi/Desktop/Mocking-Bird log --oneline -20)",
+      "Bash(find:*)",
+      "Bash(git -C /Users/ashraf.beshtawi/Desktop/Mocking-Bird log --all --oneline)"
     ]
   }
 }
