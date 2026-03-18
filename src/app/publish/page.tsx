@@ -126,6 +126,9 @@ export default function PublishPage() {
   >({});
   const [selectedTelegramChannels, setSelectedTelegramChannels] = useState<string[]>([]);
 
+  // Publishing overlay visibility
+  const [publishingHidden, setPublishingHidden] = useState(false);
+
   // Queue state
   const [isQueueing, setIsQueueing] = useState(false);
   const [queueSnackbar, setQueueSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
@@ -228,7 +231,26 @@ export default function PublishPage() {
     );
   }, []);
 
+  const resetForm = useCallback(() => {
+    setPostText('');
+    setUploadedMedia([]);
+    setSelectedFacebookPages(facebookPages.map((p) => p.page_id));
+    setSelectedXAccounts(xAccounts.map((a) => a.id));
+    setSelectedTelegramChannels(telegramChannels.map((c) => c.channel_id));
+    const resetInstagram: Record<string, InstagramSelection> = {};
+    instagramAccounts.forEach((a) => {
+      resetInstagram[a.id] = { publish: false, story: false };
+    });
+    setSelectedInstagramAccounts(resetInstagram);
+  }, [facebookPages, xAccounts, instagramAccounts, telegramChannels]);
+
+  const handleHidePublishing = useCallback(() => {
+    setPublishingHidden(true);
+    resetForm();
+  }, [resetForm]);
+
   const handlePublish = async () => {
+    setPublishingHidden(false);
     const wasSuccessful = await publish({
       postText,
       uploadedMedia,
@@ -239,17 +261,7 @@ export default function PublishPage() {
     });
 
     if (wasSuccessful) {
-      setPostText('');
-      setUploadedMedia([]);
-      setSelectedFacebookPages(facebookPages.map((p) => p.page_id));
-      setSelectedXAccounts(xAccounts.map((a) => a.id));
-      setSelectedTelegramChannels(telegramChannels.map((c) => c.channel_id));
-
-      const resetInstagram: Record<string, InstagramSelection> = {};
-      instagramAccounts.forEach((a) => {
-        resetInstagram[a.id] = { publish: false, story: false };
-      });
-      setSelectedInstagramAccounts(resetInstagram);
+      resetForm();
     }
   };
 
@@ -602,7 +614,7 @@ export default function PublishPage() {
             alignItems: 'center',
             justifyContent: 'center',
           }}
-          open={isPublishing}
+          open={isPublishing && !publishingHidden}
         >
           <RocketLaunchIcon sx={{ fontSize: 48, animation: 'pulse 1.5s infinite' }} />
           <Typography variant="h5" fontWeight="medium">
@@ -710,6 +722,22 @@ export default function PublishPage() {
               )}
             </Box>
           </Box>
+
+          <Button
+            variant="text"
+            onClick={handleHidePublishing}
+            sx={{
+              mt: 2,
+              color: 'grey.400',
+              textTransform: 'none',
+              '&:hover': {
+                color: 'white',
+                bgcolor: 'rgba(255,255,255,0.1)',
+              },
+            }}
+          >
+            Hide & Reset Form
+          </Button>
         </Backdrop>
 
         {/* Header */}
