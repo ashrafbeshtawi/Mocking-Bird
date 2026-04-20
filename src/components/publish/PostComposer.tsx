@@ -12,6 +12,7 @@ interface PostComposerProps {
   uploadedMedia: UploadedMedia[];
   onMediaChange: (media: UploadedMedia[]) => void;
   showTwitterWarning: boolean;
+  onUploadingChange?: (isUploading: boolean) => void;
 }
 
 export function PostComposer({
@@ -20,6 +21,7 @@ export function PostComposer({
   uploadedMedia,
   onMediaChange,
   showTwitterWarning,
+  onUploadingChange,
 }: PostComposerProps) {
   const textFieldRef = useRef<HTMLInputElement | null>(null);
   const cursorPositionRef = useRef<number | null>(null);
@@ -99,7 +101,7 @@ export function PostComposer({
       </Box>
 
       <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
-        <MediaUploader uploadedMedia={uploadedMedia} onMediaChange={onMediaChange} />
+        <MediaUploader uploadedMedia={uploadedMedia} onMediaChange={onMediaChange} onUploadingChange={onUploadingChange} />
         <EmojiPicker onEmojiSelect={handleEmojiSelect} onOpen={handleEmojiPickerOpen} />
       </Box>
     </>

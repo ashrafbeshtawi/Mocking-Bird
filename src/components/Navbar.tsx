@@ -16,83 +16,83 @@ import {
   ListItemText,
   useMediaQuery,
   useTheme,
-  SvgIcon,
-  Divider,
-  Menu,
-  MenuItem,
-  Collapse,
-  Avatar,
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import CloseIcon from '@mui/icons-material/Close';
+import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined';
+import EditNoteOutlinedIcon from '@mui/icons-material/EditNoteOutlined';
+import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined';
+import BarChartOutlinedIcon from '@mui/icons-material/BarChartOutlined';
+import AutoAwesomeOutlinedIcon from '@mui/icons-material/AutoAwesomeOutlined';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined';
 import { useState, useCallback } from 'react';
 import { useAuth } from '../app/hooks/AuthProvider';
-import HomeIcon from '@mui/icons-material/Home';
-import DashboardIcon from '@mui/icons-material/Dashboard';
-import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
-import HistoryIcon from '@mui/icons-material/History';
-import BarChartIcon from '@mui/icons-material/BarChart';
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
-import InfoIcon from '@mui/icons-material/Info';
-import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
-import ExpandLess from '@mui/icons-material/ExpandLess';
-import ExpandMore from '@mui/icons-material/ExpandMore';
-import LoginIcon from '@mui/icons-material/Login';
-import LogoutIcon from '@mui/icons-material/Logout';
-import PersonAddIcon from '@mui/icons-material/PersonAdd';
 
 interface NavLink {
-  href?: string;
+  href: string;
   label: string;
-  icon?: typeof SvgIcon;
-  children?: { href: string; label: string; icon?: typeof SvgIcon }[];
+  icon: React.ElementType;
 }
 
 const getNavLinks = (isLoggedIn: boolean): NavLink[] =>
   isLoggedIn
     ? [
-        { href: '/dashboard', label: 'Dashboard', icon: DashboardIcon },
-        { href: '/publish', label: 'Publish', icon: RocketLaunchIcon },
-        { href: '/history', label: 'History', icon: HistoryIcon },
-        { href: '/analytics', label: 'Analytics', icon: BarChartIcon },
-        { href: '/ai', label: 'AI Tools', icon: AutoAwesomeIcon },
-        { href: '/about', label: 'About', icon: InfoIcon },
+        { href: '/dashboard', label: 'Dashboard', icon: DashboardOutlinedIcon },
+        { href: '/publish', label: 'Publish', icon: EditNoteOutlinedIcon },
+        { href: '/history', label: 'History', icon: HistoryOutlinedIcon },
+        { href: '/analytics', label: 'Analytics', icon: BarChartOutlinedIcon },
+        { href: '/ai', label: 'AI Tools', icon: AutoAwesomeOutlinedIcon },
+        { href: '/about', label: 'About', icon: InfoOutlinedIcon },
       ]
     : [
-        { href: '/', label: 'Home', icon: HomeIcon },
-        { href: '/about', label: 'About', icon: InfoIcon },
+        { href: '/', label: 'Home', icon: DashboardOutlinedIcon },
+        { href: '/about', label: 'About', icon: InfoOutlinedIcon },
       ];
+
+// Bird logo mark SVG
+function BirdMark({ size = 30 }: { size?: number }) {
+  const theme = useTheme();
+  const accent = theme.palette.primary.main;
+  const ink = theme.palette.primary.contrastText;
+  return (
+    <Box
+      sx={{
+        width: size,
+        height: size,
+        borderRadius: `${size * 0.24}px`,
+        bgcolor: accent,
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+      }}
+    >
+      <svg width={size * 0.6} height={size * 0.6} viewBox="0 0 24 24" fill="none">
+        <circle cx="7" cy="7.5" r="2.8" fill={ink} />
+        <circle cx="8.2" cy="7" r="0.6" fill={accent} />
+        <path d="M9.5 6.5 L12 5.5 L10.5 7.5 Z" fill={ink} />
+        <path
+          d="M6 10 C 7 14, 10 17.5, 18 17.5 L 20 14.5 L 16 13.5 L 17.5 10 L 13 11.5 Z"
+          fill={ink}
+        />
+      </svg>
+    </Box>
+  );
+}
 
 export default function Navbar() {
   const pathname = usePathname();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const [openSubMenu, setOpenSubMenu] = useState<string | null>(null);
 
   const { isLoggedIn, logout } = useAuth();
-
-  const handleSubMenuClick = useCallback((label: string) => {
-    setOpenSubMenu((prev) => (prev === label ? null : label));
-  }, []);
 
   const handleDrawerToggle = useCallback(
     () => setDrawerOpen((prev) => !prev),
     []
   );
-
-  const handleMenuClose = useCallback(() => {
-    setAnchorEl(null);
-  }, []);
-
-  const handleMenuMouseEnter = useCallback((event: React.MouseEvent<HTMLElement>) => {
-    setAnchorEl(event.currentTarget);
-  }, []);
-
-  const handleMenuMouseLeave = useCallback(() => {
-    setAnchorEl(null);
-  }, []);
 
   const handleLogout = useCallback(async () => {
     if (isMobile) setDrawerOpen(false);
@@ -112,209 +112,99 @@ export default function Navbar() {
       }}
       role="presentation"
     >
-      {/* Drawer Header */}
       <Box
         sx={{
-          p: 3,
-          background: 'linear-gradient(135deg, #1877f2 0%, #E1306C 50%, #F77737 100%)',
+          p: 2.5,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
+          borderBottom: '1px solid',
+          borderColor: 'divider',
         }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <Avatar
+          <BirdMark size={30} />
+          <Typography
             sx={{
-              width: 40,
-              height: 40,
-              bgcolor: 'rgba(255,255,255,0.2)',
-              backdropFilter: 'blur(10px)',
+              fontFamily: 'var(--font-fraunces), Georgia, serif',
+              fontSize: 18,
+              fontWeight: 500,
+              letterSpacing: '-0.02em',
             }}
           >
-            <RocketLaunchIcon sx={{ color: 'white', fontSize: 22 }} />
-          </Avatar>
-          <Typography variant="h6" fontWeight={700} sx={{ color: 'white' }}>
-            Mockingbird
+            Mocking<span style={{ fontStyle: 'italic', fontWeight: 400 }}>bird</span>
           </Typography>
         </Box>
-        <IconButton onClick={handleDrawerToggle} sx={{ color: 'white' }}>
-          <CloseIcon />
+        <IconButton onClick={handleDrawerToggle} size="small">
+          <CloseIcon fontSize="small" />
         </IconButton>
       </Box>
 
-      {/* Navigation Links */}
-      <List sx={{ flex: 1, py: 2 }}>
-        {currentNavLinks.map((item) =>
-          item.href ? (
-            <ListItem key={item.href} disablePadding sx={{ px: 1 }}>
-              <ListItemButton
-                component={Link}
-                href={item.href}
-                selected={pathname === item.href}
-                onClick={handleDrawerToggle}
+      <List sx={{ flex: 1, py: 1 }}>
+        {currentNavLinks.map((item) => (
+          <ListItem key={item.href} disablePadding sx={{ px: 1 }}>
+            <ListItemButton
+              component={Link}
+              href={item.href}
+              selected={pathname === item.href}
+              onClick={handleDrawerToggle}
+              sx={{
+                borderRadius: 2,
+                mx: 0.5,
+                my: 0.25,
+                gap: 1.5,
+                '&.Mui-selected': {
+                  bgcolor: 'action.selected',
+                  '& .nav-icon': { color: 'primary.main' },
+                },
+              }}
+            >
+              <item.icon
+                className="nav-icon"
                 sx={{
-                  borderRadius: 2,
-                  mx: 1,
-                  my: 0.5,
-                  '&.Mui-selected': {
-                    background: 'linear-gradient(90deg, #1877f215, #E1306C15)',
-                    '&:hover': {
-                      background: 'linear-gradient(90deg, #1877f225, #E1306C25)',
-                    },
-                  },
-                  '&:hover': {
-                    bgcolor: 'action.hover',
-                  },
+                  fontSize: 18,
+                  color: pathname === item.href ? 'primary.main' : 'text.secondary',
                 }}
-              >
-                {item.icon && (
-                  <item.icon
-                    sx={{
-                      mr: 2,
-                      fontSize: 22,
-                      color: pathname === item.href ? '#E1306C' : 'text.secondary',
-                    }}
-                  />
-                )}
-                <ListItemText
-                  primary={item.label}
-                  primaryTypographyProps={{
-                    fontWeight: pathname === item.href ? 600 : 400,
-                    color: pathname === item.href ? 'text.primary' : 'text.secondary',
-                  }}
-                />
-              </ListItemButton>
-            </ListItem>
-          ) : (
-            <Box key={item.label}>
-              <ListItem disablePadding sx={{ px: 1 }}>
-                <ListItemButton
-                  onClick={() => handleSubMenuClick(item.label)}
-                  sx={{
-                    borderRadius: 2,
-                    mx: 1,
-                    my: 0.5,
-                  }}
-                >
-                  {item.icon && (
-                    <item.icon sx={{ mr: 2, fontSize: 22, color: 'text.secondary' }} />
-                  )}
-                  <ListItemText
-                    primary={item.label}
-                    primaryTypographyProps={{ color: 'text.secondary' }}
-                  />
-                  {openSubMenu === item.label ? (
-                    <ExpandLess sx={{ color: 'text.secondary' }} />
-                  ) : (
-                    <ExpandMore sx={{ color: 'text.secondary' }} />
-                  )}
-                </ListItemButton>
-              </ListItem>
-              <Collapse in={openSubMenu === item.label} timeout="auto" unmountOnExit>
-                <List component="div" disablePadding sx={{ pl: 2 }}>
-                  {item.children?.map((child) => (
-                    <ListItem key={child.href} disablePadding sx={{ px: 1 }}>
-                      <ListItemButton
-                        component={Link}
-                        href={child.href}
-                        selected={pathname === child.href}
-                        onClick={handleDrawerToggle}
-                        sx={{
-                          borderRadius: 2,
-                          mx: 1,
-                          my: 0.5,
-                          '&.Mui-selected': {
-                            background: 'linear-gradient(90deg, #1877f215, #E1306C15)',
-                          },
-                        }}
-                      >
-                        {child.icon && (
-                          <child.icon
-                            sx={{
-                              mr: 2,
-                              fontSize: 20,
-                              color: pathname === child.href ? '#E1306C' : 'text.secondary',
-                            }}
-                          />
-                        )}
-                        <ListItemText
-                          primary={child.label}
-                          primaryTypographyProps={{
-                            fontSize: '0.9rem',
-                            fontWeight: pathname === child.href ? 600 : 400,
-                            color: pathname === child.href ? 'text.primary' : 'text.secondary',
-                          }}
-                        />
-                      </ListItemButton>
-                    </ListItem>
-                  ))}
-                </List>
-              </Collapse>
-            </Box>
-          )
-        )}
+              />
+              <ListItemText
+                primary={item.label}
+                primaryTypographyProps={{
+                  fontSize: '0.8125rem',
+                  fontWeight: pathname === item.href ? 600 : 500,
+                  color: pathname === item.href ? 'text.primary' : 'text.secondary',
+                }}
+              />
+            </ListItemButton>
+          </ListItem>
+        ))}
       </List>
 
-      {/* Auth Section */}
       <Box sx={{ p: 2, borderTop: '1px solid', borderColor: 'divider' }}>
         {!isLoggedIn ? (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
             <Button
               component={Link}
-              href="/login"
+              href="/auth"
               onClick={handleDrawerToggle}
               variant="outlined"
               fullWidth
-              startIcon={<LoginIcon />}
-              sx={{
-                borderRadius: 2,
-                textTransform: 'none',
-                py: 1.2,
-                borderColor: 'divider',
-                color: 'text.primary',
-                '&:hover': {
-                  borderColor: '#1877f2',
-                  bgcolor: '#1877f210',
-                },
-              }}
+              size="small"
             >
-              Login
-            </Button>
-            <Button
-              component={Link}
-              href="/register"
-              onClick={handleDrawerToggle}
-              variant="contained"
-              fullWidth
-              startIcon={<PersonAddIcon />}
-              sx={{
-                borderRadius: 2,
-                textTransform: 'none',
-                py: 1.2,
-                background: 'linear-gradient(90deg, #1877f2 0%, #E1306C 50%, #F77737 100%)',
-                '&:hover': {
-                  background: 'linear-gradient(90deg, #155eaf 0%, #c02a5c 50%, #d96830 100%)',
-                },
-              }}
-            >
-              Get Started
+              Sign in
             </Button>
           </Box>
         ) : (
           <Button
             onClick={handleLogout}
-            variant="outlined"
+            variant="text"
             fullWidth
-            startIcon={<LogoutIcon />}
+            startIcon={<LogoutOutlinedIcon sx={{ fontSize: 16 }} />}
             sx={{
-              borderRadius: 2,
-              textTransform: 'none',
-              py: 1.2,
-              borderColor: '#ef444450',
-              color: '#ef4444',
+              justifyContent: 'flex-start',
+              color: 'text.secondary',
               '&:hover': {
-                borderColor: '#ef4444',
-                bgcolor: '#ef444410',
+                color: 'error.main',
+                bgcolor: 'error.light',
               },
             }}
           >
@@ -330,289 +220,131 @@ export default function Navbar() {
       position="sticky"
       elevation={0}
       sx={{
-        backgroundColor: 'rgba(255,255,255,0.8)',
-        backdropFilter: 'blur(20px)',
+        bgcolor: 'background.paper',
         borderBottom: '1px solid',
         borderColor: 'divider',
+        boxShadow: 'none',
       }}
     >
       <Toolbar
         sx={{
           justifyContent: 'space-between',
           px: { xs: 2, md: 4 },
-          py: 1,
-          minHeight: { xs: 64, md: 72 },
+          py: 0.5,
+          minHeight: { xs: 56, md: 60 },
         }}
       >
-        {/* Logo */}
-        <Link href="/" style={{ textDecoration: 'none' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <Box
-              sx={{
-                width: 40,
-                height: 40,
-                borderRadius: 2,
-                background: 'linear-gradient(135deg, #1877f2 0%, #E1306C 50%, #F77737 100%)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 4px 12px rgba(225,48,108,0.3)',
-                transition: 'transform 0.2s ease, box-shadow 0.2s ease',
-                '&:hover': {
-                  transform: 'scale(1.05)',
-                  boxShadow: '0 6px 16px rgba(225,48,108,0.4)',
-                },
-              }}
-            >
-              <RocketLaunchIcon sx={{ color: 'white', fontSize: 22 }} />
-            </Box>
-            <Typography
-              variant="h5"
-              sx={{
-                fontWeight: 800,
-                background: 'linear-gradient(90deg, #1877f2, #E1306C, #F77737)',
-                backgroundClip: 'text',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                display: { xs: 'none', sm: 'block' },
-              }}
-            >
-              Mockingbird
-            </Typography>
-          </Box>
-        </Link>
-
-        {/* Desktop Links */}
-        <Box
-          sx={{
-            display: { xs: 'none', md: 'flex' },
-            alignItems: 'center',
-            gap: 1,
-          }}
-        >
-          {currentNavLinks.map((item) =>
-            item.href ? (
-              <Button
-                key={item.href}
-                component={Link}
-                href={item.href}
-                startIcon={item.icon && <item.icon sx={{ fontSize: 18 }} />}
+        {/* Logo + Nav */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 2, md: 4 } }}>
+          <Link href="/" style={{ textDecoration: 'none', color: 'inherit' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <BirdMark size={30} />
+              <Typography
                 sx={{
-                  px: 2,
-                  py: 1,
-                  borderRadius: 2,
-                  color: pathname === item.href ? '#E1306C' : 'text.secondary',
-                  fontWeight: pathname === item.href ? 600 : 500,
-                  textTransform: 'none',
-                  bgcolor: pathname === item.href ? '#E1306C10' : 'transparent',
-                  transition: 'all 0.2s ease',
-                  '&:hover': {
-                    bgcolor: pathname === item.href ? '#E1306C15' : 'action.hover',
-                  },
+                  fontFamily: 'var(--font-fraunces), Georgia, serif',
+                  fontSize: 18,
+                  fontWeight: 500,
+                  letterSpacing: '-0.02em',
+                  color: 'text.primary',
+                  display: { xs: 'none', sm: 'block' },
                 }}
               >
-                {item.label}
-              </Button>
-            ) : (
-              <Box
-                key={item.label}
-                onMouseEnter={handleMenuMouseEnter}
-                onMouseLeave={handleMenuMouseLeave}
-              >
+                Mocking<span style={{ fontStyle: 'italic', fontWeight: 400 }}>bird</span>
+              </Typography>
+            </Box>
+          </Link>
+
+          {/* Desktop Nav */}
+          <Box
+            sx={{
+              display: { xs: 'none', md: 'flex' },
+              gap: 0.25,
+            }}
+          >
+            {currentNavLinks.map((item) => {
+              const isActive = pathname === item.href;
+              return (
                 <Button
-                  startIcon={item.icon && <item.icon sx={{ fontSize: 18 }} />}
-                  endIcon={
-                    <KeyboardArrowDownIcon
+                  key={item.href}
+                  component={Link}
+                  href={item.href}
+                  startIcon={
+                    <item.icon
                       sx={{
-                        fontSize: 18,
-                        transition: 'transform 0.2s',
-                        transform: Boolean(anchorEl) ? 'rotate(180deg)' : 'rotate(0)',
+                        fontSize: '15px !important',
+                        color: isActive ? 'primary.main' : 'text.secondary',
                       }}
                     />
                   }
                   sx={{
-                    px: 2,
-                    py: 1,
+                    px: 1.5,
+                    py: 0.75,
                     borderRadius: 2,
-                    color: item.children?.some((child) => pathname === child.href)
-                      ? '#E1306C'
-                      : 'text.secondary',
-                    fontWeight: item.children?.some((child) => pathname === child.href) ? 600 : 500,
-                    textTransform: 'none',
-                    bgcolor: item.children?.some((child) => pathname === child.href)
-                      ? '#E1306C10'
-                      : 'transparent',
+                    fontSize: '0.8125rem',
+                    fontWeight: 500,
+                    color: isActive ? 'text.primary' : 'text.secondary',
+                    bgcolor: isActive ? 'action.selected' : 'transparent',
+                    letterSpacing: '-0.01em',
+                    minWidth: 'auto',
                     '&:hover': {
-                      bgcolor: 'action.hover',
+                      bgcolor: isActive ? 'action.selected' : 'action.hover',
                     },
                   }}
                 >
                   {item.label}
                 </Button>
-                <Menu
-                  anchorEl={anchorEl}
-                  open={Boolean(anchorEl)}
-                  onClose={handleMenuClose}
-                  MenuListProps={{
-                    onMouseLeave: handleMenuMouseLeave,
-                  }}
-                  anchorOrigin={{
-                    vertical: 'bottom',
-                    horizontal: 'left',
-                  }}
-                  transformOrigin={{
-                    vertical: 'top',
-                    horizontal: 'left',
-                  }}
-                  sx={{
-                    '& .MuiPaper-root': {
-                      mt: 1,
-                      minWidth: 220,
-                      borderRadius: 3,
-                      border: '1px solid',
-                      borderColor: 'divider',
-                      boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
-                      overflow: 'hidden',
-                    },
-                  }}
-                >
-                  {item.children?.map((child) => (
-                    <MenuItem
-                      key={child.href}
-                      component={Link}
-                      href={child.href}
-                      onClick={handleMenuClose}
-                      selected={pathname === child.href}
-                      sx={{
-                        py: 1.5,
-                        px: 2.5,
-                        gap: 2,
-                        '&.Mui-selected': {
-                          background: 'linear-gradient(90deg, #1877f215, #E1306C15)',
-                          '&:hover': {
-                            background: 'linear-gradient(90deg, #1877f225, #E1306C25)',
-                          },
-                        },
-                        '&:hover': {
-                          bgcolor: 'action.hover',
-                        },
-                        transition: 'all 0.2s ease',
-                      }}
-                    >
-                      {child.icon && (
-                        <child.icon
-                          sx={{
-                            fontSize: 20,
-                            color: pathname === child.href ? '#E1306C' : 'text.secondary',
-                          }}
-                        />
-                      )}
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          fontWeight: pathname === child.href ? 600 : 400,
-                          color: pathname === child.href ? 'text.primary' : 'text.secondary',
-                        }}
-                      >
-                        {child.label}
-                      </Typography>
-                    </MenuItem>
-                  ))}
-                </Menu>
-              </Box>
-            )
-          )}
-
-          <Divider orientation="vertical" flexItem sx={{ mx: 1, my: 1.5 }} />
-
-          {!isLoggedIn ? (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <Button
-                component={Link}
-                href="/login"
-                sx={{
-                  px: 2.5,
-                  py: 1,
-                  borderRadius: 2,
-                  textTransform: 'none',
-                  fontWeight: 500,
-                  color: 'text.secondary',
-                  '&:hover': {
-                    bgcolor: 'action.hover',
-                  },
-                }}
-              >
-                Login
-              </Button>
-              <Button
-                component={Link}
-                href="/register"
-                variant="contained"
-                disableElevation
-                sx={{
-                  px: 3,
-                  py: 1,
-                  borderRadius: 2,
-                  textTransform: 'none',
-                  fontWeight: 600,
-                  background: 'linear-gradient(90deg, #1877f2 0%, #E1306C 50%, #F77737 100%)',
-                  boxShadow: '0 4px 12px rgba(225,48,108,0.3)',
-                  transition: 'all 0.2s ease',
-                  '&:hover': {
-                    background: 'linear-gradient(90deg, #155eaf 0%, #c02a5c 50%, #d96830 100%)',
-                    boxShadow: '0 6px 16px rgba(225,48,108,0.4)',
-                    transform: 'translateY(-1px)',
-                  },
-                }}
-              >
-                Get Started
-              </Button>
-            </Box>
-          ) : (
-            <Button
-              onClick={handleLogout}
-              variant="outlined"
-              startIcon={<LogoutIcon sx={{ fontSize: 18 }} />}
-              sx={{
-                px: 2.5,
-                py: 1,
-                borderRadius: 2,
-                textTransform: 'none',
-                fontWeight: 500,
-                borderColor: 'divider',
-                color: 'text.secondary',
-                transition: 'all 0.2s ease',
-                '&:hover': {
-                  borderColor: '#ef4444',
-                  color: '#ef4444',
-                  bgcolor: '#ef444410',
-                },
-              }}
-            >
-              Logout
-            </Button>
-          )}
+              );
+            })}
+          </Box>
         </Box>
 
-        {/* Mobile Menu Button */}
-        <Box sx={{ display: { xs: 'flex', md: 'none' } }}>
+        {/* Right side */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          {/* Desktop auth */}
+          <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: 1 }}>
+            {!isLoggedIn ? (
+              <Button
+                component={Link}
+                href="/auth"
+                size="small"
+                sx={{
+                  color: 'text.secondary',
+                  fontSize: '0.8125rem',
+                }}
+              >
+                Sign in
+              </Button>
+            ) : (
+              <Button
+                onClick={handleLogout}
+                size="small"
+                startIcon={<LogoutOutlinedIcon sx={{ fontSize: 15 }} />}
+                sx={{
+                  color: 'text.secondary',
+                  fontSize: '0.8125rem',
+                  '&:hover': {
+                    color: 'error.main',
+                  },
+                }}
+              >
+                Logout
+              </Button>
+            )}
+          </Box>
+
+          {/* Mobile menu button */}
           <IconButton
             onClick={handleDrawerToggle}
             sx={{
-              width: 44,
-              height: 44,
+              display: { xs: 'flex', md: 'none' },
+              width: 38,
+              height: 38,
               borderRadius: 2,
               border: '1px solid',
               borderColor: 'divider',
-              color: 'text.primary',
-              transition: 'all 0.2s ease',
-              '&:hover': {
-                borderColor: '#E1306C',
-                bgcolor: '#E1306C10',
-              },
             }}
           >
-            <MenuIcon />
+            <MenuIcon fontSize="small" />
           </IconButton>
         </Box>
       </Toolbar>
@@ -626,7 +358,7 @@ export default function Navbar() {
         PaperProps={{
           sx: {
             borderRadius: '16px 0 0 16px',
-            boxShadow: '-8px 0 30px rgba(0,0,0,0.1)',
+            border: 'none',
           },
         }}
       >

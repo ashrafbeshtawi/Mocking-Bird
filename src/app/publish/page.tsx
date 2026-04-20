@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Container,
   Box,
@@ -41,6 +41,7 @@ import { useAllPromptMatchings } from '@/hooks/useAllPromptMatchings';
 import { PostComposer } from '@/components/publish/PostComposer';
 import { AccountSelector } from '@/components/publish/AccountSelector';
 import { PublishResults } from '@/components/publish/PublishResults';
+import { PageHeader } from '@/components/PageHeader';
 import type { UploadedMedia } from '@/components/publish/MediaUploader';
 import type { InstagramSelection } from '@/types/accounts';
 import { TWITTER_CHAR_LIMIT } from '@/types/accounts';
@@ -128,6 +129,10 @@ export default function PublishPage() {
 
   // Publishing overlay visibility
   const [publishingHidden, setPublishingHidden] = useState(false);
+  const publishingHiddenRef = useRef(false);
+
+  // Media uploading state
+  const [isMediaUploading, setIsMediaUploading] = useState(false);
 
   // Queue state
   const [isQueueing, setIsQueueing] = useState(false);
@@ -246,11 +251,12 @@ export default function PublishPage() {
 
   const handleHidePublishing = useCallback(() => {
     setPublishingHidden(true);
-    resetForm();
-  }, [resetForm]);
+    publishingHiddenRef.current = true;
+  }, []);
 
   const handlePublish = async () => {
     setPublishingHidden(false);
+    publishingHiddenRef.current = false;
     const wasSuccessful = await publish({
       postText,
       uploadedMedia,
@@ -259,6 +265,11 @@ export default function PublishPage() {
       selectedInstagramAccounts,
       selectedTelegramChannels,
     });
+
+    if (publishingHiddenRef.current) {
+      clearStatus();
+      return;
+    }
 
     if (wasSuccessful) {
       resetForm();
@@ -565,6 +576,7 @@ export default function PublishPage() {
     !isPublishing &&
     !isQueueing &&
     !isTransforming &&
+    !isMediaUploading &&
     (postText.trim() !== '' || uploadedMedia.length > 0) &&
     (selectedFacebookPages.length > 0 ||
       selectedXAccounts.length > 0 ||
@@ -596,9 +608,9 @@ export default function PublishPage() {
     <Box
       sx={{
         minHeight: '100vh',
-        background: 'linear-gradient(180deg, rgba(25,118,210,0.05) 0%, rgba(255,255,255,0) 50%)',
+        bgcolor: 'background.default',
         py: { xs: 2, sm: 3, md: 4 },
-        px: { xs: 1, sm: 0 },
+        px: { xs: 2, sm: 0 },
       }}
     >
       <Container maxWidth="md">
@@ -625,7 +637,7 @@ export default function PublishPage() {
           {accountsProgress.length > 0 && (
             <Paper
               sx={{
-                width: 400,
+                width: { xs: '100%', sm: 400 },
                 maxWidth: '90vw',
                 maxHeight: 300,
                 overflow: 'auto',
@@ -707,7 +719,7 @@ export default function PublishPage() {
                   bgcolor: 'rgba(255,255,255,0.2)',
                   '& .MuiLinearProgress-bar': {
                     borderRadius: 3,
-                    background: 'linear-gradient(90deg, #1877f2 0%, #E1306C 50%, #F77737 100%)',
+                    bgcolor: 'primary.main',
                     transition: 'transform 0.3s ease-out',
                   },
                 }}
@@ -736,32 +748,16 @@ export default function PublishPage() {
               },
             }}
           >
-            Hide & Reset Form
+            Continue in Background
           </Button>
         </Backdrop>
 
         {/* Header */}
-        <Fade in timeout={600}>
-          <Box sx={{ mb: 4 }}>
-            <Typography
-              variant="h3"
-              fontWeight="bold"
-              sx={{
-                fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' },
-                background: 'linear-gradient(90deg, #1877f2, #E1306C, #F77737)',
-                backgroundClip: 'text',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                mb: 1,
-              }}
-            >
-              Create Post
-            </Typography>
-            <Typography variant="body1" color="text.secondary">
-              Share your content across multiple platforms at once
-            </Typography>
-          </Box>
-        </Fade>
+        <PageHeader
+          eyebrow="Draft · compose"
+          title={<>Compose</>}
+          lead="Write once. Tailor per platform — limits, tone and media adapt automatically."
+        />
 
         {/* Results */}
         <PublishResults error={error} success={success} results={results} onClose={clearStatus} />
@@ -795,7 +791,7 @@ export default function PublishPage() {
                 elevation={0}
                 sx={{
                   p: 3,
-                  borderRadius: 3,
+                  borderRadius: 4,
                   border: '1px solid',
                   borderColor: 'divider',
                   bgcolor: 'background.paper',
@@ -803,9 +799,9 @@ export default function PublishPage() {
                 }}
               >
                 <Typography
-                  variant="subtitle2"
+                  variant="overline"
                   color="text.secondary"
-                  sx={{ mb: 2, textTransform: 'uppercase', letterSpacing: 1 }}
+                  sx={{ mb: 2, display: 'block' }}
                 >
                   Compose Your Post
                 </Typography>
@@ -815,6 +811,7 @@ export default function PublishPage() {
                   uploadedMedia={uploadedMedia}
                   onMediaChange={setUploadedMedia}
                   showTwitterWarning={showTwitterWarning}
+                  onUploadingChange={setIsMediaUploading}
                 />
               </Paper>
 
@@ -823,7 +820,7 @@ export default function PublishPage() {
                 elevation={0}
                 sx={{
                   p: 3,
-                  borderRadius: 3,
+                  borderRadius: 4,
                   border: '1px solid',
                   borderColor: 'divider',
                   bgcolor: 'background.paper',
@@ -852,15 +849,15 @@ export default function PublishPage() {
               <Box
                 sx={{
                   display: 'flex',
+                  flexDirection: { xs: 'column', sm: 'row' },
                   justifyContent: 'space-between',
-                  alignItems: 'center',
+                  alignItems: { xs: 'stretch', sm: 'center' },
                   mt: 2,
-                  flexWrap: 'wrap',
                   gap: 2,
                 }}
               >
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Typography variant="body2" color="text.secondary">
+                  <Typography variant="body2" sx={{ fontSize: 13, color: 'text.secondary' }}>
                     {selectedCount > 0
                       ? `Publishing to ${selectedCount} destination${selectedCount > 1 ? 's' : ''}`
                       : 'Select at least one account'}
@@ -870,9 +867,13 @@ export default function PublishPage() {
                       icon={<SmartToyIcon sx={{ fontSize: 16 }} />}
                       label="AI Transform"
                       size="small"
-                      color="primary"
                       variant="outlined"
-                      sx={{ height: 24 }}
+                      sx={{
+                        height: 24,
+                        borderColor: 'primary.main',
+                        color: 'primary.main',
+                        '& .MuiChip-icon': { color: 'primary.main' },
+                      }}
                     />
                   )}
                 </Box>
@@ -890,11 +891,10 @@ export default function PublishPage() {
                       textTransform: 'none',
                       fontSize: '1rem',
                       fontWeight: 600,
-                      borderColor: canPublish ? 'primary.main' : undefined,
-                      color: canPublish ? 'primary.main' : undefined,
+                      borderColor: 'divider',
+                      color: 'text.primary',
                       '&:hover': {
-                        borderColor: canPublish ? 'primary.dark' : undefined,
-                        backgroundColor: canPublish ? 'rgba(25, 118, 210, 0.04)' : undefined,
+                        borderColor: 'primary.main',
                       },
                     }}
                   >
@@ -914,16 +914,13 @@ export default function PublishPage() {
                       textTransform: 'none',
                       fontSize: '1rem',
                       fontWeight: 600,
-                      background: canPublish
-                        ? 'linear-gradient(90deg, #1877f2 0%, #E1306C 50%, #F77737 100%)'
-                        : undefined,
+                      bgcolor: canPublish ? 'primary.main' : undefined,
+                      color: canPublish ? 'primary.contrastText' : undefined,
                       '&:hover': {
-                        background: canPublish
-                          ? 'linear-gradient(90deg, #155eaf 0%, #c02a5c 50%, #d96830 100%)'
-                          : undefined,
+                        bgcolor: canPublish ? 'primary.dark' : undefined,
                       },
                       '&.Mui-disabled': {
-                        background: 'action.disabledBackground',
+                        bgcolor: 'action.disabledBackground',
                       },
                     }}
                   >
@@ -943,12 +940,12 @@ export default function PublishPage() {
         maxWidth="md"
         fullWidth
         PaperProps={{
-          sx: { borderRadius: 3 }
+          sx: { borderRadius: 4 }
         }}
       >
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, pb: 1 }}>
           <SmartToyIcon color="primary" />
-          <Typography variant="h6" component="span">
+          <Typography variant="h6" component="span" sx={{ fontFamily: 'var(--font-fraunces), Georgia, serif' }}>
             AI Transformation Preview
           </Typography>
           <IconButton
@@ -1054,9 +1051,10 @@ export default function PublishPage() {
             endIcon={<SendIcon />}
             sx={{
               borderRadius: 2,
-              background: 'linear-gradient(90deg, #1877f2 0%, #E1306C 50%, #F77737 100%)',
+              bgcolor: 'primary.main',
+              color: 'primary.contrastText',
               '&:hover': {
-                background: 'linear-gradient(90deg, #155eaf 0%, #c02a5c 50%, #d96830 100%)',
+                bgcolor: 'primary.dark',
               },
             }}
           >

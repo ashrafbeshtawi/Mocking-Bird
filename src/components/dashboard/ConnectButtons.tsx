@@ -28,11 +28,10 @@ export function ConnectButtons({
     <Box
       sx={{
         display: 'flex',
-        gap: 2,
-        mb: 4,
+        gap: 1.5,
+        mb: 2,
         flexWrap: 'wrap',
         flexDirection: { xs: 'column', sm: 'row' },
-        px: { xs: 2, sm: 3 },
       }}
     >
       <Button
@@ -51,9 +50,10 @@ export function ConnectButtons({
           )
         }
         sx={{
-          background: 'linear-gradient(90deg, #1877f2 0%, #E1306C 50%, #F77737 100%)',
+          bgcolor: 'primary.main',
+          color: 'primary.contrastText',
           '&:hover': {
-            background: 'linear-gradient(90deg, #155eaf 0%, #c02a5c 50%, #d96830 100%)',
+            bgcolor: 'primary.dark',
           },
           maxWidth: { sm: 'fit-content' },
         }}

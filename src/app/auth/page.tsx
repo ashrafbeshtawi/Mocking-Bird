@@ -41,8 +41,12 @@ export default function AuthPage() {
           }}
         >
           {/* Logo/Title */}
-          <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 600 }}>
-            Mocking Bird
+          <Typography variant="h4" component="h1" gutterBottom sx={{
+            fontFamily: 'var(--font-fraunces), Georgia, serif',
+            fontWeight: 500,
+            letterSpacing: '-0.02em',
+          }}>
+            Mocking<span style={{ fontStyle: 'italic', fontWeight: 400 }}>bird</span>
           </Typography>
           <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
             Sign in to continue

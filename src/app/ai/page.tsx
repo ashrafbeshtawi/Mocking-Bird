@@ -25,19 +25,19 @@ import {
   Chip,
   Tabs,
   Tab,
-  Fade,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import SaveIcon from '@mui/icons-material/Save';
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import { PageHeader } from '@/components/PageHeader';
 import SettingsIcon from '@mui/icons-material/Settings';
 import ChatIcon from '@mui/icons-material/Chat';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import ScienceIcon from '@mui/icons-material/Science';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { useAiProviders } from '@/hooks/useAiProviders';
 import { useAiPrompts } from '@/hooks/useAiPrompts';
 import { COMMON_BASE_URLS } from '@/types/ai';
@@ -297,48 +297,17 @@ export default function AiPage() {
     <Box
       sx={{
         minHeight: '100vh',
-        background: 'linear-gradient(180deg, rgba(25,118,210,0.05) 0%, rgba(255,255,255,0) 50%)',
+        bgcolor: 'background.default',
         py: 4,
       }}
     >
       <Container maxWidth="md">
         {/* Header */}
-        <Fade in timeout={600}>
-          <Box sx={{ mb: 4 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
-              <Box
-                sx={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: 2,
-                  background: 'linear-gradient(135deg, #1877f2 0%, #E1306C 100%)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <AutoAwesomeIcon sx={{ color: '#fff', fontSize: 28 }} />
-              </Box>
-              <Box>
-                <Typography
-                  variant="h4"
-                  fontWeight="bold"
-                  sx={{
-                    background: 'linear-gradient(90deg, #1877f2, #E1306C, #F77737)',
-                    backgroundClip: 'text',
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                  }}
-                >
-                  AI Tools
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Configure AI providers and prompts for content transformation
-                </Typography>
-              </Box>
-            </Box>
-          </Box>
-        </Fade>
+        <PageHeader
+          eyebrow="Settings · AI"
+          title={<>AI <span style={{ fontStyle: 'italic' }}>tools</span></>}
+          lead="Bring your own model. Configure providers and tune the prompts that shape your per-platform drafts."
+        />
 
         {/* Tabs */}
         <Paper
@@ -358,13 +327,14 @@ export default function AiPage() {
                 '& .MuiTab-root': {
                   textTransform: 'none',
                   fontWeight: 500,
-                  minHeight: 56,
+                  minHeight: 48,
+                  fontSize: '0.8125rem',
                 },
                 '& .Mui-selected': {
-                  color: '#E1306C',
+                  color: 'primary.main',
                 },
                 '& .MuiTabs-indicator': {
-                  backgroundColor: '#E1306C',
+                  backgroundColor: 'primary.main',
                 },
               }}
             >
@@ -383,22 +353,22 @@ export default function AiPage() {
                 </Alert>
               )}
 
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                Configure AI providers to power your content transformations. Supports any OpenAI-compatible API including OpenAI, Claude, Gemini, and local models like Ollama.
-              </Typography>
+              <Box sx={{ bgcolor: 'action.hover', borderRadius: 3, p: 2.5, mb: 3, display: 'flex', gap: 1.5, alignItems: 'flex-start' }}>
+                <InfoOutlinedIcon sx={{ fontSize: 18, color: 'primary.main', mt: 0.25 }} />
+                <Typography sx={{ fontSize: 13, color: 'text.secondary', lineHeight: 1.6 }}>
+                  Configure AI providers to power your content transformations. Supports any OpenAI-compatible API including OpenAI, Claude, Gemini, and local models like Ollama.
+                </Typography>
+              </Box>
 
               <Box sx={{ display: 'flex', justifyContent: 'flex-start', mb: 3 }}>
                 <Button
                   variant="contained"
+                  size="small"
                   onClick={() => handleOpenProviderDialog()}
                   startIcon={<AddIcon />}
                   sx={{
                     textTransform: 'none',
-                    borderRadius: 2,
-                    background: 'linear-gradient(90deg, #1877f2 0%, #E1306C 100%)',
-                    '&:hover': {
-                      background: 'linear-gradient(90deg, #155eaf 0%, #c02a5c 100%)',
-                    },
+                    borderRadius: 999,
                   }}
                 >
                   Add Provider
@@ -437,13 +407,13 @@ export default function AiPage() {
                       elevation={0}
                       sx={{
                         p: 2.5,
-                        borderRadius: 2,
+                        borderRadius: 4,
                         border: '1px solid',
                         borderColor: 'divider',
                         transition: 'all 0.2s ease',
                         '&:hover': {
-                          borderColor: '#E1306C50',
-                          boxShadow: '0 4px 12px rgba(225,48,108,0.1)',
+                          borderColor: 'primary.light',
+                          boxShadow: '0 4px 12px rgba(46,125,50,0.1)',
                         },
                       }}
                     >
@@ -454,18 +424,18 @@ export default function AiPage() {
                               width: 40,
                               height: 40,
                               borderRadius: 2,
-                              bgcolor: '#E1306C15',
+                              bgcolor: 'primary.light',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
                               flexShrink: 0,
                             }}
                           >
-                            <SettingsIcon sx={{ color: '#E1306C', fontSize: 20 }} />
+                            <SettingsIcon sx={{ color: 'primary.main', fontSize: 20 }} />
                           </Box>
                           <Box sx={{ minWidth: 0, flex: 1 }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                              <Typography variant="subtitle1" fontWeight={600} noWrap>
+                              <Typography variant="subtitle1" fontWeight={500} noWrap>
                                 {provider.name}
                               </Typography>
                               <Chip label={provider.model} size="small" sx={{ height: 22, fontSize: '0.7rem' }} />
@@ -527,22 +497,22 @@ export default function AiPage() {
                 </Alert>
               )}
 
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                Create prompts to transform your content before publishing. Each prompt can be linked to a specific AI provider.
-              </Typography>
+              <Box sx={{ bgcolor: 'action.hover', borderRadius: 3, p: 2.5, mb: 3, display: 'flex', gap: 1.5, alignItems: 'flex-start' }}>
+                <InfoOutlinedIcon sx={{ fontSize: 18, color: 'primary.main', mt: 0.25 }} />
+                <Typography sx={{ fontSize: 13, color: 'text.secondary', lineHeight: 1.6 }}>
+                  Create prompts to transform your content before publishing. Each prompt can be linked to a specific AI provider.
+                </Typography>
+              </Box>
 
               <Box sx={{ display: 'flex', justifyContent: 'flex-start', mb: 3 }}>
                 <Button
                   variant="contained"
+                  size="small"
                   onClick={() => handleOpenPromptDialog()}
                   startIcon={<AddIcon />}
                   sx={{
                     textTransform: 'none',
-                    borderRadius: 2,
-                    background: 'linear-gradient(90deg, #1877f2 0%, #E1306C 100%)',
-                    '&:hover': {
-                      background: 'linear-gradient(90deg, #155eaf 0%, #c02a5c 100%)',
-                    },
+                    borderRadius: 999,
                   }}
                 >
                   Add Prompt
@@ -581,13 +551,13 @@ export default function AiPage() {
                       elevation={0}
                       sx={{
                         p: 2.5,
-                        borderRadius: 2,
+                        borderRadius: 4,
                         border: '1px solid',
                         borderColor: 'divider',
                         transition: 'all 0.2s ease',
                         '&:hover': {
-                          borderColor: '#E1306C50',
-                          boxShadow: '0 4px 12px rgba(225,48,108,0.1)',
+                          borderColor: 'primary.light',
+                          boxShadow: '0 4px 12px rgba(46,125,50,0.1)',
                         },
                       }}
                     >
@@ -598,18 +568,18 @@ export default function AiPage() {
                               width: 40,
                               height: 40,
                               borderRadius: 2,
-                              bgcolor: '#1877f215',
+                              bgcolor: 'primary.light',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
                               flexShrink: 0,
                             }}
                           >
-                            <ChatIcon sx={{ color: '#1877f2', fontSize: 20 }} />
+                            <ChatIcon sx={{ color: 'primary.main', fontSize: 20 }} />
                           </Box>
                           <Box sx={{ minWidth: 0 }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                              <Typography variant="subtitle1" fontWeight={600}>
+                              <Typography variant="subtitle1" fontWeight={500}>
                                 {prompt.title}
                               </Typography>
                               {prompt.provider_name ? (
@@ -676,15 +646,15 @@ export default function AiPage() {
                 width: 40,
                 height: 40,
                 borderRadius: 2,
-                bgcolor: '#E1306C15',
+                bgcolor: 'primary.light',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
             >
-              <SettingsIcon sx={{ color: '#E1306C' }} />
+              <SettingsIcon sx={{ color: 'primary.main' }} />
             </Box>
-            <Typography variant="h6" fontWeight={600}>
+            <Typography variant="h6" sx={{ fontFamily: 'var(--font-fraunces), Georgia, serif', fontSize: 20, letterSpacing: '-0.02em' }}>
               {editingProvider ? 'Edit Provider' : 'Add New Provider'}
             </Typography>
           </Box>
@@ -772,10 +742,6 @@ export default function AiPage() {
             sx={{
               borderRadius: 2,
               textTransform: 'none',
-              background: 'linear-gradient(90deg, #1877f2 0%, #E1306C 100%)',
-              '&:hover': {
-                background: 'linear-gradient(90deg, #155eaf 0%, #c02a5c 100%)',
-              },
             }}
           >
             {isSavingProvider ? 'Saving...' : 'Save'}
@@ -790,7 +756,7 @@ export default function AiPage() {
             <Box sx={{ width: 40, height: 40, borderRadius: 2, bgcolor: '#ef444415', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <DeleteIcon sx={{ color: '#ef4444' }} />
             </Box>
-            <Typography variant="h6" fontWeight={600}>
+            <Typography variant="h6" sx={{ fontFamily: 'var(--font-fraunces), Georgia, serif', fontSize: 20, letterSpacing: '-0.02em' }}>
               Delete Provider
             </Typography>
           </Box>
@@ -819,15 +785,15 @@ export default function AiPage() {
                 width: 40,
                 height: 40,
                 borderRadius: 2,
-                bgcolor: '#1877f215',
+                bgcolor: 'primary.light',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
             >
-              <ChatIcon sx={{ color: '#1877f2' }} />
+              <ChatIcon sx={{ color: 'primary.main' }} />
             </Box>
-            <Typography variant="h6" fontWeight={600}>
+            <Typography variant="h6" sx={{ fontFamily: 'var(--font-fraunces), Georgia, serif', fontSize: 20, letterSpacing: '-0.02em' }}>
               {editingPrompt ? 'Edit Prompt' : 'Add New Prompt'}
             </Typography>
           </Box>
@@ -888,10 +854,6 @@ export default function AiPage() {
             sx={{
               borderRadius: 2,
               textTransform: 'none',
-              background: 'linear-gradient(90deg, #1877f2 0%, #E1306C 100%)',
-              '&:hover': {
-                background: 'linear-gradient(90deg, #155eaf 0%, #c02a5c 100%)',
-              },
             }}
           >
             {isSavingPrompt ? 'Saving...' : 'Save'}
@@ -906,7 +868,7 @@ export default function AiPage() {
             <Box sx={{ width: 40, height: 40, borderRadius: 2, bgcolor: '#ef444415', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <DeleteIcon sx={{ color: '#ef4444' }} />
             </Box>
-            <Typography variant="h6" fontWeight={600}>
+            <Typography variant="h6" sx={{ fontFamily: 'var(--font-fraunces), Georgia, serif', fontSize: 20, letterSpacing: '-0.02em' }}>
               Delete Prompt
             </Typography>
           </Box>
@@ -950,7 +912,7 @@ export default function AiPage() {
               <ScienceIcon sx={{ color: '#10b981' }} />
             </Box>
             <Box>
-              <Typography variant="h6" fontWeight={600}>
+              <Typography variant="h6" sx={{ fontFamily: 'var(--font-fraunces), Georgia, serif', fontSize: 20, letterSpacing: '-0.02em' }}>
                 Test Prompt
               </Typography>
               <Typography variant="body2" color="text.secondary">

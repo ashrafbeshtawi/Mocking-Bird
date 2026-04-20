@@ -3,7 +3,6 @@
 import React from 'react';
 import {
   Typography,
-  Paper,
   Table,
   TableBody,
   TableCell,
@@ -30,7 +29,6 @@ interface AccountsTableProps {
   onDelete: (account: AccountData) => void;
   showPromptSelector?: boolean;
 }
-
 
 export function AccountsTable({
   title,
@@ -66,30 +64,35 @@ export function AccountsTable({
 
   return (
     <>
-      <Typography
-        variant="h5"
-        component="h2"
-        sx={{ mb: 2, mt: 4, fontWeight: 'bold' }}
-      >
-        {title}
-      </Typography>
+      {title && (
+        <Typography
+          sx={{
+            fontFamily: 'var(--font-fraunces), Georgia, serif',
+            fontSize: 20,
+            letterSpacing: '-0.02em',
+            mb: 2,
+            mt: 1,
+          }}
+        >
+          {title}
+        </Typography>
+      )}
 
       {data.length === 0 ? (
-        <Typography variant="body1" color="text.secondary">
+        <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>
           {emptyMessage}
         </Typography>
       ) : (
-        <TableContainer component={Paper} elevation={3} sx={{ overflowX: 'auto' }}>
-          <Table sx={{ minWidth: 600 }}>
+        <TableContainer sx={{ overflowX: 'auto' }}>
+          <Table size="small" sx={{ minWidth: { xs: 320, sm: 500 } }}>
             <TableHead>
               <TableRow>
-                <TableCell sx={{ fontWeight: 'bold' }}>Platform</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Name</TableCell>
+                <TableCell>Platform</TableCell>
+                <TableCell>Name</TableCell>
                 {showPromptSelector && (
-                  <TableCell sx={{ fontWeight: 'bold', width: 220 }}>AI Prompt</TableCell>
+                  <TableCell sx={{ width: 200 }}>AI Prompt</TableCell>
                 )}
-                <TableCell sx={{ fontWeight: 'bold' }}>ID</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', width: 100 }}>Actions</TableCell>
+                <TableCell sx={{ width: 80 }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -101,20 +104,24 @@ export function AccountsTable({
                   <TableRow key={`${account.platform}-${account.id}`}>
                     <TableCell>
                       <Chip
-                        icon={<PlatformIcon sx={{ fontSize: 18 }} />}
+                        icon={<PlatformIcon sx={{ fontSize: 14 }} />}
                         label={config.label}
                         size="small"
                         sx={{
                           bgcolor: config.color,
                           color: '#fff',
                           '& .MuiChip-icon': { color: '#fff' },
+                          height: 24,
+                          fontSize: 11,
                         }}
                       />
                     </TableCell>
                     <TableCell>
-                      {account.name}
+                      <Typography sx={{ fontSize: 13, fontWeight: 500 }}>
+                        {account.name}
+                      </Typography>
                       {account.details && (
-                        <Typography variant="caption" color="text.secondary" display="block">
+                        <Typography sx={{ fontSize: 11, color: 'text.secondary' }}>
                           {account.details}
                         </Typography>
                       )}
@@ -130,21 +137,19 @@ export function AccountsTable({
                         />
                       </TableCell>
                     )}
-                    <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>
-                      {account.id}
-                    </TableCell>
                     <TableCell>
-                      <Tooltip title="Disconnect Account">
+                      <Tooltip title="Disconnect">
                         <span>
                           <IconButton
                             onClick={() => onDelete(account)}
-                            color="error"
+                            size="small"
                             disabled={loadingId === account.id}
+                            sx={{ color: 'text.secondary', '&:hover': { color: 'error.main' } }}
                           >
                             {loadingId === account.id ? (
-                              <CircularProgress size={20} color="inherit" />
+                              <CircularProgress size={16} color="inherit" />
                             ) : (
-                              <DeleteIcon />
+                              <DeleteIcon sx={{ fontSize: 16 }} />
                             )}
                           </IconButton>
                         </span>

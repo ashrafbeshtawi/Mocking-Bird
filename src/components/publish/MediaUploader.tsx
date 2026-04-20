@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Box, Button, LinearProgress, Typography, Alert } from '@mui/material';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
 import CloudDoneIcon from '@mui/icons-material/CloudDone';
@@ -24,6 +24,7 @@ export interface UploadedMedia {
 interface MediaUploaderProps {
   uploadedMedia: UploadedMedia[];
   onMediaChange: (media: UploadedMedia[]) => void;
+  onUploadingChange?: (isUploading: boolean) => void;
 }
 
 interface UploadingFile {
@@ -32,7 +33,7 @@ interface UploadingFile {
   error?: string;
 }
 
-export function MediaUploader({ uploadedMedia, onMediaChange }: MediaUploaderProps) {
+export function MediaUploader({ uploadedMedia, onMediaChange, onUploadingChange }: MediaUploaderProps) {
   const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
@@ -151,6 +152,10 @@ export function MediaUploader({ uploadedMedia, onMediaChange }: MediaUploaderPro
   );
 
   const isUploading = uploadingFiles.length > 0;
+
+  useEffect(() => {
+    onUploadingChange?.(isUploading);
+  }, [isUploading, onUploadingChange]);
 
   if (!isConfigured) {
     return (

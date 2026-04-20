@@ -35,15 +35,20 @@ export function TimeRangeSelector({ value, onChange }: TimeRangeSelectorProps) {
             borderRadius: 2,
             textTransform: 'none',
             fontWeight: 500,
+            fontSize: '0.8125rem',
             border: '1px solid',
             borderColor: 'divider',
+            color: 'text.secondary',
             '&.Mui-selected': {
-              bgcolor: '#E1306C15',
-              color: '#E1306C',
-              borderColor: '#E1306C',
+              bgcolor: 'primary.light',
+              color: 'primary.dark',
+              borderColor: 'primary.main',
               '&:hover': {
-                bgcolor: '#E1306C25',
+                bgcolor: 'primary.light',
               },
+            },
+            '&:hover': {
+              bgcolor: 'action.hover',
             },
           },
         }}

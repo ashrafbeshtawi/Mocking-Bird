@@ -255,9 +255,8 @@ export function PublishResults({ error, success, results, onClose }: PublishResu
             borderRadius: 2,
             textTransform: 'none',
             fontWeight: 600,
-            background: isFullSuccess
-              ? 'linear-gradient(90deg, #1877f2 0%, #E1306C 50%, #F77737 100%)'
-              : undefined,
+            bgcolor: isFullSuccess ? 'primary.main' : undefined,
+            color: isFullSuccess ? 'primary.contrastText' : undefined,
           }}
         >
           {isFullSuccess ? 'Awesome!' : 'Close'}
