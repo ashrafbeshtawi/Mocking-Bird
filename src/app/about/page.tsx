@@ -7,39 +7,8 @@ import {
   Typography,
   Button,
 } from '@mui/material';
-import { useTheme } from '@mui/material/styles';
 import Link from 'next/link';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
-
-// Bird logo mark (same as Navbar)
-function BirdMark({ size = 64 }: { size?: number }) {
-  const theme = useTheme();
-  const accent = theme.palette.primary.main;
-  const ink = theme.palette.primary.contrastText;
-  return (
-    <Box
-      sx={{
-        width: size,
-        height: size,
-        borderRadius: `${size * 0.24}px`,
-        bgcolor: accent,
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexShrink: 0,
-      }}
-    >
-      <svg width={size * 0.58} height={size * 0.58} viewBox="0 0 24 24" fill="none">
-        <circle cx="7" cy="8" r="2.4" fill={ink} />
-        <path
-          d="M6.5 10.8 C 7.5 14, 10 17, 17 17 L 20 14 L 16 13 L 17 10 L 13 11.5 Z"
-          fill={ink}
-        />
-        <path d="M8.8 7.2 L 11 5.5" stroke={ink} strokeWidth="1.2" strokeLinecap="round" />
-      </svg>
-    </Box>
-  );
-}
 
 // Principle row for the two-column layout
 function Principle({
@@ -154,10 +123,6 @@ export default function AboutPage() {
           px: 3,
         }}
       >
-        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 4 }}>
-          <BirdMark size={64} />
-        </Box>
-
         <Typography
           sx={{
             fontFamily: 'var(--font-geist-mono), ui-monospace, monospace',

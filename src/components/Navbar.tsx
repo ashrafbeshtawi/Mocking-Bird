@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import {
   AppBar,
@@ -50,34 +51,15 @@ const getNavLinks = (isLoggedIn: boolean): NavLink[] =>
         { href: '/about', label: 'About', icon: InfoOutlinedIcon },
       ];
 
-// Bird logo mark SVG
-function BirdMark({ size = 30 }: { size?: number }) {
-  const theme = useTheme();
-  const accent = theme.palette.primary.main;
-  const ink = theme.palette.primary.contrastText;
+function LogoMark({ size = 30 }: { size?: number }) {
   return (
-    <Box
-      sx={{
-        width: size,
-        height: size,
-        borderRadius: `${size * 0.24}px`,
-        bgcolor: accent,
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexShrink: 0,
-      }}
-    >
-      <svg width={size * 0.6} height={size * 0.6} viewBox="0 0 24 24" fill="none">
-        <circle cx="7" cy="7.5" r="2.8" fill={ink} />
-        <circle cx="8.2" cy="7" r="0.6" fill={accent} />
-        <path d="M9.5 6.5 L12 5.5 L10.5 7.5 Z" fill={ink} />
-        <path
-          d="M6 10 C 7 14, 10 17.5, 18 17.5 L 20 14.5 L 16 13.5 L 17.5 10 L 13 11.5 Z"
-          fill={ink}
-        />
-      </svg>
-    </Box>
+    <Image
+      src="/logo.png"
+      alt="Mockingbird"
+      width={size}
+      height={size}
+      style={{ borderRadius: size * 0.24, flexShrink: 0 }}
+    />
   );
 }
 
@@ -123,7 +105,7 @@ export default function Navbar() {
         }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <BirdMark size={30} />
+          <LogoMark size={38} />
           <Typography
             sx={{
               fontFamily: 'var(--font-fraunces), Georgia, serif',
@@ -238,7 +220,7 @@ export default function Navbar() {
         <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 2, md: 4 } }}>
           <Link href="/" style={{ textDecoration: 'none', color: 'inherit' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <BirdMark size={30} />
+              <LogoMark size={38} />
               <Typography
                 sx={{
                   fontFamily: 'var(--font-fraunces), Georgia, serif',
