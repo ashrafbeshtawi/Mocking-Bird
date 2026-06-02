@@ -67,7 +67,7 @@ export default function PublishPage() {
   } = useConnectedAccounts();
 
   // Publishing logic
-  const { isPublishing, error, success, results, statusMessage, stepProgress, accountsProgress, publish, clearStatus } = usePublish();
+  const { isPublishing, error, success, results, statusMessage, stepProgress, accountsProgress, publish, clearStatus, silenceUpdates } = usePublish();
 
   // AI prompt matchings
   const { matchings: aiMatchings, loading: aiMatchingsLoading, hasAiTransformation } = useAllPromptMatchings();
@@ -252,7 +252,9 @@ export default function PublishPage() {
   const handleHidePublishing = useCallback(() => {
     setPublishingHidden(true);
     publishingHiddenRef.current = true;
-  }, []);
+    resetForm();
+    silenceUpdates();
+  }, [resetForm, silenceUpdates]);
 
   const handlePublish = async () => {
     setPublishingHidden(false);
@@ -267,7 +269,7 @@ export default function PublishPage() {
     });
 
     if (publishingHiddenRef.current) {
-      clearStatus();
+      // Form was already reset and status silenced when user backgrounded.
       return;
     }
 

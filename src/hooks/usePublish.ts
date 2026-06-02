@@ -79,6 +79,7 @@ interface UsePublishReturn {
   accountsProgress: AccountProgress[];
   publish: (params: PublishParams) => Promise<boolean>;
   clearStatus: () => void;
+  silenceUpdates: () => void;
 }
 
 export function usePublish(): UsePublishReturn {
@@ -91,8 +92,22 @@ export function usePublish(): UsePublishReturn {
   const [stepProgress, setStepProgress] = useState<StepProgress | null>(null);
   const [accountsProgress, setAccountsProgress] = useState<AccountProgress[]>([]);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const silencedRef = useRef(false);
 
   const clearStatus = useCallback(() => {
+    setError(null);
+    setSuccess(null);
+    setResults(null);
+    setStatusMessage('');
+    setProgress(null);
+    setStepProgress(null);
+    setAccountsProgress([]);
+  }, []);
+
+  // Suppress all further UI updates from the in-flight publish (server-side
+  // publishing continues; user will see the outcome in History).
+  const silenceUpdates = useCallback(() => {
+    silencedRef.current = true;
     setError(null);
     setSuccess(null);
     setResults(null);
@@ -111,6 +126,7 @@ export function usePublish(): UsePublishReturn {
       selectedInstagramAccounts,
       selectedTelegramChannels,
     }: PublishParams): Promise<boolean> => {
+      silencedRef.current = false;
       setIsPublishing(true);
       setError(null);
       setSuccess(null);
@@ -232,6 +248,12 @@ export function usePublish(): UsePublishReturn {
               try {
                 const parsed = JSON.parse(data);
 
+                if (silencedRef.current) {
+                  // User dismissed the in-flight publish; let the server
+                  // finish but stop reflecting status in the UI.
+                  continue;
+                }
+
                 switch (currentEvent) {
                   case 'status':
                     const statusData = parsed as StatusUpdate;
@@ -343,5 +365,6 @@ export function usePublish(): UsePublishReturn {
     accountsProgress,
     publish,
     clearStatus,
+    silenceUpdates,
   };
 }

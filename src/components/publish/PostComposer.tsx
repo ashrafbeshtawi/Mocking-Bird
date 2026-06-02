@@ -4,6 +4,7 @@ import React, { useRef, useCallback } from 'react';
 import { Box, TextField, Typography } from '@mui/material';
 import { EmojiPicker } from './EmojiPicker';
 import { MediaUploader, UploadedMedia } from './MediaUploader';
+import { TemplatePicker } from './TemplatePicker';
 import { TWITTER_CHAR_LIMIT } from '@/types/accounts';
 
 interface PostComposerProps {
@@ -59,6 +60,34 @@ export function PostComposer({
     }
   }, [postText.length]);
 
+  const handleTemplatePickerOpen = useCallback(() => {
+    const input = textFieldRef.current;
+    if (input) {
+      cursorPositionRef.current = input.selectionStart ?? postText.length;
+    }
+  }, [postText.length]);
+
+  const handleTemplateSelect = useCallback(
+    (text: string) => {
+      const input = textFieldRef.current;
+      const cursorPos = cursorPositionRef.current ?? postText.length;
+
+      const newText = postText.slice(0, cursorPos) + text + postText.slice(cursorPos);
+      onTextChange(newText);
+
+      const newCursorPos = cursorPos + text.length;
+      cursorPositionRef.current = newCursorPos;
+
+      setTimeout(() => {
+        if (input) {
+          input.focus();
+          input.setSelectionRange(newCursorPos, newCursorPos);
+        }
+      }, 0);
+    },
+    [postText, onTextChange]
+  );
+
   return (
     <>
       <TextField
@@ -103,6 +132,7 @@ export function PostComposer({
       <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
         <MediaUploader uploadedMedia={uploadedMedia} onMediaChange={onMediaChange} onUploadingChange={onUploadingChange} />
         <EmojiPicker onEmojiSelect={handleEmojiSelect} onOpen={handleEmojiPickerOpen} />
+        <TemplatePicker onTemplateSelect={handleTemplateSelect} onOpen={handleTemplatePickerOpen} />
       </Box>
     </>
   );
