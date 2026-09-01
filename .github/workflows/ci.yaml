@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: symfony
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: mockingbird
+          POSTGRES_PASSWORD: mockingbird
+          POSTGRES_DB: mockingbird
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U mockingbird"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: "postgresql://mockingbird:mockingbird@127.0.0.1:5432/mockingbird?serverVersion=18&charset=utf8"
+      PANTHER_NO_SANDBOX: 1
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP 8.4
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: intl, pdo_pgsql, zip
+          coverage: none
+
+      - name: Prepare environment
+        run: cp .env.example .env
+
+      - name: Install dependencies (cached)
+        uses: ramsey/composer-install@v3
+        with:
+          working-directory: symfony
+
+      - name: Create test database
+        run: php bin/console doctrine:database:create --env=test --if-not-exists
+
+      - name: Unit & integration tests
+        run: vendor/bin/phpunit --testsuite Unit,Integration
+
+      - name: Install ChromeDriver
+        run: vendor/bin/bdi detect drivers
+
+      - name: E2E tests (Chromium)
+        # drivers/ first on PATH so Panther uses the bdi-installed ChromeDriver
+        run: PATH="$PWD/drivers:$PATH" vendor/bin/phpunit --testsuite E2E

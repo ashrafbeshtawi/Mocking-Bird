@@ -42,3 +42,7 @@ next-env.d.ts
 
 # local claude settings
 .claude/settings.local.json
+
+# keep committed symfony env templates
+!.env.example
+!.env.test
