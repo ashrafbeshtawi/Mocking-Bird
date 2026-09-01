@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## ⚠️ Symfony Rewrite in Progress (branch `feat/symfony-rewrite`)
+
+The app is being rewritten in Symfony 7.4 (PHP 8.4). The new app lives in `symfony/` — see `symfony/README.md` and `symfony/CHEATSHEET.md`. The Next.js code described below stays in place as the porting reference until cutover; do not add features to it on this branch.
+
 ## Project Overview
 
 Mockingbird is a social media automation platform for cross-posting content from Facebook to Twitter/X, Instagram, and Telegram. It provides analytics, scheduling, and AI-powered content transformation. Single Next.js 15 application (not a monorepo).
