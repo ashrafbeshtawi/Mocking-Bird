@@ -85,11 +85,11 @@ Mockingbird exposes an MCP (Model Context Protocol) endpoint at `/api/mcp` so AI
 - `get_connected_social_media_types` — which platforms you have accounts connected for
 - `list_drafts` / `add_draft` / `edit_draft` / `delete_draft` — manage post drafts (text, target platforms, optional media URLs)
 
-Set `MCP_API_KEY` (a long random secret) and `MCP_USER_ID` (the user the token acts as) in `.env`, then connect a client:
+Generate your personal long-lived bearer token on the **Dashboard → MCP Access** card (shown once; regenerating replaces it, and it can be revoked anytime). Then connect a client:
 
 ```bash
 claude mcp add --transport http mockingbird https://your-host/api/mcp \
-  --header "Authorization: Bearer $MCP_API_KEY"
+  --header "Authorization: Bearer <your-token>"
 ```
 
 ## 🤝 Contributing

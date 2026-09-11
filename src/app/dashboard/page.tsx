@@ -25,6 +25,7 @@ import { fetchWithAuth } from '@/lib/fetch';
 import { ConfirmDisconnectDialog } from '@/components/dashboard/ConfirmDisconnectDialog';
 import { TelegramConnectDialog } from '@/components/dashboard/TelegramConnectDialog';
 import { ConnectButtons } from '@/components/dashboard/ConnectButtons';
+import { McpTokenCard } from '@/components/dashboard/McpTokenCard';
 import { AccountsTable } from '@/components/dashboard/AccountsTable';
 import type { AccountData } from '@/types/accounts';
 import { API_CONFIG } from '@/types/accounts';
@@ -603,6 +604,9 @@ export default function DashboardPage() {
                 </Box>
               ))}
             </Box>
+
+            {/* --- MCP access card --- */}
+            <McpTokenCard />
           </Box>
         </Box>
       </Container>

@@ -1,7 +1,7 @@
-import { timingSafeEqual } from 'crypto';
 import { createMcpHandler, withMcpAuth } from 'mcp-handler';
 import { z } from 'zod';
 import { createLogger } from '@/lib/logger';
+import { getUserIdByMcpToken } from '@/lib/mcpTokens';
 import { getConnectedPlatformTypes } from '@/lib/connectedPlatforms';
 import {
   createDraft,
@@ -138,18 +138,20 @@ const handler = createMcpHandler(
   { serverInfo: { name: 'mockingbird', version: '1.0.0' } }
 );
 
-// ponytail: single shared bearer token mapped to one user via env vars;
-// move to a per-user token table when a second user needs MCP access.
+// Per-user long-lived tokens, generated on the dashboard (MCP Access card).
 const verifyToken = async (_req: Request, bearerToken?: string) => {
-  const expected = process.env.MCP_API_KEY;
-  const userId = parseInt(process.env.MCP_USER_ID ?? '', 10);
+  if (!bearerToken) return undefined;
 
-  if (!expected || !userId || !bearerToken) return undefined;
+  let userId: number | null = null;
+  try {
+    userId = await getUserIdByMcpToken(bearerToken);
+  } catch (error) {
+    logger.error('Token lookup failed', error);
+    return undefined;
+  }
 
-  const provided = Buffer.from(bearerToken);
-  const secret = Buffer.from(expected);
-  if (provided.length !== secret.length || !timingSafeEqual(provided, secret)) {
-    logger.warn('Rejected MCP request with invalid token');
+  if (!userId) {
+    logger.warn('Rejected MCP request with unknown token');
     return undefined;
   }
 
