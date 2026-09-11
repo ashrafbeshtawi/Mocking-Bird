@@ -42,7 +42,7 @@ export function McpTokenCard() {
       try {
         const response = await fetchWithAuth('/api/mcp-token');
         const data = await response.json();
-        if (response.ok) setCreatedAt(data.token?.created_at ?? null);
+        if (response.ok) setCreatedAt(data.tokenInfo?.created_at ?? null);
       } catch {
         // status stays unknown; the card still allows generating a token
       } finally {

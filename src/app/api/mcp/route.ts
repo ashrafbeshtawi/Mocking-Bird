@@ -1,6 +1,7 @@
 import { createMcpHandler, withMcpAuth } from 'mcp-handler';
 import { z } from 'zod';
 import { createLogger } from '@/lib/logger';
+import { ingestRemoteMedia } from '@/lib/services/cloudinaryService';
 import { getUserIdByMcpToken } from '@/lib/mcpTokens';
 import { getConnectedPlatformTypes } from '@/lib/connectedPlatforms';
 import {
@@ -22,8 +23,10 @@ const mediaUrls = z
   .optional()
   .describe('Optional list of media URLs to attach to the draft');
 
-const toMedia = (urls?: string[]): DraftMedia[] | null =>
-  urls && urls.length > 0 ? urls.map((publicUrl) => ({ publicUrl })) : null;
+// External URLs can expire, so drafts must not reference them directly.
+// Ingest them into Cloudinary (same store the UI uploads to) at write time.
+const toMedia = async (urls?: string[]): Promise<DraftMedia[] | null> =>
+  urls && urls.length > 0 ? ingestRemoteMedia(urls) : null;
 
 const json = (data: unknown) => ({
   content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }],
@@ -104,11 +107,23 @@ const handler = createMcpHandler(
         }),
       },
       async ({ text, target_platforms, media }, extra) => {
-        const input = { text, target_platforms, media: toMedia(media) };
-        const validationError = validateDraftInput(input);
+        const userId = userIdFrom(extra);
+        // Validate before ingesting so bad input doesn't trigger uploads
+        const validationError = validateDraftInput({
+          text,
+          target_platforms,
+          media: media?.map((publicUrl) => ({ publicUrl })) ?? null,
+        });
         if (validationError) return fail(validationError);
 
-        const draft = await createDraft(userIdFrom(extra), input);
+        let storedMedia;
+        try {
+          storedMedia = await toMedia(media);
+        } catch (error) {
+          return fail((error as Error).message);
+        }
+
+        const draft = await createDraft(userId, { text, target_platforms, media: storedMedia });
         return json({ draft });
       }
     );
@@ -130,15 +145,27 @@ const handler = createMcpHandler(
         const existing = await getDraft(userId, id);
         if (!existing) return fail(`Draft ${id} not found.`);
 
-        const input = {
+        // Validate before ingesting so bad input doesn't trigger uploads
+        const validationError = validateDraftInput({
           text: text ?? existing.text,
           target_platforms: target_platforms ?? existing.target_platforms,
-          media: media !== undefined ? toMedia(media) : existing.media,
-        };
-        const validationError = validateDraftInput(input);
+          media:
+            media !== undefined ? media.map((publicUrl) => ({ publicUrl })) : existing.media,
+        });
         if (validationError) return fail(validationError);
 
-        const draft = await updateDraft(userId, id, input);
+        let storedMedia;
+        try {
+          storedMedia = media !== undefined ? await toMedia(media) : existing.media;
+        } catch (error) {
+          return fail((error as Error).message);
+        }
+
+        const draft = await updateDraft(userId, id, {
+          text: text ?? existing.text,
+          target_platforms: target_platforms ?? existing.target_platforms,
+          media: storedMedia,
+        });
         return json({ draft });
       }
     );

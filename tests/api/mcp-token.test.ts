@@ -33,12 +33,13 @@ describe('MCP Token API', () => {
     expect(mockQuery).not.toHaveBeenCalled();
   });
 
-  it('reports token status', async () => {
+  it('reports token status without ever exposing the token', async () => {
     mockQuery.mockResolvedValue({ rows: [{ created_at: '2026-09-11T00:00:00Z' }] });
 
     const data = await (await GET()).json();
 
-    expect(data.token).toEqual({ created_at: '2026-09-11T00:00:00Z' });
+    expect(data.tokenInfo).toEqual({ created_at: '2026-09-11T00:00:00Z' });
+    expect(data.token).toBeUndefined();
   });
 
   it('creates a token and stores only its hash', async () => {

@@ -11,7 +11,8 @@ const getUserId = async (): Promise<number | null> => {
   return parsedUserId && !isNaN(parsedUserId) ? parsedUserId : null;
 };
 
-// GET: Whether the user has an MCP token, and when it was created
+// GET: Whether the user has an MCP token, and when it was created.
+// Never returns the token itself — only its hash is stored, so it cannot be retrieved again.
 export async function GET() {
   const userId = await getUserId();
   if (!userId) {
@@ -19,8 +20,8 @@ export async function GET() {
   }
 
   try {
-    const token = await getMcpTokenInfo(userId);
-    return NextResponse.json({ success: true, token });
+    const tokenInfo = await getMcpTokenInfo(userId);
+    return NextResponse.json({ success: true, tokenInfo });
   } catch (error) {
     logger.error('GET failed', error);
     return NextResponse.json({ error: 'Internal Server Error.' }, { status: 500 });

@@ -153,6 +153,44 @@ export async function uploadMultipleToCloudinary(
 }
 
 /**
+ * Ingests remote media URLs into Cloudinary so drafts reference assets we control
+ * instead of external links that may expire. Cloudinary fetches the URLs itself.
+ * Throws on the first URL that cannot be ingested, naming it in the message.
+ */
+export async function ingestRemoteMedia(urls: string[]): Promise<
+  Array<UploadedMedia & { originalFilename: string }>
+> {
+  ensureConfigured();
+
+  logger.info('Ingesting remote media into Cloudinary', { count: urls.length });
+
+  return Promise.all(
+    urls.map(async (url) => {
+      try {
+        const result = await cloudinary.uploader.upload(url, {
+          resource_type: 'auto',
+          folder: 'mocking-bird/drafts',
+          type: 'upload',
+        });
+        return {
+          publicUrl: result.secure_url,
+          publicId: result.public_id,
+          resourceType: result.resource_type === 'video' ? ('video' as const) : ('image' as const),
+          format: result.format,
+          width: result.width,
+          height: result.height,
+          originalFilename: url,
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown upload error';
+        logger.error('Remote media ingestion failed', { url, error: message });
+        throw new Error(`Could not ingest media URL "${url}": ${message}`);
+      }
+    })
+  );
+}
+
+/**
  * Deletes a media file from Cloudinary by its public ID
  */
 export async function deleteFromCloudinary(
