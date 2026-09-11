@@ -32,23 +32,39 @@ describe('Drafts API', () => {
     mockGetAuthUserId.mockResolvedValue('42');
   });
 
+  const getRequest = (params = '') => new Request(`http://localhost/api/drafts${params}`);
+
   it('rejects unauthenticated requests', async () => {
     mockGetAuthUserId.mockResolvedValue(null);
 
-    const response = await GET();
+    const response = await GET(getRequest());
 
     expect(response.status).toBe(401);
   });
 
-  it('lists drafts for the current user', async () => {
-    mockQuery.mockResolvedValue({ rows: [draftRow] });
+  it('lists drafts for the current user with pagination info', async () => {
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ count: '7' }] })
+      .mockResolvedValueOnce({ rows: [draftRow] });
 
-    const response = await GET();
+    const response = await GET(getRequest());
     const data = await response.json();
 
     expect(response.status).toBe(200);
     expect(data.drafts).toHaveLength(1);
-    expect(mockQuery.mock.calls[0][1]).toEqual([42]);
+    expect(data.total).toBe(7);
+    expect(mockQuery.mock.calls[0][1]).toEqual([42, null]);
+    expect(mockQuery.mock.calls[1][1]).toEqual([42, null, 20, 0]);
+  });
+
+  it('escapes ILIKE wildcards in search and clamps pagination', async () => {
+    mockQuery.mockResolvedValue({ rows: [{ count: '0' }] });
+
+    await GET(getRequest('?q=100%25_done&limit=500&offset=-5'));
+
+    const pattern = '%100\\%\\_done%';
+    expect(mockQuery.mock.calls[0][1]).toEqual([42, pattern]);
+    expect(mockQuery.mock.calls[1][1]).toEqual([42, pattern, 100, 0]);
   });
 
   it('rejects a draft with an unknown target platform', async () => {

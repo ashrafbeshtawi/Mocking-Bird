@@ -19,6 +19,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
+  // MCP endpoint authenticates itself via bearer token (see api/mcp/route.ts)
+  if (pathname.startsWith("/api/mcp")) {
+    return NextResponse.next()
+  }
+
   // Allow public paths
   if (isPublicPath(pathname)) {
     return NextResponse.next()

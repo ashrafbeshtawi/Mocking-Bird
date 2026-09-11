@@ -32,7 +32,7 @@ import { useDrafts, type Draft } from '@/hooks/useDrafts';
 import { PLATFORMS, type Platform } from '@/types/accounts';
 
 export default function DraftsPage() {
-  const { drafts, loading, error, updateDraft, deleteDraft } = useDrafts();
+  const { drafts, total, loading, error, updateDraft, deleteDraft } = useDrafts();
 
   const [editing, setEditing] = useState<Draft | null>(null);
   const [editText, setEditText] = useState('');
@@ -210,6 +210,11 @@ export default function DraftsPage() {
                   </Box>
                 </Paper>
               ))}
+              {total > drafts.length && (
+                <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center' }}>
+                  Showing the {drafts.length} most recent of {total} drafts
+                </Typography>
+              )}
             </Box>
           </Fade>
         )}
