@@ -4,6 +4,7 @@ import { createLogger } from '@/lib/logger';
 import {
   createDraft,
   deleteDraft,
+  getDraft,
   listDrafts,
   updateDraft,
   validateDraftInput,
@@ -33,6 +34,16 @@ export async function GET(req: Request) {
 
   try {
     const { searchParams } = new URL(req.url);
+
+    const id = intParam(searchParams.get('id'));
+    if (id) {
+      const draft = await getDraft(userId, id);
+      if (!draft) {
+        return NextResponse.json({ error: 'Draft not found or access denied.' }, { status: 404 });
+      }
+      return NextResponse.json({ success: true, draft });
+    }
+
     const page = await listDrafts(userId, {
       query: searchParams.get('q') ?? undefined,
       limit: intParam(searchParams.get('limit')),

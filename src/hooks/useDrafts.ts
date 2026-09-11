@@ -3,8 +3,23 @@
 import { useState, useEffect, useCallback } from 'react';
 import { fetchWithAuth } from '@/lib/fetch';
 import type { Draft, DraftInput } from '@/lib/drafts';
+import type { UploadedMedia } from '@/components/publish/MediaUploader';
 
 export type { Draft, DraftInput };
+
+/** Turn stored draft media into the shape the composer and publisher expect. */
+export function mapDraftMediaToUploaded(media: Draft['media']): UploadedMedia[] {
+  return (media ?? []).map((m) => ({
+    publicId: m.publicId ?? '',
+    publicUrl: m.publicUrl,
+    resourceType: m.resourceType ?? 'image',
+    format: m.format ?? '',
+    width: m.width,
+    height: m.height,
+    originalFilename: m.originalFilename ?? 'media',
+    previewUrl: m.publicUrl,
+  }));
+}
 
 export function useDrafts() {
   const [drafts, setDrafts] = useState<Draft[]>([]);
@@ -30,23 +45,6 @@ export function useDrafts() {
     }
   }, []);
 
-  const updateDraft = useCallback(async (id: number, input: DraftInput): Promise<Draft> => {
-    const response = await fetchWithAuth('/api/drafts', {
-      method: 'PUT',
-      body: JSON.stringify({ id, ...input }),
-    });
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.error || 'Failed to update draft');
-    }
-    setDrafts((prev) => {
-      const next = prev.map((d) => (d.id === id ? data.draft : d));
-      next.sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1));
-      return next;
-    });
-    return data.draft;
-  }, []);
-
   const deleteDraft = useCallback(async (id: number): Promise<void> => {
     const response = await fetchWithAuth('/api/drafts', {
       method: 'DELETE',
@@ -69,7 +67,6 @@ export function useDrafts() {
     loading,
     error,
     refetch: fetchDrafts,
-    updateDraft,
     deleteDraft,
   };
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import {
   Container,
   Box,
@@ -17,67 +18,98 @@ import {
   DialogContent,
   DialogActions,
   IconButton,
-  TextField,
-  FormControlLabel,
-  Checkbox,
-  FormGroup,
 } from '@mui/material';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined';
+import VideocamOutlinedIcon from '@mui/icons-material/VideocamOutlined';
+import SendIcon from '@mui/icons-material/Send';
 import CloseIcon from '@mui/icons-material/Close';
 import { PageHeader } from '@/components/PageHeader';
 import { getPlatformConfig } from '@/lib/platformConfig';
-import { useDrafts, type Draft } from '@/hooks/useDrafts';
-import { PLATFORMS, type Platform } from '@/types/accounts';
+import { useDrafts, mapDraftMediaToUploaded, type Draft } from '@/hooks/useDrafts';
+import { useConnectedAccounts } from '@/hooks/useConnectedAccounts';
+import { usePublish } from '@/hooks/usePublish';
+import type { InstagramSelection, Platform } from '@/types/accounts';
 
 export default function DraftsPage() {
-  const { drafts, total, loading, error, updateDraft, deleteDraft } = useDrafts();
+  const { drafts, total, loading, error, deleteDraft } = useDrafts();
+  const { facebookPages, xAccounts, instagramAccounts, telegramChannels } = useConnectedAccounts();
+  const { publish, isPublishing, statusMessage } = usePublish();
 
-  const [editing, setEditing] = useState<Draft | null>(null);
-  const [editText, setEditText] = useState('');
-  const [editTargets, setEditTargets] = useState<Platform[]>([]);
+  const [previewDraft, setPreviewDraft] = useState<Draft | null>(null);
   const [deleting, setDeleting] = useState<Draft | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [working, setWorking] = useState(false);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false,
     message: '',
     severity: 'success',
   });
 
-  const openEdit = (draft: Draft) => {
-    setEditing(draft);
-    setEditText(draft.text);
-    setEditTargets(draft.target_platforms);
+  const accountNamesFor = (platform: Platform): string[] => {
+    switch (platform) {
+      case 'facebook':
+        return facebookPages.map((p) => p.page_name);
+      case 'twitter':
+        return xAccounts.map((a) => `@${a.name}`);
+      case 'instagram':
+        return instagramAccounts.map((a) => `@${a.username}`);
+      case 'telegram':
+        return telegramChannels.map((c) => c.channel_title);
+    }
   };
 
-  const toggleTarget = (platform: Platform) => {
-    setEditTargets((prev) =>
-      prev.includes(platform) ? prev.filter((p) => p !== platform) : [...prev, platform]
-    );
-  };
+  const previewHasMedia = (previewDraft?.media?.length ?? 0) > 0;
 
-  const handleSaveEdit = async () => {
-    if (!editing) return;
-    setSaving(true);
-    try {
-      await updateDraft(editing.id, {
-        text: editText,
-        target_platforms: editTargets,
-        media: editing.media,
+  /** Accounts the confirm button would actually publish to. */
+  const previewDestinationCount = previewDraft
+    ? previewDraft.target_platforms.reduce((count, platform) => {
+        if (platform === 'instagram' && !previewHasMedia) return count;
+        return count + accountNamesFor(platform).length;
+      }, 0)
+    : 0;
+
+  const handleConfirmPublish = async () => {
+    if (!previewDraft) return;
+    const targets = previewDraft.target_platforms;
+    const media = mapDraftMediaToUploaded(previewDraft.media);
+
+    const instagram: Record<string, InstagramSelection> = {};
+    instagramAccounts.forEach((a) => {
+      instagram[a.id] = { publish: targets.includes('instagram') && media.length > 0, story: false };
+    });
+
+    const ok = await publish({
+      postText: previewDraft.text,
+      uploadedMedia: media,
+      selectedFacebookPages: targets.includes('facebook') ? facebookPages.map((p) => p.page_id) : [],
+      selectedXAccounts: targets.includes('twitter') ? xAccounts.map((a) => a.id) : [],
+      selectedInstagramAccounts: instagram,
+      selectedTelegramChannels: targets.includes('telegram')
+        ? telegramChannels.map((c) => c.channel_id)
+        : [],
+    });
+
+    if (ok) {
+      try {
+        await deleteDraft(previewDraft.id);
+      } catch {
+        // publish went through; a stale draft in the list is not fatal
+      }
+      setPreviewDraft(null);
+      setSnackbar({ open: true, message: 'Draft published', severity: 'success' });
+    } else {
+      setSnackbar({
+        open: true,
+        message: 'Publishing failed — see History for details',
+        severity: 'error',
       });
-      setEditing(null);
-      setSnackbar({ open: true, message: 'Draft updated', severity: 'success' });
-    } catch (err) {
-      setSnackbar({ open: true, message: (err as Error).message, severity: 'error' });
-    } finally {
-      setSaving(false);
     }
   };
 
   const handleConfirmDelete = async () => {
     if (!deleting) return;
-    setSaving(true);
+    setWorking(true);
     try {
       await deleteDraft(deleting.id);
       setDeleting(null);
@@ -85,7 +117,7 @@ export default function DraftsPage() {
     } catch (err) {
       setSnackbar({ open: true, message: (err as Error).message, severity: 'error' });
     } finally {
-      setSaving(false);
+      setWorking(false);
     }
   };
 
@@ -127,7 +159,7 @@ export default function DraftsPage() {
         <PageHeader
           eyebrow="Draft · manage"
           title={<>Drafts</>}
-          lead="Posts you saved for later. Edit, retarget or delete them here."
+          lead="Posts you saved for later. Continue editing in the composer, or publish directly."
         />
 
         {error && (
@@ -201,7 +233,20 @@ export default function DraftsPage() {
                         </Typography>
                       </Box>
                     </Box>
-                    <IconButton size="small" onClick={() => openEdit(draft)} title="Edit draft">
+                    <IconButton
+                      size="small"
+                      color="primary"
+                      onClick={() => setPreviewDraft(draft)}
+                      title="Publish draft"
+                    >
+                      <SendIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton
+                      size="small"
+                      component={Link}
+                      href={`/publish?draft=${draft.id}`}
+                      title="Edit in composer"
+                    >
                       <EditOutlinedIcon fontSize="small" />
                     </IconButton>
                     <IconButton size="small" color="error" onClick={() => setDeleting(draft)} title="Delete draft">
@@ -220,58 +265,130 @@ export default function DraftsPage() {
         )}
       </Container>
 
-      {/* Edit dialog */}
-      <Dialog open={!!editing} onClose={() => setEditing(null)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 4 } }}>
+      {/* Publish preview / confirmation */}
+      <Dialog
+        open={!!previewDraft}
+        onClose={() => !isPublishing && setPreviewDraft(null)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 4 } }}
+      >
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', pb: 1 }}>
-          Edit draft
-          <IconButton onClick={() => setEditing(null)} sx={{ ml: 'auto' }} size="small">
+          Publish this draft?
+          <IconButton
+            onClick={() => setPreviewDraft(null)}
+            disabled={isPublishing}
+            sx={{ ml: 'auto' }}
+            size="small"
+          >
             <CloseIcon />
           </IconButton>
         </DialogTitle>
         <DialogContent dividers>
-          <TextField
-            fullWidth
-            multiline
-            minRows={4}
-            maxRows={12}
-            value={editText}
-            onChange={(e) => setEditText(e.target.value)}
-            placeholder="What do you want to say?"
-            sx={{ mb: 2 }}
-          />
           <Typography variant="overline" color="text.secondary">
-            Target platforms
+            Text
           </Typography>
-          <FormGroup row>
-            {PLATFORMS.map((platform) => {
-              const config = getPlatformConfig(platform);
-              return (
-                <FormControlLabel
-                  key={platform}
-                  control={
-                    <Checkbox
-                      size="small"
-                      checked={editTargets.includes(platform)}
-                      onChange={() => toggleTarget(platform)}
+          <Paper
+            elevation={0}
+            sx={{
+              p: 1.5,
+              mb: 2,
+              maxHeight: 220,
+              overflow: 'auto',
+              border: '1px solid',
+              borderColor: 'divider',
+              borderRadius: 2,
+              whiteSpace: 'pre-wrap',
+              fontSize: '0.9rem',
+            }}
+          >
+            {previewDraft?.text || <em>(no text)</em>}
+          </Paper>
+
+          {previewHasMedia && (
+            <>
+              <Typography variant="overline" color="text.secondary">
+                Media
+              </Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+                {previewDraft!.media!.map((m, i) =>
+                  m.resourceType === 'video' ? (
+                    <Chip key={i} icon={<VideocamOutlinedIcon />} label={m.originalFilename ?? 'video'} />
+                  ) : (
+                    <Box
+                      key={i}
+                      component="img"
+                      src={m.publicUrl}
+                      alt={m.originalFilename ?? 'media'}
+                      sx={{
+                        height: 80,
+                        borderRadius: 2,
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        objectFit: 'cover',
+                      }}
                     />
-                  }
-                  label={config?.label ?? platform}
-                />
+                  )
+                )}
+              </Box>
+            </>
+          )}
+
+          <Typography variant="overline" color="text.secondary">
+            Publishing to
+          </Typography>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75, mt: 0.5 }}>
+            {previewDraft?.target_platforms.length === 0 && (
+              <Alert severity="warning" sx={{ py: 0.5 }}>
+                This draft has no target platforms — edit it in the composer first.
+              </Alert>
+            )}
+            {previewDraft?.target_platforms.map((platform) => {
+              const names = accountNamesFor(platform);
+              const skipped = platform === 'instagram' && !previewHasMedia;
+              return (
+                <Box key={platform} sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                  {renderPlatformChips([platform])}
+                  <Typography variant="caption" color={names.length && !skipped ? 'text.secondary' : 'warning.main'}>
+                    {skipped
+                      ? 'needs media — will be skipped'
+                      : names.length
+                        ? names.join(', ')
+                        : 'no connected accounts'}
+                  </Typography>
+                </Box>
               );
             })}
-          </FormGroup>
+          </Box>
+
+          {isPublishing && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mt: 2 }}>
+              <CircularProgress size={18} />
+              <Typography variant="caption" color="text.secondary">
+                {statusMessage || 'Publishing...'}
+              </Typography>
+            </Box>
+          )}
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>
-          <Button onClick={() => setEditing(null)} variant="outlined" sx={{ borderRadius: 2 }}>
+          <Button
+            onClick={() => setPreviewDraft(null)}
+            disabled={isPublishing}
+            variant="outlined"
+            sx={{ borderRadius: 2 }}
+          >
             Cancel
           </Button>
           <Button
-            onClick={handleSaveEdit}
+            onClick={handleConfirmPublish}
             variant="contained"
-            disabled={saving || (!editText.trim() && (editing?.media?.length ?? 0) === 0)}
+            disabled={isPublishing || previewDestinationCount === 0}
+            endIcon={isPublishing ? <CircularProgress size={16} color="inherit" /> : <SendIcon />}
             sx={{ borderRadius: 2 }}
           >
-            {saving ? 'Saving...' : 'Save'}
+            {isPublishing
+              ? 'Publishing...'
+              : `Publish to ${previewDestinationCount} destination${previewDestinationCount === 1 ? '' : 's'}`}
           </Button>
         </DialogActions>
       </Dialog>
@@ -288,7 +405,7 @@ export default function DraftsPage() {
           <Button onClick={() => setDeleting(null)} variant="outlined" sx={{ borderRadius: 2 }}>
             Cancel
           </Button>
-          <Button onClick={handleConfirmDelete} variant="contained" color="error" disabled={saving} sx={{ borderRadius: 2 }}>
+          <Button onClick={handleConfirmDelete} variant="contained" color="error" disabled={working} sx={{ borderRadius: 2 }}>
             Delete
           </Button>
         </DialogActions>
