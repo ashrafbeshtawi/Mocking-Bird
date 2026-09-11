@@ -18,16 +18,27 @@ const getUserId = async (): Promise<number | null> => {
   return parsedUserId && !isNaN(parsedUserId) ? parsedUserId : null;
 };
 
-// GET: List all drafts for the current user
-export async function GET() {
+const intParam = (value: string | null): number | undefined => {
+  if (!value) return undefined;
+  const parsed = parseInt(value, 10);
+  return Number.isNaN(parsed) ? undefined : parsed;
+};
+
+// GET: List (or search via ?q=) drafts for the current user, paginated
+export async function GET(req: Request) {
   const userId = await getUserId();
   if (!userId) {
     return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
   }
 
   try {
-    const drafts = await listDrafts(userId);
-    return NextResponse.json({ success: true, drafts });
+    const { searchParams } = new URL(req.url);
+    const page = await listDrafts(userId, {
+      query: searchParams.get('q') ?? undefined,
+      limit: intParam(searchParams.get('limit')),
+      offset: intParam(searchParams.get('offset')),
+    });
+    return NextResponse.json({ success: true, ...page });
   } catch (error) {
     logger.error('GET failed', error);
     return NextResponse.json({ error: 'Internal Server Error.' }, { status: 500 });

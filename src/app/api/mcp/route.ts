@@ -58,12 +58,35 @@ const handler = createMcpHandler(
       }
     );
 
+    const pageArgs = {
+      limit: z.number().int().min(1).max(100).optional().describe('Page size, default 20, max 100'),
+      offset: z.number().int().min(0).optional().describe('Number of drafts to skip'),
+    };
+
     server.registerTool(
       'list_drafts',
-      { description: 'List all saved post drafts, newest first.', inputSchema: z.object({}) },
-      async (_args, extra) => {
-        const drafts = await listDrafts(userIdFrom(extra));
-        return json({ drafts });
+      {
+        description:
+          'List saved post drafts, newest first. Paginated; the response includes `total`, so page with `offset` until you have them all.',
+        inputSchema: z.object(pageArgs),
+      },
+      async ({ limit, offset }, extra) => {
+        return json(await listDrafts(userIdFrom(extra), { limit, offset }));
+      }
+    );
+
+    server.registerTool(
+      'search_drafts',
+      {
+        description:
+          'Search drafts by text (case-insensitive substring match), newest first. Paginated like list_drafts.',
+        inputSchema: z.object({
+          query: z.string().min(1).describe('Text to search for in the draft body'),
+          ...pageArgs,
+        }),
+      },
+      async ({ query, limit, offset }, extra) => {
+        return json(await listDrafts(userIdFrom(extra), { query, limit, offset }));
       }
     );
 

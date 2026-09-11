@@ -8,6 +8,7 @@ export type { Draft, DraftInput };
 
 export function useDrafts() {
   const [drafts, setDrafts] = useState<Draft[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -15,12 +16,13 @@ export function useDrafts() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetchWithAuth('/api/drafts');
+      const response = await fetchWithAuth('/api/drafts?limit=100');
       if (!response.ok) {
         throw new Error('Failed to fetch drafts');
       }
       const data = await response.json();
       setDrafts(data.drafts || []);
+      setTotal(data.total ?? (data.drafts?.length || 0));
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -63,6 +65,7 @@ export function useDrafts() {
 
   return {
     drafts,
+    total,
     loading,
     error,
     refetch: fetchDrafts,

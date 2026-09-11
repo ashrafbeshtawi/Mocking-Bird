@@ -67,12 +67,50 @@ export async function getDraft(userId: number, id: number): Promise<Draft | null
   return rows[0] ?? null;
 }
 
-export async function listDrafts(userId: number): Promise<Draft[]> {
-  const { rows } = await pool.query(
-    `SELECT ${DRAFT_COLUMNS} FROM drafts WHERE user_id = $1 ORDER BY updated_at DESC`,
-    [userId]
-  );
-  return rows;
+export interface ListDraftsOptions {
+  /** Case-insensitive substring match on the draft text. */
+  query?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface DraftPage {
+  drafts: Draft[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+const DEFAULT_PAGE_SIZE = 20;
+const MAX_PAGE_SIZE = 100;
+
+const escapeLike = (s: string): string => s.replace(/[\\%_]/g, (m) => `\\${m}`);
+
+export async function listDrafts(
+  userId: number,
+  options: ListDraftsOptions = {}
+): Promise<DraftPage> {
+  const limit = Math.min(Math.max(options.limit ?? DEFAULT_PAGE_SIZE, 1), MAX_PAGE_SIZE);
+  const offset = Math.max(options.offset ?? 0, 0);
+  const pattern = options.query?.trim() ? `%${escapeLike(options.query.trim())}%` : null;
+
+  const where = 'user_id = $1 AND ($2::text IS NULL OR text ILIKE $2)';
+  const [countResult, pageResult] = await Promise.all([
+    pool.query(`SELECT COUNT(*) FROM drafts WHERE ${where}`, [userId, pattern]),
+    pool.query(
+      `SELECT ${DRAFT_COLUMNS} FROM drafts WHERE ${where}
+       ORDER BY updated_at DESC, id DESC
+       LIMIT $3 OFFSET $4`,
+      [userId, pattern, limit, offset]
+    ),
+  ]);
+
+  return {
+    drafts: pageResult.rows,
+    total: parseInt(countResult.rows[0].count, 10),
+    limit,
+    offset,
+  };
 }
 
 export async function createDraft(userId: number, input: DraftInput): Promise<Draft> {
