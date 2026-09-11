@@ -22,6 +22,7 @@ import MenuIcon from '@mui/icons-material/Menu';
 import CloseIcon from '@mui/icons-material/Close';
 import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined';
 import EditNoteOutlinedIcon from '@mui/icons-material/EditNoteOutlined';
+import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
 import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined';
 import BarChartOutlinedIcon from '@mui/icons-material/BarChartOutlined';
 import AutoAwesomeOutlinedIcon from '@mui/icons-material/AutoAwesomeOutlined';
@@ -41,6 +42,7 @@ const getNavLinks = (isLoggedIn: boolean): NavLink[] =>
     ? [
         { href: '/dashboard', label: 'Dashboard', icon: DashboardOutlinedIcon },
         { href: '/publish', label: 'Publish', icon: EditNoteOutlinedIcon },
+        { href: '/drafts', label: 'Drafts', icon: DescriptionOutlinedIcon },
         { href: '/history', label: 'History', icon: HistoryOutlinedIcon },
         { href: '/analytics', label: 'Analytics', icon: BarChartOutlinedIcon },
         { href: '/ai', label: 'AI Tools', icon: AutoAwesomeOutlinedIcon },

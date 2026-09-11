@@ -2,6 +2,8 @@
 
 export type Platform = 'facebook' | 'instagram' | 'twitter' | 'telegram';
 
+export const PLATFORMS: readonly Platform[] = ['facebook', 'instagram', 'twitter', 'telegram'];
+
 // Facebook page from API
 export interface ConnectedPage {
   page_id: string;

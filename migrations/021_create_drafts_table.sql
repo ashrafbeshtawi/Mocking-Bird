@@ -1,0 +1,11 @@
+CREATE TABLE drafts (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    text TEXT NOT NULL DEFAULT '',
+    target_platforms TEXT[] NOT NULL DEFAULT '{}',
+    media JSONB,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_drafts_user_id ON drafts(user_id);

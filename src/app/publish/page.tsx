@@ -27,6 +27,7 @@ import {
 } from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
 import ScheduleSendIcon from '@mui/icons-material/ScheduleSend';
+import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
 import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { getPlatformConfig } from '@/lib/platformConfig';
@@ -136,6 +137,8 @@ export default function PublishPage() {
 
   // Queue state
   const [isQueueing, setIsQueueing] = useState(false);
+  // Draft state
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [queueSnackbar, setQueueSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false,
     message: '',
@@ -397,6 +400,52 @@ export default function PublishPage() {
     handlePublish();
   };
 
+  const handleSaveDraft = async () => {
+    setIsSavingDraft(true);
+
+    // Targets = platforms with at least one selected account
+    const targetPlatforms = [
+      selectedFacebookPages.length > 0 ? 'facebook' : null,
+      selectedXAccounts.length > 0 ? 'twitter' : null,
+      Object.values(selectedInstagramAccounts).some((s) => s.publish || s.story) ? 'instagram' : null,
+      selectedTelegramChannels.length > 0 ? 'telegram' : null,
+    ].filter(Boolean);
+
+    try {
+      const response = await fetch('/api/drafts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          text: postText,
+          target_platforms: targetPlatforms,
+          media: uploadedMedia.map((media) => ({
+            publicId: media.publicId,
+            publicUrl: media.publicUrl,
+            resourceType: media.resourceType,
+            format: media.format,
+            width: media.width,
+            height: media.height,
+            originalFilename: media.originalFilename,
+          })),
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setQueueSnackbar({ open: true, message: 'Draft saved', severity: 'success' });
+        resetForm();
+      } else {
+        setQueueSnackbar({ open: true, message: data.error || 'Failed to save draft', severity: 'error' });
+      }
+    } catch (err) {
+      setQueueSnackbar({ open: true, message: (err as Error).message || 'Failed to save draft', severity: 'error' });
+    } finally {
+      setIsSavingDraft(false);
+    }
+  };
+
   const handleQueuePost = async () => {
     setIsQueueing(true);
 
@@ -574,11 +623,19 @@ export default function PublishPage() {
   const hasInstagramSelection = Object.values(selectedInstagramAccounts).some(
     (s) => s.publish || s.story
   );
+  const canSaveDraft =
+    !isPublishing &&
+    !isQueueing &&
+    !isTransforming &&
+    !isMediaUploading &&
+    !isSavingDraft &&
+    (postText.trim() !== '' || uploadedMedia.length > 0);
   const canPublish =
     !isPublishing &&
     !isQueueing &&
     !isTransforming &&
     !isMediaUploading &&
+    !isSavingDraft &&
     (postText.trim() !== '' || uploadedMedia.length > 0) &&
     (selectedFacebookPages.length > 0 ||
       selectedXAccounts.length > 0 ||
@@ -880,6 +937,28 @@ export default function PublishPage() {
                   )}
                 </Box>
                 <Box sx={{ display: 'flex', gap: 2 }}>
+                  <Button
+                    variant="outlined"
+                    size="large"
+                    onClick={handleSaveDraft}
+                    disabled={!canSaveDraft}
+                    endIcon={isSavingDraft ? <CircularProgress size={20} /> : <SaveOutlinedIcon />}
+                    sx={{
+                      px: 3,
+                      py: 1.5,
+                      borderRadius: 3,
+                      textTransform: 'none',
+                      fontSize: '1rem',
+                      fontWeight: 600,
+                      borderColor: 'divider',
+                      color: 'text.primary',
+                      '&:hover': {
+                        borderColor: 'primary.main',
+                      },
+                    }}
+                  >
+                    {isSavingDraft ? 'Saving...' : 'Save as Draft'}
+                  </Button>
                   <Button
                     variant="outlined"
                     size="large"

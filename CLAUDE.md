@@ -51,7 +51,7 @@ npx jest tests/path.test.ts  # Run a single test
 
 ### Database
 - Raw SQL with `pg` driver (no ORM). Migrations in `migrations/` run alphabetically via `scripts/migrate.js`.
-- Key tables: `users`, `connected_facebook_pages`, `connected_x_accounts`, `connected_x_accounts_v1.1`, `connected_instagram_accounts`, `connected_telegram_channels`, `publish_history`, `ai_prompts`, `ai_providers`, `openai_api_keys`, `scheduled_posts`, `oauth_auth_system`
+- Key tables: `users`, `connected_facebook_pages`, `connected_x_accounts`, `connected_x_accounts_v1.1`, `connected_instagram_accounts`, `connected_telegram_channels`, `publish_history`, `ai_prompts`, `ai_providers`, `openai_api_keys`, `scheduled_posts`, `oauth_auth_system`, `drafts`
 
 ### API Patterns
 - Status codes: 200 (success), 207 (partial success across platforms), 400 (validation), 401 (auth), 404 (not found), 500 (error)
