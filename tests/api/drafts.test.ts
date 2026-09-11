@@ -57,6 +57,23 @@ describe('Drafts API', () => {
     expect(mockQuery.mock.calls[1][1]).toEqual([42, null, 20, 0]);
   });
 
+  it('fetches a single draft by id', async () => {
+    mockQuery.mockResolvedValue({ rows: [draftRow] });
+
+    const response = await GET(getRequest('?id=1'));
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.draft).toEqual(draftRow);
+    expect(mockQuery.mock.calls[0][1]).toEqual([1, 42]);
+  });
+
+  it('returns 404 for a draft that is not owned', async () => {
+    mockQuery.mockResolvedValue({ rows: [] });
+
+    expect((await GET(getRequest('?id=99'))).status).toBe(404);
+  });
+
   it('escapes ILIKE wildcards in search and clamps pagination', async () => {
     mockQuery.mockResolvedValue({ rows: [{ count: '0' }] });
 

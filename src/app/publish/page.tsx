@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Container,
   Box,
@@ -44,7 +45,8 @@ import { AccountSelector } from '@/components/publish/AccountSelector';
 import { PublishResults } from '@/components/publish/PublishResults';
 import { PageHeader } from '@/components/PageHeader';
 import type { UploadedMedia } from '@/components/publish/MediaUploader';
-import type { InstagramSelection } from '@/types/accounts';
+import { mapDraftMediaToUploaded } from '@/hooks/useDrafts';
+import type { InstagramSelection, Platform } from '@/types/accounts';
 import { TWITTER_CHAR_LIMIT } from '@/types/accounts';
 
 interface TransformResult {
@@ -58,6 +60,21 @@ interface TransformResult {
 }
 
 export default function PublishPage() {
+  // useSearchParams needs a Suspense boundary in the app router
+  return (
+    <Suspense fallback={null}>
+      <PublishPageInner />
+    </Suspense>
+  );
+}
+
+function PublishPageInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  // When arriving via /publish?draft=<id>, the draft is loaded into the composer
+  const draftIdParam = searchParams.get('draft');
+  const draftId = draftIdParam ? parseInt(draftIdParam, 10) : null;
+
   // Data fetching
   const {
     facebookPages,
@@ -174,6 +191,36 @@ export default function PublishPage() {
     }
   }, [telegramChannels]);
 
+  // Draft loading state
+  const [draftTargets, setDraftTargets] = useState<Platform[] | null>(null);
+  const draftTargetsApplied = useRef(false);
+
+  // Load the draft's content into the composer
+  useEffect(() => {
+    if (!draftId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await fetch(`/api/drafts?id=${draftId}`, { credentials: 'include' });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to load draft');
+        if (cancelled) return;
+        setPostText(data.draft.text);
+        setUploadedMedia(mapDraftMediaToUploaded(data.draft.media));
+        setDraftTargets(data.draft.target_platforms);
+      } catch (err) {
+        if (!cancelled) {
+          setQueueSnackbar({ open: true, message: (err as Error).message, severity: 'error' });
+          router.replace('/publish');
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftId]);
+
   // Auto-select Instagram accounts when media is added, deselect when removed
   useEffect(() => {
     if (instagramAccounts.length === 0) return;
@@ -202,6 +249,44 @@ export default function PublishPage() {
       });
     }
   }, [uploadedMedia.length, instagramAccounts]);
+
+  // Apply the draft's target platforms once accounts are loaded.
+  // Declared after the account-init and media effects so it overrides their defaults.
+  useEffect(() => {
+    if (!draftTargets || loading || draftTargetsApplied.current) return;
+    draftTargetsApplied.current = true;
+    setSelectedFacebookPages(
+      draftTargets.includes('facebook') ? facebookPages.map((p) => p.page_id) : []
+    );
+    setSelectedXAccounts(draftTargets.includes('twitter') ? xAccounts.map((a) => a.id) : []);
+    setSelectedTelegramChannels(
+      draftTargets.includes('telegram') ? telegramChannels.map((c) => c.channel_id) : []
+    );
+    const instagram: Record<string, InstagramSelection> = {};
+    instagramAccounts.forEach((a) => {
+      instagram[a.id] = {
+        publish: draftTargets.includes('instagram') && uploadedMedia.length > 0,
+        story: false,
+      };
+    });
+    setSelectedInstagramAccounts(instagram);
+  }, [draftTargets, loading, facebookPages, xAccounts, telegramChannels, instagramAccounts, uploadedMedia.length]);
+
+  // A published or queued draft is consumed: delete it and drop the ?draft param
+  const consumeDraft = useCallback(async () => {
+    if (!draftId) return;
+    try {
+      await fetch('/api/drafts', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ id: draftId }),
+      });
+    } catch {
+      // not fatal — the draft just stays in the list
+    }
+    router.replace('/publish');
+  }, [draftId, router]);
 
   // Handlers
   const handleFacebookChange = useCallback((pageId: string) => {
@@ -270,6 +355,10 @@ export default function PublishPage() {
       selectedInstagramAccounts,
       selectedTelegramChannels,
     });
+
+    if (wasSuccessful) {
+      await consumeDraft();
+    }
 
     if (publishingHiddenRef.current) {
       // Form was already reset and status silenced when user backgrounded.
@@ -413,10 +502,11 @@ export default function PublishPage() {
 
     try {
       const response = await fetch('/api/drafts', {
-        method: 'POST',
+        method: draftId ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
+          ...(draftId ? { id: draftId } : {}),
           text: postText,
           target_platforms: targetPlatforms,
           media: uploadedMedia.map((media) => ({
@@ -434,8 +524,12 @@ export default function PublishPage() {
       const data = await response.json();
 
       if (response.ok && data.success) {
-        setQueueSnackbar({ open: true, message: 'Draft saved', severity: 'success' });
-        resetForm();
+        setQueueSnackbar({
+          open: true,
+          message: draftId ? 'Draft updated' : 'Draft saved',
+          severity: 'success',
+        });
+        if (!draftId) resetForm();
       } else {
         setQueueSnackbar({ open: true, message: data.error || 'Failed to save draft', severity: 'error' });
       }
@@ -498,6 +592,8 @@ export default function PublishPage() {
           message: `Post added to queue (${data.destinations_count} destinations)`,
           severity: 'success'
         });
+
+        await consumeDraft();
 
         // Clear form
         setPostText('');
@@ -957,7 +1053,7 @@ export default function PublishPage() {
                       },
                     }}
                   >
-                    {isSavingDraft ? 'Saving...' : 'Save as Draft'}
+                    {isSavingDraft ? 'Saving...' : draftId ? 'Update Draft' : 'Save as Draft'}
                   </Button>
                   <Button
                     variant="outlined"
