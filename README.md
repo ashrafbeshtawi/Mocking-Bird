@@ -78,6 +78,20 @@ To get Mockingbird up and running locally, follow these steps:
 
     The application will be accessible at `http://localhost:3000` or `https://localhost:3000` respectively.
 
+## 🤖 MCP Server
+
+Mockingbird exposes an MCP (Model Context Protocol) endpoint at `/api/mcp` so AI clients like Claude can manage your drafts. Available tools:
+
+- `get_connected_social_media_types` — which platforms you have accounts connected for
+- `list_drafts` / `add_draft` / `edit_draft` / `delete_draft` — manage post drafts (text, target platforms, optional media URLs)
+
+Set `MCP_API_KEY` (a long random secret) and `MCP_USER_ID` (the user the token acts as) in `.env`, then connect a client:
+
+```bash
+claude mcp add --transport http mockingbird https://your-host/api/mcp \
+  --header "Authorization: Bearer $MCP_API_KEY"
+```
+
 ## 🤝 Contributing
 
 We welcome contributions! If you're interested in improving Mockingbird, please feel free to fork the repository, make your changes, and submit a pull request.

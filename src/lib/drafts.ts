@@ -59,6 +59,14 @@ export function validateDraftInput(input: Record<string, unknown>): string | nul
   return null;
 }
 
+export async function getDraft(userId: number, id: number): Promise<Draft | null> {
+  const { rows } = await pool.query(
+    `SELECT ${DRAFT_COLUMNS} FROM drafts WHERE id = $1 AND user_id = $2`,
+    [id, userId]
+  );
+  return rows[0] ?? null;
+}
+
 export async function listDrafts(userId: number): Promise<Draft[]> {
   const { rows } = await pool.query(
     `SELECT ${DRAFT_COLUMNS} FROM drafts WHERE user_id = $1 ORDER BY updated_at DESC`,
