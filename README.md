@@ -84,6 +84,7 @@ Mockingbird exposes an MCP (Model Context Protocol) endpoint at `/api/mcp` so AI
 
 - `get_connected_social_media_types` — which platforms you have accounts connected for
 - `list_drafts` / `search_drafts` / `add_draft` / `edit_draft` / `delete_draft` — manage post drafts (text, target platforms, optional media URLs); listing and search are paginated (`limit`/`offset`, response includes `total`)
+- `get_publish_history` — what was posted where and whether it succeeded, newest first; paginated like the draft listing (report texts omitted for efficiency)
 
 Generate your personal long-lived bearer token on the **Dashboard → MCP Access** card (shown once; regenerating replaces it, and it can be revoked anytime). Then connect a client:
 

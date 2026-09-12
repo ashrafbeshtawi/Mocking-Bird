@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { createLogger } from '@/lib/logger';
 import { ingestRemoteMedia } from '@/lib/services/cloudinaryService';
 import { getUserIdByMcpToken } from '@/lib/mcpTokens';
+import { listPublishHistory } from '@/lib/publishHistory';
 import { getConnectedPlatformTypes } from '@/lib/connectedPlatforms';
 import {
   createDraft,
@@ -90,6 +91,18 @@ const handler = createMcpHandler(
       },
       async ({ query, limit, offset }, extra) => {
         return json(await listDrafts(userIdFrom(extra), { query, limit, offset }));
+      }
+    );
+
+    server.registerTool(
+      'get_publish_history',
+      {
+        description:
+          'Publish history (what was posted where and whether it succeeded), newest first. Paginated: limit default 20 / max 100, offset default 0; the response includes `total`. Per-account report texts are omitted for efficiency.',
+        inputSchema: z.object(pageArgs),
+      },
+      async ({ limit, offset }, extra) => {
+        return json(await listPublishHistory(userIdFrom(extra), { limit, offset }));
       }
     );
 
