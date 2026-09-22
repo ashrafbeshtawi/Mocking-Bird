@@ -78,6 +78,21 @@ To get Mockingbird up and running locally, follow these steps:
 
     The application will be accessible at `http://localhost:3000` or `https://localhost:3000` respectively.
 
+## 🐳 Docker
+
+Every push to `main` builds a multi-arch image (amd64 + arm64) and publishes it to GitHub Container Registry as `ghcr.io/ashrafbeshtawi/mocking-bird:latest` (plus a `sha-<commit>` tag) via `.github/workflows/container.yml`. The two `NEXT_PUBLIC_CLOUDINARY_*` values are inlined at build time and come from GitHub repository **variables**.
+
+The container runs pending SQL migrations from `migrations/` on startup (tracked in `schema_migrations`), then starts the Next.js server on port 3000. All configuration is passed as environment variables — see `.example.env` for the full list.
+
+```bash
+docker build \
+  --build-arg NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=<cloud_name> \
+  --build-arg NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=<preset> \
+  -t mockingbird .
+
+docker run --rm -p 3000:3000 --env-file .env mockingbird
+```
+
 ## 🤖 MCP Server
 
 Mockingbird exposes an MCP (Model Context Protocol) endpoint at `/api/mcp` so AI clients like Claude can manage your drafts. Available tools:
