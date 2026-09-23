@@ -1,0 +1,36 @@
+# Throwaway stack for the functional tests: the production image against a
+# fresh Postgres. Host ports 3000 / 5433 match the defaults in helpers.ts.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD: test
+      POSTGRES_DB: mockingbird
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build:
+      context: ../..
+    environment:
+      DATABASE_STRING: postgresql://postgres:test@postgres:5432/mockingbird
+      NEXTAUTH_SECRET: functional-test-secret
+      NEXTAUTH_URL: http://localhost:3000
+      CLOUDINARY_URL: cloudinary://123456:secret@testcloud
+      CLOUDINARY_UPLOAD_PRESET: testpreset
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+      start_period: 5s

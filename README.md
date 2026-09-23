@@ -80,17 +80,22 @@ To get Mockingbird up and running locally, follow these steps:
 
 ## 🐳 Docker
 
-Every push to `main` builds a multi-arch image (amd64 + arm64) and publishes it to GitHub Container Registry as `ghcr.io/ashrafbeshtawi/mocking-bird:latest` (plus a `sha-<commit>` tag) via `.github/workflows/container.yml`. The two `NEXT_PUBLIC_CLOUDINARY_*` values are inlined at build time and come from GitHub repository **variables**.
+Every push to `main` builds a multi-arch image (amd64 + arm64) and publishes it to GitHub Container Registry as `ghcr.io/ashrafbeshtawi/mocking-bird:latest` (plus a `sha-<commit>` tag) via `.github/workflows/ci.yml`. The publish jobs only run after the unit and functional test jobs pass.
 
-The container runs pending SQL migrations from `migrations/` on startup (tracked in `schema_migrations`), then starts the Next.js server on port 3000. All configuration is passed as environment variables — see `.example.env` for the full list.
+The container runs pending SQL migrations from `migrations/` on startup (tracked in `schema_migrations`), then starts the Next.js server on port 3000. All configuration is passed as environment variables at runtime — see `.example.env` for the full list; nothing is baked in at build time.
 
 ```bash
-docker build \
-  --build-arg NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=<cloud_name> \
-  --build-arg NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=<preset> \
-  -t mockingbird .
-
+docker build -t mockingbird .
 docker run --rm -p 3000:3000 --env-file .env mockingbird
+```
+
+## 🧪 Tests
+
+```bash
+npm test                 # unit tests (Jest)
+docker compose -f tests/functional/compose.yaml up -d --build --wait
+npm run test:functional  # functional tests against the production image + a fresh Postgres
+docker compose -f tests/functional/compose.yaml down -v
 ```
 
 ## 🤖 MCP Server

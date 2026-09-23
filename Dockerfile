@@ -10,11 +10,6 @@ RUN npm ci
 FROM node:22-alpine AS build
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
-# NEXT_PUBLIC_* values are inlined into the client bundle at build time, so they
-# must be passed as build args (CI: GitHub repository variables). Not secrets —
-# the Cloudinary cloud name + unsigned upload preset ship in the browser anyway.
-ARG NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
-ARG NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET
 # `next build` imports the API route modules to collect page data, and src/lib/db.ts
 # fails fast when DATABASE_STRING is unset. No connection is opened at build time;
 # this placeholder only lives in the build stage.

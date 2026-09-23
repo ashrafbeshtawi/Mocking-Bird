@@ -1,16 +1,51 @@
-name: Build and push container image
+name: CI
 
+# Every branch: unit + functional tests. main only: build + publish the image,
+# gated on both test jobs.
 on:
   push:
-    branches: [main]
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
+  unit:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+
+  functional:
+    name: Functional tests (container + Postgres)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build the image and start the stack
+        run: docker compose -f tests/functional/compose.yaml up -d --build --wait
+      - run: npm run test:functional
+      - name: Container logs
+        if: failure()
+        run: docker compose -f tests/functional/compose.yaml logs --no-color
+      - name: Tear down
+        if: always()
+        run: docker compose -f tests/functional/compose.yaml down -v
+
   build:
-    name: Build (${{ matrix.platform }})
+    name: Build image (${{ matrix.platform }})
+    if: github.ref == 'refs/heads/main'
+    needs: [unit, functional]
     runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
@@ -51,11 +86,6 @@ jobs:
           context: .
           platforms: ${{ matrix.platform }}
           provenance: false
-          # NEXT_PUBLIC_* is inlined into the client bundle at build time →
-          # comes from GitHub repository *variables* (Settings → Secrets and variables → Actions → Variables).
-          build-args: |
-            NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=${{ vars.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME }}
-            NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=${{ vars.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET }}
           cache-from: type=gha,scope=${{ matrix.arch_tag }}
           cache-to: type=gha,scope=${{ matrix.arch_tag }},mode=max
           outputs: type=image,name=${{ steps.image.outputs.name }},push-by-digest=true,name-canonical=true,push=true
@@ -75,8 +105,9 @@ jobs:
 
   manifest:
     name: Publish multi-arch manifest
-    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
     needs: build
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write

@@ -26,8 +26,26 @@ export interface CloudinaryBatchResult {
   failed: CloudinaryUploadError[];
 }
 
-const CLOUDINARY_CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
-const CLOUDINARY_UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
+export interface CloudinaryClientConfig {
+  cloudName: string | null;
+  uploadPreset: string | null;
+}
+
+let configPromise: Promise<CloudinaryClientConfig> | null = null;
+
+/**
+ * Runtime upload config (cloud name + unsigned preset) served by /api/cloudinary/config.
+ * Fetched once per page load; a failed fetch is retried on the next call.
+ */
+export function getCloudinaryClientConfig(): Promise<CloudinaryClientConfig> {
+  configPromise ??= fetch('/api/cloudinary/config')
+    .then((response) => response.json() as Promise<CloudinaryClientConfig>)
+    .catch((error) => {
+      configPromise = null;
+      throw error;
+    });
+  return configPromise;
+}
 
 /**
  * Upload a single file to Cloudinary directly from the browser
@@ -36,16 +54,17 @@ export async function uploadToCloudinaryClient(
   file: File,
   onProgress?: (progress: number) => void
 ): Promise<CloudinaryUploadResult> {
-  if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
-    throw new Error('Cloudinary client configuration is missing. Check NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME and NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET environment variables.');
+  const { cloudName, uploadPreset } = await getCloudinaryClientConfig();
+  if (!cloudName || !uploadPreset) {
+    throw new Error('Cloudinary client configuration is missing. Set CLOUDINARY_URL and CLOUDINARY_UPLOAD_PRESET on the server.');
   }
 
   const resourceType = file.type.startsWith('video/') ? 'video' : 'image';
-  const uploadUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/${resourceType}/upload`;
+  const uploadUrl = `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`;
 
   const formData = new FormData();
   formData.append('file', file);
-  formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+  formData.append('upload_preset', uploadPreset);
   formData.append('folder', 'mocking-bird/uploads');
 
   return new Promise((resolve, reject) => {
@@ -130,11 +149,4 @@ export async function uploadMultipleToCloudinaryClient(
   await Promise.all(uploadPromises);
 
   return { successful, failed };
-}
-
-/**
- * Check if Cloudinary client upload is configured
- */
-export function isCloudinaryClientConfigured(): boolean {
-  return Boolean(CLOUDINARY_CLOUD_NAME && CLOUDINARY_UPLOAD_PRESET);
 }
