@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Fraunces, Instrument_Serif } from "next/font/google";
 import "./globals.css";
+import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import { AuthProvider } from "./hooks/AuthProvider";
 import MuiThemeProvider from "./ThemeProvider";
@@ -47,6 +48,13 @@ export default function RootLayout({
           <MuiThemeProvider>
             <Navbar />
             {children}
+            <footer className="py-6 text-center text-sm opacity-70">
+              <Link href="/impressum">Impressum</Link>
+              {" · "}
+              <Link href="/privacy">Datenschutz</Link>
+              {" · "}
+              <Link href="/terms">Nutzungsbedingungen</Link>
+            </footer>
           </MuiThemeProvider>
         </AuthProvider>
       </body>
