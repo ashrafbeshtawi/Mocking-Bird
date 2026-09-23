@@ -5,7 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, createContext, useContext } from 'react';
 
 // Public routes that don't require authentication
-const PUBLIC_ROUTES = ['/', '/about', '/auth', '/privacy', '/error', '/terms'];
+const PUBLIC_ROUTES = ['/', '/about', '/auth', '/privacy', '/terms', '/impressum', '/delete-account', '/error'];
 
 interface AuthContextType {
   isLoggedIn: boolean;

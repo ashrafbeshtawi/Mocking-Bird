@@ -26,6 +26,7 @@ import { ConfirmDisconnectDialog } from '@/components/dashboard/ConfirmDisconnec
 import { TelegramConnectDialog } from '@/components/dashboard/TelegramConnectDialog';
 import { ConnectButtons } from '@/components/dashboard/ConnectButtons';
 import { McpTokenCard } from '@/components/dashboard/McpTokenCard';
+import { DeleteAccountCard } from '@/components/dashboard/DeleteAccountCard';
 import { AccountsTable } from '@/components/dashboard/AccountsTable';
 import type { AccountData } from '@/types/accounts';
 import { API_CONFIG } from '@/types/accounts';
@@ -607,6 +608,9 @@ export default function DashboardPage() {
 
             {/* --- MCP access card --- */}
             <McpTokenCard />
+
+            {/* --- Account deletion --- */}
+            <DeleteAccountCard />
           </Box>
         </Box>
       </Container>
