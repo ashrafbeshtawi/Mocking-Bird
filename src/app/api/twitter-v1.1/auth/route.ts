@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { oauth } from '@/lib/twitter-auth/twitter-client';
+import { publicUrl } from '@/lib/publicUrl';
 
 export async function GET(req: NextRequest) {
-  const url = new URL(req.url);
-  const callbackUrl = url.origin + `/api/twitter-v1.1/auth/callback`;
+  const callbackUrl = publicUrl('/api/twitter-v1.1/auth/callback', req).toString();
 
   const requestData = {
     url: 'https://api.twitter.com/oauth/request_token',
