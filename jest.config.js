@@ -8,7 +8,7 @@ module.exports = {
   testMatch: ['**/tests/**/*.test.ts?(x)'],
   // Functional tests need a running app + Postgres: `npm run test:functional`.
   testPathIgnorePatterns: ['/node_modules/', '/tests/functional/'],
-  setupFilesAfterEnv: ['@testing-library/jest-dom'],
+  setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
   },

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { oauth } from '@/lib/twitter-auth/twitter-client';
+import { publicUrl } from '@/lib/publicUrl';
 import { auth } from '@/lib/auth';
 import pool from '@/lib/db';
 
@@ -14,13 +15,13 @@ export async function GET(req: NextRequest) {
   const oauthTokenSecret = req.cookies.get('twitter_oauth_secret')?.value;
 
   if (!oauthToken || !oauthVerifier || !oauthTokenSecret) {
-    return NextResponse.redirect(new URL('/error?statusCode=500&message=Missing parameters (oauth_token, oauth_verifier, oauth_token_secret)', req.url));
+    return NextResponse.redirect(publicUrl('/error?statusCode=500&message=Missing parameters (oauth_token, oauth_verifier, oauth_token_secret)', req));
   }
 
   // Get user ID from NextAuth session
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.redirect(new URL('/error?statusCode=401&message=Unauthorized', req.url));
+    return NextResponse.redirect(publicUrl('/error?statusCode=401&message=Unauthorized', req));
   }
   const userId = session.user.id;
 
@@ -56,7 +57,7 @@ export async function GET(req: NextRequest) {
     const screenName = params.get('screen_name');
 
     if (!accessToken || !accessTokenSecret || !xUserId || !screenName) {
-      return NextResponse.redirect(new URL('/error?statusCode=500&message=Failed to get access token or user details from Twitter', req.url));
+      return NextResponse.redirect(publicUrl('/error?statusCode=500&message=Failed to get access token or user details from Twitter', req));
     }
 
     // Insert into database
@@ -71,10 +72,10 @@ export async function GET(req: NextRequest) {
     );
 
     return NextResponse.redirect(
-      new URL(`/dashboard`, req.url)
+      publicUrl(`/dashboard`, req)
     );
   } catch (error) {
     console.error('Token exchange or database insertion error:', error);
-    return NextResponse.redirect(new URL('/error?statusCode=500&message=Something went wrong with the Twitter authentication or saving credentials', req.url));
+    return NextResponse.redirect(publicUrl('/error?statusCode=500&message=Something went wrong with the Twitter authentication or saving credentials', req));
   }
 }
