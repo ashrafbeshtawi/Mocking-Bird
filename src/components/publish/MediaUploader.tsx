@@ -6,7 +6,7 @@ import FileUploadIcon from '@mui/icons-material/FileUpload';
 import CloudDoneIcon from '@mui/icons-material/CloudDone';
 import {
   uploadToCloudinaryClient,
-  isCloudinaryClientConfigured,
+  getCloudinaryClientConfig,
 } from '@/lib/cloudinary/clientUpload';
 
 export interface UploadedMedia {
@@ -37,7 +37,14 @@ export function MediaUploader({ uploadedMedia, onMediaChange, onUploadingChange 
   const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
-  const isConfigured = isCloudinaryClientConfigured();
+  // null = config still loading; only a definite "not configured" hides the uploader
+  const [isConfigured, setIsConfigured] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    getCloudinaryClientConfig()
+      .then((config) => setIsConfigured(Boolean(config.cloudName && config.uploadPreset)))
+      .catch(() => setIsConfigured(false));
+  }, []);
 
   const handleFileChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -157,12 +164,11 @@ export function MediaUploader({ uploadedMedia, onMediaChange, onUploadingChange 
     onUploadingChange?.(isUploading);
   }, [isUploading, onUploadingChange]);
 
-  if (!isConfigured) {
+  if (isConfigured === false) {
     return (
       <Box sx={{ mb: 2 }}>
         <Alert severity="warning">
-          Media upload is not configured. Please set NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME and
-          NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET environment variables.
+          Media upload is currently unavailable. Please try again later or contact us.
         </Alert>
       </Box>
     );

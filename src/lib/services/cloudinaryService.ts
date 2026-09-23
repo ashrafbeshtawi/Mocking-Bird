@@ -40,6 +40,12 @@ function ensureConfigured() {
   isConfigured = true;
 }
 
+/** Cloud name from CLOUDINARY_URL (cloudinary://API_KEY:API_SECRET@CLOUD_NAME), or null when unset. */
+export function getCloudinaryCloudName(): string | null {
+  const url = process.env.CLOUDINARY_URL;
+  return url ? new URL(url).hostname : null;
+}
+
 export interface UploadedMedia {
   publicUrl: string;
   publicId: string;
