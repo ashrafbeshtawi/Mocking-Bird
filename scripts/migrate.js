@@ -6,10 +6,11 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Local dev reads .env; in containers there is none and the process env is used as-is.
-try {
-  process.loadEnvFile(path.resolve(__dirname, '../.env'));
-} catch {
-  /* no .env file */
+const envFile = path.resolve(__dirname, '../.env');
+if (fs.existsSync(envFile)) {
+  process.loadEnvFile(envFile);
+} else {
+  console.log(`No .env file at ${envFile}; using the process environment.`);
 }
 
 const pool = new Pool({

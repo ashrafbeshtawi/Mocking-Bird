@@ -56,7 +56,7 @@ export async function uploadToCloudinaryClient(
 ): Promise<CloudinaryUploadResult> {
   const { cloudName, uploadPreset } = await getCloudinaryClientConfig();
   if (!cloudName || !uploadPreset) {
-    throw new Error('Cloudinary client configuration is missing. Set CLOUDINARY_URL and CLOUDINARY_UPLOAD_PRESET on the server.');
+    throw new Error('Media upload is currently unavailable. Please try again later or contact us.');
   }
 
   const resourceType = file.type.startsWith('video/') ? 'video' : 'image';

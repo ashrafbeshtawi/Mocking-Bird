@@ -168,7 +168,7 @@ export function MediaUploader({ uploadedMedia, onMediaChange, onUploadingChange 
     return (
       <Box sx={{ mb: 2 }}>
         <Alert severity="warning">
-          Media upload is not configured. Set CLOUDINARY_URL and CLOUDINARY_UPLOAD_PRESET on the server.
+          Media upload is currently unavailable. Please try again later or contact us.
         </Alert>
       </Box>
     );
