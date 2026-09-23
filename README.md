@@ -78,6 +78,17 @@ To get Mockingbird up and running locally, follow these steps:
 
     The application will be accessible at `http://localhost:3000` or `https://localhost:3000` respectively.
 
+### Local development with Docker
+
+One container for the app (hot reload) and one for PostgreSQL. The app reads your `.env` like `npm run dev` does; only `DATABASE_STRING` is overridden to point at the `db` container.
+
+```bash
+docker compose up          # app on http://localhost:3000, Postgres on localhost:5433
+docker compose down        # stop; add -v to also drop the database
+```
+
+On the first start the app container installs dependencies into its own volume and runs the migrations, so it takes a minute before the dev server is up. For host-side tools set `DATABASE_STRING=postgresql://postgres:dev@localhost:5433/mockingbird` in `.env`.
+
 ## 🐳 Docker
 
 Every push to `main` builds a multi-arch image (amd64 + arm64) and publishes it to GitHub Container Registry as `ghcr.io/ashrafbeshtawi/mocking-bird:latest` (plus a `sha-<commit>` tag) via `.github/workflows/ci.yml`. The publish jobs only run after the unit and functional test jobs pass.
