@@ -1,0 +1,42 @@
+# Local development: `docker compose up`
+# App with hot reload on http://localhost:3000, Postgres on localhost:5433.
+# The app reads .env from the bind mount like `npm run dev` does; only
+# DATABASE_STRING is overridden so it points at the db container.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD: dev
+      POSTGRES_DB: mockingbird
+    ports:
+      - "5433:5432"   # 5432 on the host is taken by another stack
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  app:
+    image: node:22-alpine
+    working_dir: /app
+    # node_modules and .next live in volumes: the host copies are built for
+    # macOS (SWC binary, native modules) and must not leak into the container.
+    command: sh -c "npm install && npm run migrate && npm run dev"
+    environment:
+      DATABASE_STRING: postgresql://postgres:dev@db:5432/mockingbird
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+      - next_cache:/app/.next
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  node_modules:
+  next_cache:
