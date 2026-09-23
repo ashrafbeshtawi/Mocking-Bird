@@ -20,7 +20,9 @@ services:
     environment:
       DATABASE_STRING: postgresql://postgres:test@postgres:5432/mockingbird
       NEXTAUTH_SECRET: functional-test-secret
-      NEXTAUTH_URL: http://localhost:3000
+      # https like in production: the middleware expects the __Secure- session cookie
+      # whenever NODE_ENV=production, and Auth.js only uses it when this URL is https.
+      NEXTAUTH_URL: https://localhost:3000
       CLOUDINARY_URL: cloudinary://123456:secret@testcloud
       CLOUDINARY_UPLOAD_PRESET: testpreset
     ports:
