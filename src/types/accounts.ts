@@ -47,7 +47,7 @@ export interface ApiConfig {
 export const API_CONFIG: Record<Platform, ApiConfig> = {
   facebook: { deleteUrl: '/api/facebook/delete-page', idParamName: 'page_id' },
   instagram: { deleteUrl: '/api/instagram', idParamName: 'instagram_account_id' },
-  twitter: { deleteUrl: '/api/twitter-v1.1/delete-account', idParamName: 'page_id' },
+  twitter: { deleteUrl: '/api/twitter-v1.1/delete-account', idParamName: 'x_user_id' },
   telegram: { deleteUrl: '/api/telegram/delete-channel', idParamName: 'channel_id' },
 };
 
