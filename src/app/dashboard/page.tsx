@@ -119,6 +119,7 @@ export default function DashboardPage() {
           refetch();
         } catch (err) {
           setStatus({ error: (err as Error).message, success: null });
+        window.scrollTo({ top: 0, behavior: 'smooth' });
         }
       },
       () => {
@@ -155,11 +156,12 @@ export default function DashboardPage() {
           body: JSON.stringify({ [config.idParamName]: account.id }),
         });
         const data = await response.json();
-        if (!response.ok) throw new Error(data.message || 'Failed to disconnect account');
+        if (!response.ok) throw new Error(data.error || data.message || 'Failed to disconnect account');
         setStatus({ error: null, success: 'Account disconnected successfully.' });
         refetch();
       } catch (err) {
         setStatus({ error: (err as Error).message, success: null });
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       } finally {
         setDeletingId(null);
       }
