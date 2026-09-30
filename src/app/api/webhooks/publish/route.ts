@@ -16,7 +16,9 @@ interface Destination {
   platform: string;
   account_id: string;
   account_name: string;
-  transformed_content: string | null;
+  // Only set on posts queued before the AI transformation was removed (migration 025);
+  // those still publish the adapted text the user queued.
+  transformed_content?: string | null;
   post_type?: string;
 }
 

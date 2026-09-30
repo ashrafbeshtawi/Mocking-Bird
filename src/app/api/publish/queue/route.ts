@@ -3,7 +3,6 @@ import pool from '@/lib/db';
 import { createLogger } from '@/lib/logger';
 import { validateUserId, validateTextContent, validateAccountArrays, parsePublishRequest } from '@/lib/publish/validators/requestValidator';
 import { validateMediaMix } from '@/lib/publish/validators/mediaValidator';
-import { getPromptForDestination, transformContent } from '@/lib/ai/transformService';
 
 const logger = createLogger('QueueAPI');
 
@@ -11,7 +10,6 @@ interface Destination {
   platform: string;
   account_id: string;
   account_name: string;
-  transformed_content: string | null;
   post_type?: string; // For Instagram: 'feed' or 'story'
 }
 
@@ -58,31 +56,6 @@ async function getAccountName(
   }
 }
 
-// Transform content for a destination if AI prompt is configured
-async function transformForDestination(
-  content: string,
-  platform: 'facebook' | 'twitter' | 'instagram' | 'telegram',
-  accountId: string,
-  userId: number
-): Promise<string | null> {
-  try {
-    const promptConfig = await getPromptForDestination(userId, platform, accountId);
-    if (!promptConfig) {
-      return null; // No AI prompt configured for this destination
-    }
-
-    const result = await transformContent(content, promptConfig.prompt.prompt, promptConfig.provider);
-    if (result.success && result.content) {
-      return result.content;
-    }
-    logger.warn(`AI transformation failed for ${platform}/${accountId}: ${result.error}`);
-    return null;
-  } catch (error) {
-    logger.error(`Error transforming content for ${platform}/${accountId}`, error);
-    return null;
-  }
-}
-
 // POST: Add a post to the queue
 export async function POST(req: NextRequest) {
   const userIdStr = validateUserId(req.headers);
@@ -124,80 +97,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: accountValidation.error }, { status: 400 });
     }
 
-    // Build destinations with AI-transformed content
-    const destinations: Destination[] = [];
-
-    // Process Facebook pages
-    for (const pageId of facebookPages) {
-      const [accountName, transformedContent] = await Promise.all([
-        getAccountName('facebook', pageId, userId),
-        transformForDestination(text, 'facebook', pageId, userId)
-      ]);
-      destinations.push({
-        platform: 'facebook',
-        account_id: pageId,
-        account_name: accountName,
-        transformed_content: transformedContent
-      });
-    }
-
-    // Process X accounts
-    for (const accountId of xAccounts) {
-      const [accountName, transformedContent] = await Promise.all([
-        getAccountName('twitter', accountId, userId),
-        transformForDestination(text, 'twitter', accountId, userId)
-      ]);
-      destinations.push({
-        platform: 'twitter',
-        account_id: accountId,
-        account_name: accountName,
-        transformed_content: transformedContent
-      });
-    }
-
-    // Process Instagram feed accounts
-    for (const accountId of instagramPublishAccounts) {
-      const [accountName, transformedContent] = await Promise.all([
-        getAccountName('instagram', accountId, userId),
-        transformForDestination(text, 'instagram', accountId, userId)
-      ]);
-      destinations.push({
-        platform: 'instagram',
-        account_id: accountId,
-        account_name: accountName,
-        transformed_content: transformedContent,
-        post_type: 'feed'
-      });
-    }
-
-    // Process Instagram story accounts
-    for (const accountId of instagramStoryAccounts) {
-      const [accountName, transformedContent] = await Promise.all([
-        getAccountName('instagram', accountId, userId),
-        transformForDestination(text, 'instagram', accountId, userId)
-      ]);
-      destinations.push({
-        platform: 'instagram',
-        account_id: accountId,
-        account_name: accountName,
-        transformed_content: transformedContent,
-        post_type: 'story'
-      });
-    }
-
-    // Process Telegram channels
-    for (const channelId of telegramChannels) {
-      const [accountName, transformedContent] = await Promise.all([
-        getAccountName('telegram', channelId, userId),
-        transformForDestination(text, 'telegram', channelId, userId)
-      ]);
-      destinations.push({
-        platform: 'telegram',
-        account_id: channelId,
-        account_name: accountName,
-        transformed_content: transformedContent
-      });
-    }
+    type Target = { platform: 'facebook' | 'twitter' | 'instagram' | 'telegram'; id: string; post_type?: string };
+    const targets: Target[] = [
+      ...facebookPages.map((id: string): Target => ({ platform: 'facebook', id })),
+      ...xAccounts.map((id: string): Target => ({ platform: 'twitter', id })),
+      ...instagramPublishAccounts.map((id: string): Target => ({ platform: 'instagram', id, post_type: 'feed' })),
+      ...instagramStoryAccounts.map((id: string): Target => ({ platform: 'instagram', id, post_type: 'story' })),
+      ...telegramChannels.map((id: string): Target => ({ platform: 'telegram', id })),
+    ];
+    const destinations: Destination[] = await Promise.all(
+      targets.map(async ({ platform, id, post_type }) => ({
+        platform,
+        account_id: id,
+        account_name: await getAccountName(platform, id, userId),
+        ...(post_type && { post_type }),
+      }))
+    );
 
     // Store in database
     const client = await pool.connect();

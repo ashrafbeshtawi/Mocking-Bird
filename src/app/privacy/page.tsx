@@ -157,11 +157,6 @@ export default function PrivacyPage() {
           und Speicherung an Cloudinary übertragen.
         </li>
         <li>
-          <strong>KI-Anbieter:</strong> OpenAI bzw. Anthropic – nur, wenn der Nutzer die KI-Textumwandlung aktiviert und
-          dafür einen eigenen API-Schlüssel hinterlegt hat; in diesem Fall werden die Beitragstexte an den gewählten
-          Anbieter übertragen.
-        </li>
-        <li>
           <strong>Anmeldung (OAuth):</strong> Google, GitHub, Discord.
         </li>
         <li>

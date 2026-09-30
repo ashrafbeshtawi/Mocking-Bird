@@ -201,7 +201,7 @@ export default function AboutPage() {
         <Principle
           number="02"
           title="One keystroke, four platforms"
-          description="Write your message once and send it to Facebook, Instagram, X, and Telegram simultaneously. AI adapts tone and format per channel so every post feels native."
+          description="Write your message once and send it to Facebook, Instagram, X, and Telegram simultaneously. Limits and media adapt per channel, and AI clients can draft posts for you through MCP."
         />
         <Principle
           number="03"

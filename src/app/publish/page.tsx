@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo, useRef, Suspense } from 'react';
+import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Container,
@@ -19,12 +19,7 @@ import {
   Chip,
   Snackbar,
   Alert,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  IconButton,
-  TextField,
+
 } from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
 import ScheduleSendIcon from '@mui/icons-material/ScheduleSend';
@@ -34,12 +29,8 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { getPlatformConfig } from '@/lib/platformConfig';
 import ErrorIcon from '@mui/icons-material/Error';
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
-import SmartToyIcon from '@mui/icons-material/SmartToy';
-import RefreshIcon from '@mui/icons-material/Refresh';
-import CloseIcon from '@mui/icons-material/Close';
 import { useConnectedAccounts } from '@/hooks/useConnectedAccounts';
 import { usePublish } from '@/hooks/usePublish';
-import { useAllPromptMatchings } from '@/hooks/useAllPromptMatchings';
 import { PostComposer } from '@/components/publish/PostComposer';
 import { AccountSelector } from '@/components/publish/AccountSelector';
 import { PublishResults } from '@/components/publish/PublishResults';
@@ -48,16 +39,6 @@ import type { UploadedMedia } from '@/components/publish/MediaUploader';
 import { mapDraftMediaToUploaded } from '@/hooks/useDrafts';
 import type { InstagramSelection, Platform } from '@/types/accounts';
 import { TWITTER_CHAR_LIMIT } from '@/types/accounts';
-
-interface TransformResult {
-  platform: string;
-  account_id: string;
-  account_name: string;
-  original_text: string;
-  transformed_text: string | null;
-  success: boolean;
-  error?: string;
-}
 
 export default function PublishPage() {
   // useSearchParams needs a Suspense boundary in the app router
@@ -86,14 +67,6 @@ function PublishPageInner() {
 
   // Publishing logic
   const { isPublishing, error, success, results, statusMessage, stepProgress, accountsProgress, publish, clearStatus, silenceUpdates } = usePublish();
-
-  // AI prompt matchings
-  const { matchings: aiMatchings, loading: aiMatchingsLoading, hasAiTransformation } = useAllPromptMatchings();
-
-  // Transformation state
-  const [isTransforming, setIsTransforming] = useState(false);
-  const [transformResults, setTransformResults] = useState<TransformResult[]>([]);
-  const [showTransformDialog, setShowTransformDialog] = useState(false);
 
   // Platform icon mapping
   const getPlatformIcon = (platform: string) => {
@@ -370,125 +343,6 @@ function PublishPageInner() {
     }
   };
 
-  // Transform and publish flow
-  const handleTransformAndPublish = async () => {
-    if (!hasSelectedAiAccount) {
-      // No AI accounts selected, proceed to regular publish
-      handlePublish();
-      return;
-    }
-
-    setIsTransforming(true);
-    const destinations = getSelectedAiDestinations();
-
-    try {
-      const response = await fetch('/api/ai/transform', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ text: postText, destinations }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        setTransformResults(data.results);
-        setShowTransformDialog(true);
-      } else {
-        setQueueSnackbar({
-          open: true,
-          message: data.error || 'Failed to transform content',
-          severity: 'error',
-        });
-      }
-    } catch (err) {
-      setQueueSnackbar({
-        open: true,
-        message: (err as Error).message || 'Failed to transform content',
-        severity: 'error',
-      });
-    } finally {
-      setIsTransforming(false);
-    }
-  };
-
-  // Retry a failed transformation
-  const handleRetryTransform = async (result: TransformResult) => {
-    setIsTransforming(true);
-
-    try {
-      const response = await fetch('/api/ai/transform', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          text: postText,
-          destinations: [{
-            platform: result.platform,
-            account_id: result.account_id,
-            account_name: result.account_name,
-          }],
-        }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok && data.success && data.results[0]) {
-        setTransformResults(prev =>
-          prev.map(r =>
-            r.account_id === result.account_id && r.platform === result.platform
-              ? data.results[0]
-              : r
-          )
-        );
-      } else {
-        setQueueSnackbar({
-          open: true,
-          message: data.error || 'Retry failed',
-          severity: 'error',
-        });
-      }
-    } catch (err) {
-      setQueueSnackbar({
-        open: true,
-        message: (err as Error).message || 'Retry failed',
-        severity: 'error',
-      });
-    } finally {
-      setIsTransforming(false);
-    }
-  };
-
-  // Remove a failed destination
-  const handleRemoveFailedDestination = (result: TransformResult) => {
-    // Remove from transform results
-    setTransformResults(prev => prev.filter(r =>
-      !(r.account_id === result.account_id && r.platform === result.platform)
-    ));
-
-    // Deselect the account
-    if (result.platform === 'facebook') {
-      setSelectedFacebookPages(prev => prev.filter(id => id !== result.account_id));
-    } else if (result.platform === 'twitter') {
-      setSelectedXAccounts(prev => prev.filter(id => id !== result.account_id));
-    } else if (result.platform === 'instagram') {
-      setSelectedInstagramAccounts(prev => ({
-        ...prev,
-        [result.account_id]: { publish: false, story: false },
-      }));
-    } else if (result.platform === 'telegram') {
-      setSelectedTelegramChannels(prev => prev.filter(id => id !== result.account_id));
-    }
-  };
-
-  // Confirm and proceed with publishing after transformation preview
-  const handleConfirmPublish = async () => {
-    setShowTransformDialog(false);
-    // TODO: Pass transformed texts to the publish function
-    // For now, proceed with original publish (transformed texts need to be integrated)
-    handlePublish();
-  };
-
   const handleSaveDraft = async () => {
     setIsSavingDraft(true);
 
@@ -625,92 +479,6 @@ function PublishPageInner() {
     }
   };
 
-  // Computed values for AI-enabled accounts
-  const aiEnabledAccounts = useMemo(() => ({
-    facebook: aiMatchings.facebook.filter(m => m.provider_name).map(m => m.account_id),
-    twitter: aiMatchings.twitter.filter(m => m.provider_name).map(m => m.account_id),
-    instagram: aiMatchings.instagram.filter(m => m.provider_name).map(m => m.account_id),
-    telegram: aiMatchings.telegram.filter(m => m.provider_name).map(m => m.account_id),
-  }), [aiMatchings]);
-
-  // Precompute account lookup maps to avoid O(n) finds in getSelectedAiDestinations
-  const accountMaps = useMemo(() => ({
-    facebook: new Map(facebookPages.map(p => [p.page_id, p])),
-    twitter: new Map(xAccounts.map(a => [a.id, a])),
-    instagram: new Map(instagramAccounts.map(a => [a.id, a])),
-    telegram: new Map(telegramChannels.map(c => [c.channel_id, c])),
-  }), [facebookPages, xAccounts, instagramAccounts, telegramChannels]);
-
-  // Precompute AI-enabled sets for O(1) lookups
-  const aiEnabledSets = useMemo(() => ({
-    facebook: new Set(aiEnabledAccounts.facebook),
-    twitter: new Set(aiEnabledAccounts.twitter),
-    instagram: new Set(aiEnabledAccounts.instagram),
-    telegram: new Set(aiEnabledAccounts.telegram),
-  }), [aiEnabledAccounts]);
-
-  // Check if any selected account has AI transformation - O(n) with Set lookups
-  const hasSelectedAiAccount = useMemo(() => {
-    const hasFacebookAi = selectedFacebookPages.some(id => aiEnabledSets.facebook.has(id));
-    const hasTwitterAi = selectedXAccounts.some(id => aiEnabledSets.twitter.has(id));
-    const hasInstagramAi = Object.entries(selectedInstagramAccounts)
-      .filter(([, s]) => s.publish || s.story)
-      .some(([id]) => aiEnabledSets.instagram.has(id));
-    const hasTelegramAi = selectedTelegramChannels.some(id => aiEnabledSets.telegram.has(id));
-    return hasFacebookAi || hasTwitterAi || hasInstagramAi || hasTelegramAi;
-  }, [selectedFacebookPages, selectedXAccounts, selectedInstagramAccounts, selectedTelegramChannels, aiEnabledSets]);
-
-  // Get selected AI destinations for transformation - O(n) instead of O(n²)
-  const getSelectedAiDestinations = useCallback(() => {
-    const destinations: Array<{
-      platform: 'facebook' | 'twitter' | 'instagram' | 'telegram';
-      account_id: string;
-      account_name: string;
-    }> = [];
-
-    // Facebook - O(n) with Set and Map lookups
-    for (const id of selectedFacebookPages) {
-      if (aiEnabledSets.facebook.has(id)) {
-        const page = accountMaps.facebook.get(id);
-        if (page) {
-          destinations.push({ platform: 'facebook', account_id: id, account_name: page.page_name });
-        }
-      }
-    }
-
-    // Twitter/X
-    for (const id of selectedXAccounts) {
-      if (aiEnabledSets.twitter.has(id)) {
-        const account = accountMaps.twitter.get(id);
-        if (account) {
-          destinations.push({ platform: 'twitter', account_id: id, account_name: `@${account.name}` });
-        }
-      }
-    }
-
-    // Instagram
-    for (const [id, selection] of Object.entries(selectedInstagramAccounts)) {
-      if ((selection.publish || selection.story) && aiEnabledSets.instagram.has(id)) {
-        const account = accountMaps.instagram.get(id);
-        if (account) {
-          destinations.push({ platform: 'instagram', account_id: id, account_name: `@${account.username}` });
-        }
-      }
-    }
-
-    // Telegram
-    for (const id of selectedTelegramChannels) {
-      if (aiEnabledSets.telegram.has(id)) {
-        const channel = accountMaps.telegram.get(id);
-        if (channel) {
-          destinations.push({ platform: 'telegram', account_id: id, account_name: channel.channel_title });
-        }
-      }
-    }
-
-    return destinations;
-  }, [selectedFacebookPages, selectedXAccounts, selectedInstagramAccounts, selectedTelegramChannels, aiEnabledSets, accountMaps]);
-
   // Computed values
   const charCount = postText.length;
   const showTwitterWarning = charCount > TWITTER_CHAR_LIMIT && selectedXAccounts.length > 0;
@@ -722,14 +490,12 @@ function PublishPageInner() {
   const canSaveDraft =
     !isPublishing &&
     !isQueueing &&
-    !isTransforming &&
     !isMediaUploading &&
     !isSavingDraft &&
     (postText.trim() !== '' || uploadedMedia.length > 0);
   const canPublish =
     !isPublishing &&
     !isQueueing &&
-    !isTransforming &&
     !isMediaUploading &&
     !isSavingDraft &&
     (postText.trim() !== '' || uploadedMedia.length > 0) &&
@@ -996,7 +762,6 @@ function PublishPageInner() {
                   onInstagramChange={handleInstagramChange}
                   onTelegramChange={handleTelegramChange}
                   mediaSelected={uploadedMedia.length > 0}
-                  aiEnabledAccounts={aiEnabledAccounts}
                 />
               </Paper>
 
@@ -1017,20 +782,6 @@ function PublishPageInner() {
                       ? `Publishing to ${selectedCount} destination${selectedCount > 1 ? 's' : ''}`
                       : 'Select at least one account'}
                   </Typography>
-                  {hasSelectedAiAccount && (
-                    <Chip
-                      icon={<SmartToyIcon sx={{ fontSize: 16 }} />}
-                      label="AI Transform"
-                      size="small"
-                      variant="outlined"
-                      sx={{
-                        height: 24,
-                        borderColor: 'primary.main',
-                        color: 'primary.main',
-                        '& .MuiChip-icon': { color: 'primary.main' },
-                      }}
-                    />
-                  )}
                 </Box>
                 <Box sx={{ display: 'flex', gap: 2 }}>
                   <Button
@@ -1080,10 +831,9 @@ function PublishPageInner() {
                   <Button
                     variant="contained"
                     size="large"
-                    onClick={hasSelectedAiAccount ? handleTransformAndPublish : handlePublish}
+                    onClick={handlePublish}
                     disabled={!canPublish}
-                    startIcon={hasSelectedAiAccount ? <SmartToyIcon /> : undefined}
-                    endIcon={isTransforming ? <CircularProgress size={20} color="inherit" /> : <SendIcon />}
+                    endIcon={<SendIcon />}
                     sx={{
                       px: 4,
                       py: 1.5,
@@ -1101,7 +851,7 @@ function PublishPageInner() {
                       },
                     }}
                   >
-                    {isTransforming ? 'Transforming...' : hasSelectedAiAccount ? 'Transform & Publish' : 'Publish Now'}
+                    Publish Now
                   </Button>
                 </Box>
               </Box>
@@ -1109,136 +859,6 @@ function PublishPageInner() {
           </Fade>
         )}
       </Container>
-
-      {/* Transformation Preview Dialog */}
-      <Dialog
-        open={showTransformDialog}
-        onClose={() => setShowTransformDialog(false)}
-        maxWidth="md"
-        fullWidth
-        PaperProps={{
-          sx: { borderRadius: 4 }
-        }}
-      >
-        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, pb: 1 }}>
-          <SmartToyIcon color="primary" />
-          <Typography variant="h6" component="span" sx={{ fontFamily: 'var(--font-fraunces), Georgia, serif' }}>
-            AI Transformation Preview
-          </Typography>
-          <IconButton
-            onClick={() => setShowTransformDialog(false)}
-            sx={{ ml: 'auto' }}
-            size="small"
-          >
-            <CloseIcon />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent dividers>
-          {transformResults.length === 0 ? (
-            <Typography color="text.secondary" sx={{ py: 3, textAlign: 'center' }}>
-              No transformations to preview
-            </Typography>
-          ) : (
-            <List sx={{ py: 0 }}>
-              {transformResults.map((result, index) => {
-                return (
-                  <Paper
-                    key={`${result.platform}-${result.account_id}`}
-                    elevation={0}
-                    sx={{
-                      p: 2,
-                      mb: index < transformResults.length - 1 ? 2 : 0,
-                      border: '1px solid',
-                      borderColor: result.success ? 'divider' : 'error.main',
-                      borderRadius: 2,
-                      bgcolor: result.success ? 'background.paper' : 'error.50',
-                    }}
-                  >
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-                      {getPlatformIcon(result.platform)}
-                      <Typography variant="subtitle2" fontWeight={600}>
-                        {result.account_name}
-                      </Typography>
-                      <Chip
-                        label={result.platform}
-                        size="small"
-                        sx={{ textTransform: 'capitalize', height: 20, fontSize: '0.7rem' }}
-                      />
-                      {result.success ? (
-                        <CheckCircleIcon sx={{ color: 'success.main', fontSize: 18, ml: 'auto' }} />
-                      ) : (
-                        <Box sx={{ display: 'flex', gap: 0.5, ml: 'auto' }}>
-                          <IconButton
-                            size="small"
-                            onClick={() => handleRetryTransform(result)}
-                            disabled={isTransforming}
-                            title="Retry"
-                          >
-                            <RefreshIcon fontSize="small" />
-                          </IconButton>
-                          <IconButton
-                            size="small"
-                            onClick={() => handleRemoveFailedDestination(result)}
-                            title="Remove destination"
-                            color="error"
-                          >
-                            <CloseIcon fontSize="small" />
-                          </IconButton>
-                        </Box>
-                      )}
-                    </Box>
-
-                    {result.success ? (
-                      <TextField
-                        fullWidth
-                        multiline
-                        minRows={2}
-                        maxRows={6}
-                        value={result.transformed_text || result.original_text}
-                        InputProps={{
-                          readOnly: true,
-                          sx: { fontSize: '0.9rem' }
-                        }}
-                        variant="outlined"
-                        size="small"
-                      />
-                    ) : (
-                      <Alert severity="error" sx={{ py: 0.5 }}>
-                        {result.error || 'Transformation failed'}
-                      </Alert>
-                    )}
-                  </Paper>
-                );
-              })}
-            </List>
-          )}
-        </DialogContent>
-        <DialogActions sx={{ px: 3, py: 2 }}>
-          <Button
-            onClick={() => setShowTransformDialog(false)}
-            variant="outlined"
-            sx={{ borderRadius: 2 }}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleConfirmPublish}
-            variant="contained"
-            disabled={isTransforming || transformResults.every(r => !r.success)}
-            endIcon={<SendIcon />}
-            sx={{
-              borderRadius: 2,
-              bgcolor: 'primary.main',
-              color: 'primary.contrastText',
-              '&:hover': {
-                bgcolor: 'primary.dark',
-              },
-            }}
-          >
-            Confirm & Publish
-          </Button>
-        </DialogActions>
-      </Dialog>
 
       {/* Queue Snackbar */}
       <Snackbar

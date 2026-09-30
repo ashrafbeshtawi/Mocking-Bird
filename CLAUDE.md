@@ -26,7 +26,6 @@ npx jest tests/path.test.ts  # Run a single test
 - **Database:** PostgreSQL via `pg` driver (no ORM)
 - **Auth:** NextAuth v5 beta (JWT strategy, Google/GitHub/Discord OAuth)
 - **Media:** Cloudinary for upload/processing
-- **AI:** OpenAI and Claude for content transformation
 - **Testing:** Jest + ts-jest + React Testing Library
 - **Path alias:** `@/*` maps to `./src/*`
 
@@ -34,8 +33,8 @@ npx jest tests/path.test.ts  # Run a single test
 
 ### App Router Structure (`src/app/`)
 - `middleware.ts` — Protects routes via NextAuth JWT, injects `x-user-id` header into API requests
-- `api/` — Backend API routes organized by domain: `publish/`, `facebook/`, `twitter/`, `twitter-v1.1/`, `instagram/`, `telegram/`, `ai/`, `auth/`
-- Pages: `dashboard/`, `publish/`, `history/`, `ai/`, `auth/`, `about/`, `privacy/`
+- `api/` — Backend API routes organized by domain: `publish/`, `facebook/`, `twitter/`, `twitter-v1.1/`, `instagram/`, `telegram/`, `mcp/`, `auth/`
+- Pages: `dashboard/`, `publish/`, `history/`, `drafts/`, `mcp/`, `auth/`, `about/`, `privacy/`
 
 ### Library Layer (`src/lib/`)
 - `db.ts` — PostgreSQL connection pool (uses `DATABASE_STRING` env var)
@@ -46,12 +45,12 @@ npx jest tests/path.test.ts  # Run a single test
 - `publish/orchestrator.ts` — Core publishing pipeline: validate → process media → fetch tokens → publish in parallel → map results → log report
 - `publish/` — Sub-modules: `validators/`, `services/`, `mappers/`, `types.ts`
 - `publishers/` — Platform-specific posting: `facebook.ts`, `twitterv1.1.ts`, `instagram.ts`, `telegram.ts`
-- `ai/transformService.ts` — AI content transformation
+- `mcpTokens.ts` + `app/api/mcp/` — MCP endpoint (`/api/mcp`) and per-user bearer tokens; AI clients manage drafts through it
 - `twitter-auth/twitter-client.ts` — Twitter API client
 
 ### Database
 - Raw SQL with `pg` driver (no ORM). Migrations in `migrations/` run alphabetically via `scripts/migrate.js`.
-- Key tables: `users`, `connected_facebook_pages`, `connected_x_accounts`, `connected_x_accounts_v1.1`, `connected_instagram_accounts`, `connected_telegram_channels`, `publish_history`, `ai_prompts`, `ai_providers`, `openai_api_keys`, `scheduled_posts`, `oauth_auth_system`, `drafts`
+- Key tables: `users`, `connected_facebook_pages`, `connected_x_accounts`, `connected_x_accounts_v1.1`, `connected_instagram_accounts`, `connected_telegram_channels`, `publish_history`, `scheduled_posts`, `oauth_auth_system`, `drafts`
 
 ### API Patterns
 - Status codes: 200 (success), 207 (partial success across platforms), 400 (validation), 401 (auth), 404 (not found), 500 (error)
