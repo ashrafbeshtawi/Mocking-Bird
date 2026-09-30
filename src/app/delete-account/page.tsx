@@ -22,7 +22,7 @@ export default function DeleteAccountPage() {
         <li>deine gespeicherten Kontodaten,</li>
         <li>gespeicherte Social-Media-Verbindungen,</li>
         <li>OAuth-Zugriffstokens,</li>
-        <li>Entwürfe, geplante Beiträge und noch nicht veröffentlichte hochgeladene Medien,</li>
+        <li>Entwürfe und noch nicht veröffentlichte hochgeladene Medien,</li>
         <li>dein Veröffentlichungsverlauf und</li>
         <li>sonstige deinem Konto zugeordnete Daten</li>
       </ul>

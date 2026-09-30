@@ -59,7 +59,7 @@ export function DeleteAccountCard() {
       </Box>
       <Typography sx={{ fontSize: 12, color: 'text.secondary', lineHeight: 1.5, mb: 2 }}>
         Permanently removes your account, connected social media accounts and their access tokens,
-        drafts, scheduled posts and publish history. Posts already published on the platforms stay.
+        drafts and publish history. Posts already published on the platforms stay.
       </Typography>
 
       {error && (

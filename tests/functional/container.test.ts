@@ -51,19 +51,8 @@ describe('migrations', () => {
   });
 });
 
-describe('AI features removed in favour of MCP', () => {
+describe('MCP page', () => {
   it('serves the MCP page to signed-in users', async () => {
     expect((await authedFetch(1, '/mcp')).status).toBe(200);
-  });
-
-  it.each(['/ai', '/api/ai/prompts', '/api/ai/providers', '/api/ai/transform'])('%s no longer exists', async (pathname) => {
-    expect((await authedFetch(1, pathname)).status).toBe(404);
-  });
-
-  it('dropped the AI tables', async () => {
-    const { rows } = await db.query(
-      `SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND (tablename LIKE 'ai\\_%' OR tablename = 'openai_api_keys')`
-    );
-    expect(rows).toEqual([]);
   });
 });

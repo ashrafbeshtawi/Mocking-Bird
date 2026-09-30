@@ -22,7 +22,6 @@ import {
 
 } from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
-import ScheduleSendIcon from '@mui/icons-material/ScheduleSend';
 import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
 import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -126,10 +125,9 @@ function PublishPageInner() {
   const [isMediaUploading, setIsMediaUploading] = useState(false);
 
   // Queue state
-  const [isQueueing, setIsQueueing] = useState(false);
   // Draft state
   const [isSavingDraft, setIsSavingDraft] = useState(false);
-  const [queueSnackbar, setQueueSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false,
     message: '',
     severity: 'success'
@@ -183,7 +181,7 @@ function PublishPageInner() {
         setDraftTargets(data.draft.target_platforms);
       } catch (err) {
         if (!cancelled) {
-          setQueueSnackbar({ open: true, message: (err as Error).message, severity: 'error' });
+          setSnackbar({ open: true, message: (err as Error).message, severity: 'error' });
           router.replace('/publish');
         }
       }
@@ -378,104 +376,19 @@ function PublishPageInner() {
       const data = await response.json();
 
       if (response.ok && data.success) {
-        setQueueSnackbar({
+        setSnackbar({
           open: true,
           message: draftId ? 'Draft updated' : 'Draft saved',
           severity: 'success',
         });
         if (!draftId) resetForm();
       } else {
-        setQueueSnackbar({ open: true, message: data.error || 'Failed to save draft', severity: 'error' });
+        setSnackbar({ open: true, message: data.error || 'Failed to save draft', severity: 'error' });
       }
     } catch (err) {
-      setQueueSnackbar({ open: true, message: (err as Error).message || 'Failed to save draft', severity: 'error' });
+      setSnackbar({ open: true, message: (err as Error).message || 'Failed to save draft', severity: 'error' });
     } finally {
       setIsSavingDraft(false);
-    }
-  };
-
-  const handleQueuePost = async () => {
-    setIsQueueing(true);
-
-    // Process Instagram selections
-    const instagramPublishAccounts: string[] = [];
-    const instagramStoryAccounts: string[] = [];
-
-    Object.entries(selectedInstagramAccounts).forEach(([accountId, types]) => {
-      if (types.publish) {
-        instagramPublishAccounts.push(accountId);
-      }
-      if (types.story) {
-        instagramStoryAccounts.push(accountId);
-      }
-    });
-
-    const payload = {
-      text: postText,
-      facebookPages: selectedFacebookPages,
-      xAccounts: selectedXAccounts,
-      instagramPublishAccounts,
-      instagramStoryAccounts,
-      telegramChannels: selectedTelegramChannels,
-      cloudinaryMedia: uploadedMedia.map((media) => ({
-        publicId: media.publicId,
-        publicUrl: media.publicUrl,
-        resourceType: media.resourceType,
-        format: media.format,
-        width: media.width,
-        height: media.height,
-        originalFilename: media.originalFilename,
-      })),
-    };
-
-    try {
-      const response = await fetch('/api/publish/queue', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-        credentials: 'include',
-      });
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        setQueueSnackbar({
-          open: true,
-          message: `Post added to queue (${data.destinations_count} destinations)`,
-          severity: 'success'
-        });
-
-        await consumeDraft();
-
-        // Clear form
-        setPostText('');
-        setUploadedMedia([]);
-        setSelectedFacebookPages(facebookPages.map((p) => p.page_id));
-        setSelectedXAccounts(xAccounts.map((a) => a.id));
-        setSelectedTelegramChannels(telegramChannels.map((c) => c.channel_id));
-
-        const resetInstagram: Record<string, InstagramSelection> = {};
-        instagramAccounts.forEach((a) => {
-          resetInstagram[a.id] = { publish: false, story: false };
-        });
-        setSelectedInstagramAccounts(resetInstagram);
-      } else {
-        setQueueSnackbar({
-          open: true,
-          message: data.error || 'Failed to queue post',
-          severity: 'error'
-        });
-      }
-    } catch (err) {
-      setQueueSnackbar({
-        open: true,
-        message: (err as Error).message || 'An error occurred',
-        severity: 'error'
-      });
-    } finally {
-      setIsQueueing(false);
     }
   };
 
@@ -489,13 +402,11 @@ function PublishPageInner() {
   );
   const canSaveDraft =
     !isPublishing &&
-    !isQueueing &&
     !isMediaUploading &&
     !isSavingDraft &&
     (postText.trim() !== '' || uploadedMedia.length > 0);
   const canPublish =
     !isPublishing &&
-    !isQueueing &&
     !isMediaUploading &&
     !isSavingDraft &&
     (postText.trim() !== '' || uploadedMedia.length > 0) &&
@@ -807,28 +718,6 @@ function PublishPageInner() {
                     {isSavingDraft ? 'Saving...' : draftId ? 'Update Draft' : 'Save as Draft'}
                   </Button>
                   <Button
-                    variant="outlined"
-                    size="large"
-                    onClick={handleQueuePost}
-                    disabled={!canPublish}
-                    endIcon={isQueueing ? <CircularProgress size={20} /> : <ScheduleSendIcon />}
-                    sx={{
-                      px: 3,
-                      py: 1.5,
-                      borderRadius: 3,
-                      textTransform: 'none',
-                      fontSize: '1rem',
-                      fontWeight: 600,
-                      borderColor: 'divider',
-                      color: 'text.primary',
-                      '&:hover': {
-                        borderColor: 'primary.main',
-                      },
-                    }}
-                  >
-                    {isQueueing ? 'Queueing...' : 'Publish in Background'}
-                  </Button>
-                  <Button
                     variant="contained"
                     size="large"
                     onClick={handlePublish}
@@ -860,19 +749,19 @@ function PublishPageInner() {
         )}
       </Container>
 
-      {/* Queue Snackbar */}
+      {/* Snackbar */}
       <Snackbar
-        open={queueSnackbar.open}
+        open={snackbar.open}
         autoHideDuration={4000}
-        onClose={() => setQueueSnackbar(prev => ({ ...prev, open: false }))}
+        onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
         <Alert
-          onClose={() => setQueueSnackbar(prev => ({ ...prev, open: false }))}
-          severity={queueSnackbar.severity}
+          onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
+          severity={snackbar.severity}
           sx={{ width: '100%' }}
         >
-          {queueSnackbar.message}
+          {snackbar.message}
         </Alert>
       </Snackbar>
 

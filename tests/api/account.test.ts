@@ -40,7 +40,7 @@ describe('DELETE /api/account', () => {
       .mockResolvedValueOnce({
         rows: [
           { media: { publicId: 'mocking-bird/uploads/a', resourceType: 'image' } },
-          { media: { publicUrl: 'https://example.com/legacy.jpg' } }, // no publicId → nothing to delete
+          { media: { publicUrl: 'https://example.com/external.jpg' } }, // no publicId → nothing to delete
           { media: null },
         ],
       })

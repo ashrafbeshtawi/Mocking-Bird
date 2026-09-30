@@ -47,7 +47,6 @@ export default function PrivacyPage() {
         <li>OAuth-Zugriffsdaten bzw. Zugriffstokens</li>
         <li>von Nutzern erstellte Beiträge</li>
         <li>Bilder, Videos und sonstige hochgeladene Inhalte</li>
-        <li>geplante Veröffentlichungen</li>
         <li>technische Protokoll- und Nutzungsdaten</li>
         <li>IP-Adresse</li>
         <li>Browser- und Geräteinformationen</li>
@@ -84,7 +83,6 @@ export default function PrivacyPage() {
         <li>Social-Media-Konten zu verbinden,</li>
         <li>Beiträge zu erstellen und zu verwalten,</li>
         <li>Beiträge auf den vom Nutzer ausgewählten Plattformen zu veröffentlichen,</li>
-        <li>geplante Veröffentlichungen durchzuführen,</li>
         <li>die Sicherheit und Stabilität der Anwendung zu gewährleisten,</li>
         <li>Fehler zu erkennen und zu beheben,</li>
         <li>die technische Funktionalität von MockingBird sicherzustellen.</li>
