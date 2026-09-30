@@ -25,7 +25,7 @@ import EditNoteOutlinedIcon from '@mui/icons-material/EditNoteOutlined';
 import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
 import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined';
 import BarChartOutlinedIcon from '@mui/icons-material/BarChartOutlined';
-import AutoAwesomeOutlinedIcon from '@mui/icons-material/AutoAwesomeOutlined';
+import HubOutlinedIcon from '@mui/icons-material/HubOutlined';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined';
 import { useState, useCallback } from 'react';
@@ -45,7 +45,7 @@ const getNavLinks = (isLoggedIn: boolean): NavLink[] =>
         { href: '/drafts', label: 'Drafts', icon: DescriptionOutlinedIcon },
         { href: '/history', label: 'History', icon: HistoryOutlinedIcon },
         { href: '/analytics', label: 'Analytics', icon: BarChartOutlinedIcon },
-        { href: '/ai', label: 'AI Tools', icon: AutoAwesomeOutlinedIcon },
+        { href: '/mcp', label: 'MCP', icon: HubOutlinedIcon },
         { href: '/about', label: 'About', icon: InfoOutlinedIcon },
       ]
     : [

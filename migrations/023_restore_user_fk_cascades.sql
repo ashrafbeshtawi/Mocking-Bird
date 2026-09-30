@@ -1,11 +1,9 @@
--- Migration 018 dropped the users table with CASCADE, which silently removed the
--- foreign keys (and their ON DELETE CASCADE) from every table created before it.
--- Account deletion relies on one `DELETE FROM users` cleaning up everything, so
--- the constraints are restored here.
+-- Adds ON DELETE CASCADE foreign keys from every user-scoped table to users(id),
+-- so one `DELETE FROM users` removes all of a user's rows (account deletion).
 --
--- NOT VALID: rows left behind by the 018 clean slate may still point at user ids
--- that no longer exist. The constraint is enforced for new rows and its cascade
--- fires on delete regardless; only the one-off scan of existing rows is skipped.
+-- NOT VALID: existing rows may reference user ids that do not exist. The
+-- constraint is enforced for new rows and its cascade fires on delete; only the
+-- one-off scan of existing rows is skipped.
 
 ALTER TABLE connected_facebook_pages
   DROP CONSTRAINT IF EXISTS connected_facebook_pages_user_id_fkey,

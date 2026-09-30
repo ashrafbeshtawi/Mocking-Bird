@@ -13,7 +13,6 @@ import {
   ListItemSecondaryAction,
   Tooltip,
 } from '@mui/material';
-import SmartToyIcon from '@mui/icons-material/SmartToy';
 import { PLATFORM_CONFIG } from '@/lib/platformConfig';
 import type {
   ConnectedPage,
@@ -22,13 +21,6 @@ import type {
   TelegramChannel,
   InstagramSelection,
 } from '@/types/accounts';
-
-interface AiEnabledAccounts {
-  facebook: string[];
-  twitter: string[];
-  instagram: string[];
-  telegram: string[];
-}
 
 interface AccountSelectorProps {
   facebookPages: ConnectedPage[];
@@ -44,7 +36,6 @@ interface AccountSelectorProps {
   onInstagramChange: (accountId: string, type: 'publish' | 'story') => void;
   onTelegramChange: (channelId: string) => void;
   mediaSelected: boolean;
-  aiEnabledAccounts?: AiEnabledAccounts;
 }
 
 
@@ -62,7 +53,6 @@ export function AccountSelector({
   onInstagramChange,
   onTelegramChange,
   mediaSelected,
-  aiEnabledAccounts,
 }: AccountSelectorProps) {
   const hasAnyAccount =
     facebookPages.length > 0 ||
@@ -96,7 +86,6 @@ export function AccountSelector({
           const config = PLATFORM_CONFIG.facebook;
           const Icon = config.icon;
           const isSelected = selectedFacebookPages.includes(page.page_id);
-          const hasAi = aiEnabledAccounts?.facebook?.includes(page.page_id);
 
           return (
             <ListItem
@@ -124,11 +113,6 @@ export function AccountSelector({
                     <Typography variant="body2" fontWeight={500}>
                       {page.page_name}
                     </Typography>
-                    {hasAi && (
-                      <Tooltip title="AI transformation enabled">
-                        <SmartToyIcon sx={{ fontSize: 16, color: 'primary.main' }} />
-                      </Tooltip>
-                    )}
                   </Box>
                 }
               />
@@ -152,7 +136,6 @@ export function AccountSelector({
           const config = PLATFORM_CONFIG.twitter;
           const Icon = config.icon;
           const isSelected = selectedXAccounts.includes(account.id);
-          const hasAi = aiEnabledAccounts?.twitter?.includes(account.id);
 
           return (
             <ListItem
@@ -180,11 +163,6 @@ export function AccountSelector({
                     <Typography variant="body2" fontWeight={500}>
                       @{account.name}
                     </Typography>
-                    {hasAi && (
-                      <Tooltip title="AI transformation enabled">
-                        <SmartToyIcon sx={{ fontSize: 16, color: 'primary.main' }} />
-                      </Tooltip>
-                    )}
                   </Box>
                 }
               />
@@ -210,7 +188,6 @@ export function AccountSelector({
           const publishChecked = selectedInstagramAccounts[account.id]?.publish || false;
           const storyChecked = selectedInstagramAccounts[account.id]?.story || false;
           const isSelected = publishChecked || storyChecked;
-          const hasAi = aiEnabledAccounts?.instagram?.includes(account.id);
 
           return (
             <ListItem
@@ -234,11 +211,6 @@ export function AccountSelector({
                     <Typography variant="body2" fontWeight={500}>
                       @{account.username}
                     </Typography>
-                    {hasAi && (
-                      <Tooltip title="AI transformation enabled">
-                        <SmartToyIcon sx={{ fontSize: 16, color: 'primary.main' }} />
-                      </Tooltip>
-                    )}
                     {!mediaSelected && (
                       <Chip
                         label="Media required"
@@ -304,7 +276,6 @@ export function AccountSelector({
           const config = PLATFORM_CONFIG.telegram;
           const Icon = config.icon;
           const isSelected = selectedTelegramChannels.includes(channel.channel_id);
-          const hasAi = aiEnabledAccounts?.telegram?.includes(channel.channel_id);
 
           return (
             <ListItem
@@ -332,11 +303,6 @@ export function AccountSelector({
                     <Typography variant="body2" fontWeight={500}>
                       {channel.channel_title}
                     </Typography>
-                    {hasAi && (
-                      <Tooltip title="AI transformation enabled">
-                        <SmartToyIcon sx={{ fontSize: 16, color: 'primary.main' }} />
-                      </Tooltip>
-                    )}
                   </Box>
                 }
                 secondary={

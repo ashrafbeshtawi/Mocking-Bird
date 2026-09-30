@@ -25,7 +25,6 @@ import { fetchWithAuth } from '@/lib/fetch';
 import { ConfirmDisconnectDialog } from '@/components/dashboard/ConfirmDisconnectDialog';
 import { TelegramConnectDialog } from '@/components/dashboard/TelegramConnectDialog';
 import { ConnectButtons } from '@/components/dashboard/ConnectButtons';
-import { McpTokenCard } from '@/components/dashboard/McpTokenCard';
 import { DeleteAccountCard } from '@/components/dashboard/DeleteAccountCard';
 import { AccountsTable } from '@/components/dashboard/AccountsTable';
 import type { AccountData } from '@/types/accounts';
@@ -524,7 +523,6 @@ export default function DashboardPage() {
                   emptyMessage="No accounts connected yet. Use the buttons above to connect your social media accounts."
                   loadingId={deletingId}
                   onDelete={promptDelete}
-                  showPromptSelector={true}
                 />
               )}
             </Box>
@@ -607,9 +605,6 @@ export default function DashboardPage() {
                 </Box>
               ))}
             </Box>
-
-            {/* --- MCP access card --- */}
-            <McpTokenCard />
 
             {/* --- Account deletion --- */}
             <DeleteAccountCard />

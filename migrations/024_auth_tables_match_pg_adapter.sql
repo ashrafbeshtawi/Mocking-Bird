@@ -1,11 +1,9 @@
--- Migration 018 created users/accounts with snake_case columns, but
--- @auth/pg-adapter (src/lib/auth.ts) queries the quoted camelCase columns of the
--- official Auth.js schema ("userId", "providerAccountId", "emailVerified") plus
--- accounts.session_state. A database built from these migrations therefore
--- failed on the first OAuth login with `column a.userId does not exist`.
+-- Gives users/accounts the column names @auth/pg-adapter (src/lib/auth.ts)
+-- queries: the quoted camelCase columns of the Auth.js schema ("userId",
+-- "providerAccountId", "emailVerified") plus accounts.session_state.
 --
--- Renames are conditional so a database that already carries the adapter
--- schema is left untouched. Indexes, the unique constraint and the FK follow
+-- Renames are conditional, so a database that already has the adapter schema
+-- is left untouched. Indexes, the unique constraint and the FK follow
 -- the renamed columns automatically. sessions / verification_token are not
 -- created: the app uses the JWT session strategy and has no e-mail provider.
 

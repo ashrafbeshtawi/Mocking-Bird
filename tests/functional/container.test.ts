@@ -50,3 +50,9 @@ describe('migrations', () => {
     expect(output).toContain('Migrations completed successfully');
   });
 });
+
+describe('MCP page', () => {
+  it('serves the MCP page to signed-in users', async () => {
+    expect((await authedFetch(1, '/mcp')).status).toBe(200);
+  });
+});

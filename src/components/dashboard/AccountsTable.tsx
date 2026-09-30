@@ -16,10 +16,7 @@ import {
 } from '@mui/material';
 import { Delete as DeleteIcon } from '@mui/icons-material';
 import { PLATFORM_CONFIG } from '@/lib/platformConfig';
-import type { AccountData, Platform } from '@/types/accounts';
-import { useAiPrompts } from '@/hooks/useAiPrompts';
-import { useAllPromptMatchings } from '@/hooks/useAllPromptMatchings';
-import { PromptSelector } from '@/components/ai';
+import type { AccountData } from '@/types/accounts';
 
 interface AccountsTableProps {
   title: string;
@@ -27,7 +24,6 @@ interface AccountsTableProps {
   emptyMessage: string;
   loadingId: string | null;
   onDelete: (account: AccountData) => void;
-  showPromptSelector?: boolean;
 }
 
 export function AccountsTable({
@@ -36,32 +32,7 @@ export function AccountsTable({
   emptyMessage,
   loadingId,
   onDelete,
-  showPromptSelector = false,
 }: AccountsTableProps) {
-  const { prompts, loading: promptsLoading } = useAiPrompts();
-  const { matchings, loading: matchingsLoading, refetch: refetchMatchings } = useAllPromptMatchings();
-
-  const getMatchingForAccount = (platform: Platform, accountId: string) => {
-    const platformMatchings = matchings[platform];
-    return platformMatchings.find((m) => String(m.account_id) === String(accountId));
-  };
-
-  const setMatching = async (platform: Platform, accountId: string, promptId: number | null) => {
-    try {
-      const response = await fetch(`/api/ai/prompt-matching/${platform}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ account_id: accountId, prompt_id: promptId }),
-      });
-      if (response.ok) {
-        refetchMatchings();
-      }
-    } catch (err) {
-      console.error('Failed to set matching:', err);
-    }
-  };
-
   return (
     <>
       {title && (
@@ -89,9 +60,6 @@ export function AccountsTable({
               <TableRow>
                 <TableCell>Platform</TableCell>
                 <TableCell>Name</TableCell>
-                {showPromptSelector && (
-                  <TableCell sx={{ width: 200 }}>AI Prompt</TableCell>
-                )}
                 <TableCell sx={{ width: 80 }}>Actions</TableCell>
               </TableRow>
             </TableHead>
@@ -126,17 +94,6 @@ export function AccountsTable({
                         </Typography>
                       )}
                     </TableCell>
-                    {showPromptSelector && (
-                      <TableCell>
-                        <PromptSelector
-                          prompts={prompts}
-                          selectedPromptId={getMatchingForAccount(account.platform, account.id)?.prompt_id || null}
-                          onChange={(promptId) => setMatching(account.platform, account.id, promptId)}
-                          loading={promptsLoading || matchingsLoading}
-                          size="small"
-                        />
-                      </TableCell>
-                    )}
                     <TableCell>
                       <Tooltip title="Disconnect">
                         <span>
