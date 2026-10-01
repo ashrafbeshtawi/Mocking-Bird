@@ -53,8 +53,8 @@ describe('Drafts API', () => {
     expect(response.status).toBe(200);
     expect(data.drafts).toHaveLength(1);
     expect(data.total).toBe(7);
-    expect(mockQuery.mock.calls[0][1]).toEqual([42, null]);
-    expect(mockQuery.mock.calls[1][1]).toEqual([42, null, 20, 0]);
+    expect(mockQuery.mock.calls[0][1]).toEqual([42, null, null]);
+    expect(mockQuery.mock.calls[1][1]).toEqual([42, null, null, 20, 0]);
   });
 
   it('fetches a single draft by id', async () => {
@@ -80,8 +80,8 @@ describe('Drafts API', () => {
     await GET(getRequest('?q=100%25_done&limit=500&offset=-5'));
 
     const pattern = '%100\\%\\_done%';
-    expect(mockQuery.mock.calls[0][1]).toEqual([42, pattern]);
-    expect(mockQuery.mock.calls[1][1]).toEqual([42, pattern, 100, 0]);
+    expect(mockQuery.mock.calls[0][1]).toEqual([42, pattern, null]);
+    expect(mockQuery.mock.calls[1][1]).toEqual([42, pattern, null, 100, 0]);
   });
 
   it('rejects a draft with an unknown target platform', async () => {
