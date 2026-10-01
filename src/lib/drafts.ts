@@ -70,6 +70,8 @@ export async function getDraft(userId: number, id: number): Promise<Draft | null
 export interface ListDraftsOptions {
   /** Case-insensitive substring match on the draft text. */
   query?: string;
+  /** Only drafts updated within the last N days (rolling, from now). */
+  lastDays?: number;
   limit?: number;
   offset?: number;
 }
@@ -94,14 +96,17 @@ export async function listDrafts(
   const offset = Math.max(options.offset ?? 0, 0);
   const pattern = options.query?.trim() ? `%${escapeLike(options.query.trim())}%` : null;
 
-  const where = 'user_id = $1 AND ($2::text IS NULL OR text ILIKE $2)';
+  const lastDays = options.lastDays ?? null;
+
+  const where = `user_id = $1 AND ($2::text IS NULL OR text ILIKE $2)
+    AND ($3::int IS NULL OR updated_at >= NOW() - make_interval(days => $3::int))`;
   const [countResult, pageResult] = await Promise.all([
-    pool.query(`SELECT COUNT(*) FROM drafts WHERE ${where}`, [userId, pattern]),
+    pool.query(`SELECT COUNT(*) FROM drafts WHERE ${where}`, [userId, pattern, lastDays]),
     pool.query(
       `SELECT ${DRAFT_COLUMNS} FROM drafts WHERE ${where}
        ORDER BY updated_at DESC, id DESC
-       LIMIT $3 OFFSET $4`,
-      [userId, pattern, limit, offset]
+       LIMIT $4 OFFSET $5`,
+      [userId, pattern, lastDays, limit, offset]
     ),
   ]);
 
