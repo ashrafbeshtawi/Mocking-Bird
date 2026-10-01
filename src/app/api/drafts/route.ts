@@ -3,13 +3,14 @@ import { getAuthUserId } from '@/lib/api-auth';
 import { createLogger } from '@/lib/logger';
 import {
   createDraft,
-  deleteDraft,
+  deleteDrafts,
   getDraft,
   listDrafts,
   updateDraft,
   validateDraftInput,
   type DraftInput,
 } from '@/lib/drafts';
+import { PLATFORMS, type Platform } from '@/types/accounts';
 
 const logger = createLogger('DraftsAPI');
 
@@ -25,7 +26,7 @@ const intParam = (value: string | null): number | undefined => {
   return Number.isNaN(parsed) ? undefined : parsed;
 };
 
-// GET: List (or search via ?q=) drafts for the current user, paginated
+// GET: List drafts for the current user, paginated; ?q= searches the text, ?platform= filters by target
 export async function GET(req: Request) {
   const userId = await getUserId();
   if (!userId) {
@@ -46,6 +47,9 @@ export async function GET(req: Request) {
 
     const page = await listDrafts(userId, {
       query: searchParams.get('q') ?? undefined,
+      platform: PLATFORMS.includes(searchParams.get('platform') as Platform)
+        ? (searchParams.get('platform') as Platform)
+        : undefined,
       limit: intParam(searchParams.get('limit')),
       offset: intParam(searchParams.get('offset')),
     });
@@ -114,16 +118,18 @@ export async function DELETE(req: Request) {
   }
 
   try {
-    const { id } = await req.json();
-    if (!id) {
-      return NextResponse.json({ error: 'Draft ID is required.' }, { status: 400 });
+    // Body: { id } for one draft or { ids } for several.
+    const body = await req.json();
+    const ids: unknown[] = Array.isArray(body.ids) ? body.ids : body.id !== undefined ? [body.id] : [];
+    if (ids.length === 0 || !ids.every((id) => Number.isInteger(id) && (id as number) > 0)) {
+      return NextResponse.json({ error: 'Provide a draft id or a non-empty ids array of positive integers.' }, { status: 400 });
     }
 
-    const deleted = await deleteDraft(userId, id);
-    if (!deleted) {
+    const deletedCount = await deleteDrafts(userId, ids as number[]);
+    if (deletedCount === 0) {
       return NextResponse.json({ error: 'Draft not found or access denied.' }, { status: 404 });
     }
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, deletedCount });
   } catch (error) {
     logger.error('DELETE failed', error);
     return NextResponse.json({ error: 'Internal Server Error.' }, { status: 500 });

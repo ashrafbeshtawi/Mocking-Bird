@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { fetchWithAuth } from '@/lib/fetch';
 import type { Draft, DraftInput } from '@/lib/drafts';
 import type { UploadedMedia } from '@/components/publish/MediaUploader';
+import type { Platform } from '@/types/accounts';
 
 export type { Draft, DraftInput };
 
@@ -21,7 +22,18 @@ export function mapDraftMediaToUploaded(media: Draft['media']): UploadedMedia[] 
   }));
 }
 
-export function useDrafts() {
+export const DRAFTS_PAGE_SIZE = 20;
+
+export interface DraftFilters {
+  /** 1-based page number. */
+  page: number;
+  /** Substring search on the draft text; empty means no search. */
+  query: string;
+  /** Target platform, or 'all'. */
+  platform: Platform | 'all';
+}
+
+export function useDrafts({ page, query, platform }: DraftFilters) {
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -31,30 +43,38 @@ export function useDrafts() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetchWithAuth('/api/drafts?limit=100');
+      const params = new URLSearchParams({
+        limit: String(DRAFTS_PAGE_SIZE),
+        offset: String((page - 1) * DRAFTS_PAGE_SIZE),
+      });
+      if (query.trim()) params.set('q', query.trim());
+      if (platform !== 'all') params.set('platform', platform);
+
+      const response = await fetchWithAuth(`/api/drafts?${params}`);
       if (!response.ok) {
         throw new Error('Failed to fetch drafts');
       }
       const data = await response.json();
       setDrafts(data.drafts || []);
-      setTotal(data.total ?? (data.drafts?.length || 0));
+      setTotal(data.total ?? 0);
     } catch (err) {
       setError((err as Error).message);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page, query, platform]);
 
-  const deleteDraft = useCallback(async (id: number): Promise<void> => {
+  /** Deletes the drafts with these ids; resolves to the number deleted. */
+  const deleteDrafts = useCallback(async (ids: number[]): Promise<number> => {
     const response = await fetchWithAuth('/api/drafts', {
       method: 'DELETE',
-      body: JSON.stringify({ id }),
+      body: JSON.stringify({ ids }),
     });
+    const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      const data = await response.json().catch(() => ({}));
-      throw new Error(data.error || 'Failed to delete draft');
+      throw new Error(data.error || 'Failed to delete drafts');
     }
-    setDrafts((prev) => prev.filter((d) => d.id !== id));
+    return data.deletedCount ?? ids.length;
   }, []);
 
   useEffect(() => {
@@ -64,9 +84,10 @@ export function useDrafts() {
   return {
     drafts,
     total,
+    totalPages: Math.max(1, Math.ceil(total / DRAFTS_PAGE_SIZE)),
     loading,
     error,
     refetch: fetchDrafts,
-    deleteDraft,
+    deleteDrafts,
   };
 }

@@ -70,6 +70,8 @@ export async function getDraft(userId: number, id: number): Promise<Draft | null
 export interface ListDraftsOptions {
   /** Case-insensitive substring match on the draft text. */
   query?: string;
+  /** Only drafts that target this platform. */
+  platform?: Platform;
   /** Only drafts updated within the last N days (rolling, from now). */
   lastDays?: number;
   limit?: number;
@@ -96,17 +98,19 @@ export async function listDrafts(
   const offset = Math.max(options.offset ?? 0, 0);
   const pattern = options.query?.trim() ? `%${escapeLike(options.query.trim())}%` : null;
 
+  const platform = options.platform ?? null;
   const lastDays = options.lastDays ?? null;
 
   const where = `user_id = $1 AND ($2::text IS NULL OR text ILIKE $2)
-    AND ($3::int IS NULL OR updated_at >= NOW() - make_interval(days => $3::int))`;
+    AND ($3::text IS NULL OR $3 = ANY(target_platforms))
+    AND ($4::int IS NULL OR updated_at >= NOW() - make_interval(days => $4::int))`;
   const [countResult, pageResult] = await Promise.all([
-    pool.query(`SELECT COUNT(*) FROM drafts WHERE ${where}`, [userId, pattern, lastDays]),
+    pool.query(`SELECT COUNT(*) FROM drafts WHERE ${where}`, [userId, pattern, platform, lastDays]),
     pool.query(
       `SELECT ${DRAFT_COLUMNS} FROM drafts WHERE ${where}
        ORDER BY updated_at DESC, id DESC
-       LIMIT $4 OFFSET $5`,
-      [userId, pattern, lastDays, limit, offset]
+       LIMIT $5 OFFSET $6`,
+      [userId, pattern, platform, lastDays, limit, offset]
     ),
   ]);
 
@@ -144,6 +148,11 @@ export async function updateDraft(userId: number, id: number, input: DraftInput)
 
 /** Returns true if a draft was deleted, false if not found / not owned. */
 export async function deleteDraft(userId: number, id: number): Promise<boolean> {
-  const result = await pool.query('DELETE FROM drafts WHERE id = $1 AND user_id = $2', [id, userId]);
-  return (result.rowCount ?? 0) > 0;
+  return (await deleteDrafts(userId, [id])) > 0;
+}
+
+/** Deletes the given drafts of this user; ids of other users' drafts are ignored. Returns the count deleted. */
+export async function deleteDrafts(userId: number, ids: number[]): Promise<number> {
+  const result = await pool.query('DELETE FROM drafts WHERE id = ANY($1::int[]) AND user_id = $2', [ids, userId]);
+  return result.rowCount ?? 0;
 }
