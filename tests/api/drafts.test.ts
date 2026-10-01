@@ -53,8 +53,8 @@ describe('Drafts API', () => {
     expect(response.status).toBe(200);
     expect(data.drafts).toHaveLength(1);
     expect(data.total).toBe(7);
-    expect(mockQuery.mock.calls[0][1]).toEqual([42, null]);
-    expect(mockQuery.mock.calls[1][1]).toEqual([42, null, 20, 0]);
+    expect(mockQuery.mock.calls[0][1]).toEqual([42, null, null]);
+    expect(mockQuery.mock.calls[1][1]).toEqual([42, null, null, 20, 0]);
   });
 
   it('fetches a single draft by id', async () => {
@@ -80,8 +80,8 @@ describe('Drafts API', () => {
     await GET(getRequest('?q=100%25_done&limit=500&offset=-5'));
 
     const pattern = '%100\\%\\_done%';
-    expect(mockQuery.mock.calls[0][1]).toEqual([42, pattern]);
-    expect(mockQuery.mock.calls[1][1]).toEqual([42, pattern, 100, 0]);
+    expect(mockQuery.mock.calls[0][1]).toEqual([42, pattern, null]);
+    expect(mockQuery.mock.calls[1][1]).toEqual([42, pattern, null, 100, 0]);
   });
 
   it('rejects a draft with an unknown target platform', async () => {
@@ -125,7 +125,42 @@ describe('Drafts API', () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.success).toBe(true);
-    expect(mockQuery.mock.calls[0][1]).toEqual([1, 42]);
+    expect(data).toEqual({ success: true, deletedCount: 1 });
+    expect(mockQuery.mock.calls[0][1]).toEqual([[1], 42]);
+  });
+
+  it('deletes several owned drafts at once', async () => {
+    mockQuery.mockResolvedValue({ rowCount: 3, rows: [] });
+
+    const response = await DELETE(request('DELETE', { ids: [1, 2, 3] }));
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).deletedCount).toBe(3);
+    expect(mockQuery.mock.calls[0][0]).toContain('user_id = $2');
+    expect(mockQuery.mock.calls[0][1]).toEqual([[1, 2, 3], 42]);
+  });
+
+  it.each([{}, { ids: [] }, { ids: [1, 'x'] }, { id: -1 }])('rejects invalid delete input %j', async (body) => {
+    const response = await DELETE(request('DELETE', body));
+
+    expect(response.status).toBe(400);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it('filters the list by target platform', async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ count: '1' }] }).mockResolvedValueOnce({ rows: [draftRow] });
+
+    await GET(getRequest('?platform=facebook'));
+
+    expect(mockQuery.mock.calls[0][1]).toEqual([42, null, 'facebook']);
+    expect(mockQuery.mock.calls[1][0]).toContain('= ANY(target_platforms)');
+  });
+
+  it('ignores an unknown platform filter', async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ count: '1' }] }).mockResolvedValueOnce({ rows: [draftRow] });
+
+    await GET(getRequest('?platform=myspace'));
+
+    expect(mockQuery.mock.calls[0][1]).toEqual([42, null, null]);
   });
 });

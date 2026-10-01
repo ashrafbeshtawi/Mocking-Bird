@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Container,
   Box,
@@ -18,7 +19,18 @@ import {
   DialogContent,
   DialogActions,
   IconButton,
+  Checkbox,
+  TextField,
+  InputAdornment,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Pagination,
+  type SelectChangeEvent,
 } from '@mui/material';
+import SearchIcon from '@mui/icons-material/Search';
+import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined';
@@ -30,21 +42,83 @@ import { getPlatformConfig } from '@/lib/platformConfig';
 import { useDrafts, mapDraftMediaToUploaded, type Draft } from '@/hooks/useDrafts';
 import { useConnectedAccounts } from '@/hooks/useConnectedAccounts';
 import { usePublish } from '@/hooks/usePublish';
-import type { InstagramSelection, Platform } from '@/types/accounts';
+import { PLATFORMS, type InstagramSelection, type Platform } from '@/types/accounts';
+
+const SEARCH_DEBOUNCE_MS = 300;
 
 export default function DraftsPage() {
-  const { drafts, total, loading, error, deleteDraft } = useDrafts();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1);
+  const query = searchParams.get('q') ?? '';
+  const platformParam = searchParams.get('platform') as Platform | null;
+  const platform: Platform | 'all' = platformParam && PLATFORMS.includes(platformParam) ? platformParam : 'all';
+
+  const { drafts, total, totalPages, loading, error, refetch, deleteDrafts } = useDrafts({ page, query, platform });
   const { facebookPages, xAccounts, instagramAccounts, telegramChannels } = useConnectedAccounts();
   const { publish, isPublishing, statusMessage } = usePublish();
 
   const [previewDraft, setPreviewDraft] = useState<Draft | null>(null);
-  const [deleting, setDeleting] = useState<Draft | null>(null);
+  // Drafts awaiting delete confirmation: one from a row button, or the selection.
+  const [deleting, setDeleting] = useState<Draft[] | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [searchInput, setSearchInput] = useState(query);
   const [working, setWorking] = useState(false);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false,
     message: '',
     severity: 'success',
   });
+
+  const updateUrl = (next: { page?: number; q?: string; platform?: Platform | 'all' }) => {
+    const params = new URLSearchParams();
+    const nextPage = next.page ?? page;
+    const nextQuery = next.q ?? query;
+    const nextPlatform = next.platform ?? platform;
+    if (nextPage > 1) params.set('page', String(nextPage));
+    if (nextQuery.trim()) params.set('q', nextQuery.trim());
+    if (nextPlatform !== 'all') params.set('platform', nextPlatform);
+    const qs = params.toString();
+    router.push(qs ? `/drafts?${qs}` : '/drafts', { scroll: false });
+  };
+
+  // The search box writes to the URL after a short pause; the URL drives the fetch.
+  useEffect(() => {
+    if (searchInput.trim() === query.trim()) return;
+    const timer = setTimeout(() => updateUrl({ q: searchInput, page: 1 }), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchInput]);
+
+  // Selection is per page: it resets whenever the visible list changes.
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [drafts]);
+
+  const isAllSelected = drafts.length > 0 && selectedIds.size === drafts.length;
+  const isSomeSelected = selectedIds.size > 0 && !isAllSelected;
+  const isFiltered = query.trim() !== '' || platform !== 'all';
+
+  const toggleSelected = (id: number) =>
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const handleSelectAll = (checked: boolean) =>
+    setSelectedIds(checked ? new Set(drafts.map((d) => d.id)) : new Set());
+
+  const handlePlatformChange = (event: SelectChangeEvent) =>
+    updateUrl({ platform: event.target.value as Platform | 'all', page: 1 });
+
+  /** Reloads the list; steps back a page when the current one ran empty. */
+  const reloadAfterDelete = (deletedCount: number) => {
+    const isPageEmptied = deletedCount >= drafts.length && page > 1;
+    if (isPageEmptied) updateUrl({ page: page - 1 });
+    else refetch();
+  };
 
   const accountNamesFor = (platform: Platform): string[] => {
     switch (platform) {
@@ -92,7 +166,8 @@ export default function DraftsPage() {
 
     if (ok) {
       try {
-        await deleteDraft(previewDraft.id);
+        await deleteDrafts([previewDraft.id]);
+        reloadAfterDelete(1);
       } catch {
         // publish went through; a stale draft in the list is not fatal
       }
@@ -111,9 +186,14 @@ export default function DraftsPage() {
     if (!deleting) return;
     setWorking(true);
     try {
-      await deleteDraft(deleting.id);
+      const deletedCount = await deleteDrafts(deleting.map((d) => d.id));
       setDeleting(null);
-      setSnackbar({ open: true, message: 'Draft deleted', severity: 'success' });
+      reloadAfterDelete(deletedCount);
+      setSnackbar({
+        open: true,
+        message: `${deletedCount} draft${deletedCount === 1 ? '' : 's'} deleted`,
+        severity: 'success',
+      });
     } catch (err) {
       setSnackbar({ open: true, message: (err as Error).message, severity: 'error' });
     } finally {
@@ -138,7 +218,7 @@ export default function DraftsPage() {
       );
     });
 
-  if (loading) {
+  if (loading && drafts.length === 0 && !isFiltered) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
         <CircularProgress size={48} />
@@ -168,7 +248,95 @@ export default function DraftsPage() {
           </Alert>
         )}
 
-        {drafts.length === 0 ? (
+        <Paper
+          elevation={0}
+          sx={{
+            p: 2,
+            mb: 2,
+            borderRadius: 3,
+            border: '1px solid',
+            borderColor: 'divider',
+            display: 'flex',
+            alignItems: { xs: 'stretch', sm: 'center' },
+            justifyContent: 'space-between',
+            flexDirection: { xs: 'column', sm: 'row' },
+            gap: 2,
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Checkbox
+                checked={isAllSelected}
+                indeterminate={isSomeSelected}
+                onChange={(e) => handleSelectAll(e.target.checked)}
+                disabled={drafts.length === 0}
+                inputProps={{ 'aria-label': 'Select all drafts on this page' }}
+              />
+              <Typography variant="body2" color="text.secondary">
+                {selectedIds.size > 0 ? `${selectedIds.size} selected` : 'Select all'}
+              </Typography>
+            </Box>
+            {selectedIds.size > 0 && (
+              <Button
+                variant="outlined"
+                color="error"
+                size="small"
+                startIcon={<DeleteSweepIcon />}
+                onClick={() => setDeleting(drafts.filter((d) => selectedIds.has(d.id)))}
+                sx={{ borderRadius: 2, textTransform: 'none' }}
+              >
+                Delete {selectedIds.size}
+              </Button>
+            )}
+          </Box>
+
+          <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', sm: 'row' } }}>
+            <TextField
+              size="small"
+              placeholder="Search drafts"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              inputProps={{ 'aria-label': 'Search drafts' }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon fontSize="small" />
+                  </InputAdornment>
+                ),
+              }}
+              sx={{ minWidth: { xs: '100%', sm: 220 } }}
+            />
+            <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 150 } }}>
+              <InputLabel id="drafts-platform-label">Platform</InputLabel>
+              <Select labelId="drafts-platform-label" value={platform} onChange={handlePlatformChange} label="Platform">
+                <MenuItem value="all">All Platforms</MenuItem>
+                {PLATFORMS.map((p) => (
+                  <MenuItem key={p} value={p}>
+                    {getPlatformConfig(p)?.label ?? p}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Box>
+        </Paper>
+
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
+            <CircularProgress size={32} />
+          </Box>
+        ) : drafts.length === 0 && isFiltered ? (
+          <Paper
+            elevation={0}
+            sx={{ p: 6, textAlign: 'center', borderRadius: 4, border: '1px solid', borderColor: 'divider' }}
+          >
+            <Typography variant="h6" color="text.secondary" gutterBottom>
+              No drafts match
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Try a different search or platform.
+            </Typography>
+          </Paper>
+        ) : drafts.length === 0 ? (
           <Fade in timeout={800}>
             <Paper
               elevation={0}
@@ -205,6 +373,12 @@ export default function DraftsPage() {
                   }}
                 >
                   <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                    <Checkbox
+                      checked={selectedIds.has(draft.id)}
+                      onChange={() => toggleSelected(draft.id)}
+                      inputProps={{ 'aria-label': `Select draft ${draft.id}` }}
+                      sx={{ mt: -0.75, ml: -1 }}
+                    />
                     <Box sx={{ flex: 1, minWidth: 0 }}>
                       <Typography
                         variant="body1"
@@ -249,17 +423,27 @@ export default function DraftsPage() {
                     >
                       <EditOutlinedIcon fontSize="small" />
                     </IconButton>
-                    <IconButton size="small" color="error" onClick={() => setDeleting(draft)} title="Delete draft">
+                    <IconButton size="small" color="error" onClick={() => setDeleting([draft])} title="Delete draft">
                       <DeleteOutlineIcon fontSize="small" />
                     </IconButton>
                   </Box>
                 </Paper>
               ))}
-              {total > drafts.length && (
-                <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center' }}>
-                  Showing the {drafts.length} most recent of {total} drafts
-                </Typography>
+              {totalPages > 1 && (
+                <Box sx={{ display: 'flex', justifyContent: 'center', mt: 1 }}>
+                  <Pagination
+                    count={totalPages}
+                    page={page}
+                    onChange={(_event, value) => updateUrl({ page: value })}
+                    color="primary"
+                    shape="rounded"
+                  />
+                </Box>
               )}
+              <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center' }}>
+                {total} draft{total === 1 ? '' : 's'}
+                {isFiltered ? ' match' : ''}
+              </Typography>
             </Box>
           </Fade>
         )}
@@ -395,18 +579,26 @@ export default function DraftsPage() {
 
       {/* Delete confirmation */}
       <Dialog open={!!deleting} onClose={() => setDeleting(null)} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 4 } }}>
-        <DialogTitle>Delete this draft?</DialogTitle>
+        <DialogTitle>
+          {deleting && deleting.length > 1 ? `Delete ${deleting.length} drafts?` : 'Delete this draft?'}
+        </DialogTitle>
         <DialogContent>
-          <Typography variant="body2" color="text.secondary" noWrap>
-            {deleting?.text || '(no text)'}
-          </Typography>
+          {deleting?.length === 1 ? (
+            <Typography variant="body2" color="text.secondary" noWrap>
+              {deleting[0].text || '(no text)'}
+            </Typography>
+          ) : (
+            <Typography variant="body2" color="text.secondary">
+              The selected drafts are deleted permanently.
+            </Typography>
+          )}
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>
           <Button onClick={() => setDeleting(null)} variant="outlined" sx={{ borderRadius: 2 }}>
             Cancel
           </Button>
           <Button onClick={handleConfirmDelete} variant="contained" color="error" disabled={working} sx={{ borderRadius: 2 }}>
-            Delete
+            {deleting && deleting.length > 1 ? `Delete ${deleting.length}` : 'Delete'}
           </Button>
         </DialogActions>
       </Dialog>

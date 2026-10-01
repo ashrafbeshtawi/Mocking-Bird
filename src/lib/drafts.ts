@@ -70,6 +70,8 @@ export async function getDraft(userId: number, id: number): Promise<Draft | null
 export interface ListDraftsOptions {
   /** Case-insensitive substring match on the draft text. */
   query?: string;
+  /** Only drafts that target this platform. */
+  platform?: Platform;
   limit?: number;
   offset?: number;
 }
@@ -94,14 +96,16 @@ export async function listDrafts(
   const offset = Math.max(options.offset ?? 0, 0);
   const pattern = options.query?.trim() ? `%${escapeLike(options.query.trim())}%` : null;
 
-  const where = 'user_id = $1 AND ($2::text IS NULL OR text ILIKE $2)';
+  const platform = options.platform ?? null;
+
+  const where = 'user_id = $1 AND ($2::text IS NULL OR text ILIKE $2) AND ($3::text IS NULL OR $3 = ANY(target_platforms))';
   const [countResult, pageResult] = await Promise.all([
-    pool.query(`SELECT COUNT(*) FROM drafts WHERE ${where}`, [userId, pattern]),
+    pool.query(`SELECT COUNT(*) FROM drafts WHERE ${where}`, [userId, pattern, platform]),
     pool.query(
       `SELECT ${DRAFT_COLUMNS} FROM drafts WHERE ${where}
        ORDER BY updated_at DESC, id DESC
-       LIMIT $3 OFFSET $4`,
-      [userId, pattern, limit, offset]
+       LIMIT $4 OFFSET $5`,
+      [userId, pattern, platform, limit, offset]
     ),
   ]);
 
@@ -139,6 +143,11 @@ export async function updateDraft(userId: number, id: number, input: DraftInput)
 
 /** Returns true if a draft was deleted, false if not found / not owned. */
 export async function deleteDraft(userId: number, id: number): Promise<boolean> {
-  const result = await pool.query('DELETE FROM drafts WHERE id = $1 AND user_id = $2', [id, userId]);
-  return (result.rowCount ?? 0) > 0;
+  return (await deleteDrafts(userId, [id])) > 0;
+}
+
+/** Deletes the given drafts of this user; ids of other users' drafts are ignored. Returns the count deleted. */
+export async function deleteDrafts(userId: number, ids: number[]): Promise<number> {
+  const result = await pool.query('DELETE FROM drafts WHERE id = ANY($1::int[]) AND user_id = $2', [ids, userId]);
+  return result.rowCount ?? 0;
 }
