@@ -25,20 +25,24 @@ const MAX_PAGE_SIZE = 100;
  */
 export async function listPublishHistory(
   userId: number,
-  options: { limit?: number; offset?: number } = {}
+  /** lastDays: only entries published within the last N days (rolling, from now). */
+  options: { lastDays?: number; limit?: number; offset?: number } = {}
 ): Promise<PublishHistoryPage> {
   const limit = Math.min(Math.max(options.limit ?? DEFAULT_PAGE_SIZE, 1), MAX_PAGE_SIZE);
   const offset = Math.max(options.offset ?? 0, 0);
 
+  const lastDays = options.lastDays ?? null;
+
+  const where = 'user_id = $1 AND ($2::int IS NULL OR created_at >= NOW() - make_interval(days => $2::int))';
   const [countResult, pageResult] = await Promise.all([
-    pool.query('SELECT COUNT(*) FROM publish_history WHERE user_id = $1', [userId]),
+    pool.query(`SELECT COUNT(*) FROM publish_history WHERE ${where}`, [userId, lastDays]),
     pool.query(
       `SELECT id, content, publish_status, publish_destinations, created_at
        FROM publish_history
-       WHERE user_id = $1
+       WHERE ${where}
        ORDER BY created_at DESC, id DESC
-       LIMIT $2 OFFSET $3`,
-      [userId, limit, offset]
+       LIMIT $3 OFFSET $4`,
+      [userId, lastDays, limit, offset]
     ),
   ]);
 

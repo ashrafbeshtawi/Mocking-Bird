@@ -6,9 +6,9 @@ import { McpTokenCard } from '@/components/dashboard/McpTokenCard';
 
 const TOOLS = [
   ['get_connected_social_media_types', 'which platforms you have accounts connected for'],
-  ['list_drafts / search_drafts', 'browse your drafts, paginated'],
+  ['list_drafts / search_drafts', 'browse your drafts, paginated, optionally only the last N days'],
   ['add_draft / edit_draft / delete_draft', 'write and manage drafts: text, target platforms, media URLs'],
-  ['get_publish_history', 'what was posted where and whether it succeeded'],
+  ['get_publish_history', 'what was posted where and whether it succeeded, optionally only the last N days'],
 ];
 
 export default function McpPage() {

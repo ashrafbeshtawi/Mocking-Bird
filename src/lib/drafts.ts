@@ -72,6 +72,8 @@ export interface ListDraftsOptions {
   query?: string;
   /** Only drafts that target this platform. */
   platform?: Platform;
+  /** Only drafts updated within the last N days (rolling, from now). */
+  lastDays?: number;
   limit?: number;
   offset?: number;
 }
@@ -97,15 +99,18 @@ export async function listDrafts(
   const pattern = options.query?.trim() ? `%${escapeLike(options.query.trim())}%` : null;
 
   const platform = options.platform ?? null;
+  const lastDays = options.lastDays ?? null;
 
-  const where = 'user_id = $1 AND ($2::text IS NULL OR text ILIKE $2) AND ($3::text IS NULL OR $3 = ANY(target_platforms))';
+  const where = `user_id = $1 AND ($2::text IS NULL OR text ILIKE $2)
+    AND ($3::text IS NULL OR $3 = ANY(target_platforms))
+    AND ($4::int IS NULL OR updated_at >= NOW() - make_interval(days => $4::int))`;
   const [countResult, pageResult] = await Promise.all([
-    pool.query(`SELECT COUNT(*) FROM drafts WHERE ${where}`, [userId, pattern, platform]),
+    pool.query(`SELECT COUNT(*) FROM drafts WHERE ${where}`, [userId, pattern, platform, lastDays]),
     pool.query(
       `SELECT ${DRAFT_COLUMNS} FROM drafts WHERE ${where}
        ORDER BY updated_at DESC, id DESC
-       LIMIT $4 OFFSET $5`,
-      [userId, pattern, platform, limit, offset]
+       LIMIT $5 OFFSET $6`,
+      [userId, pattern, platform, lastDays, limit, offset]
     ),
   ]);
 

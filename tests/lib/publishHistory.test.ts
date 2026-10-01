@@ -30,13 +30,13 @@ describe('listPublishHistory', () => {
     expect(page).toEqual({ entries: [entry], total: 42, limit: 20, offset: 0 });
     const listSql: string = mockQuery.mock.calls[1][0];
     expect(listSql).toContain('ORDER BY created_at DESC, id DESC');
-    expect(mockQuery.mock.calls[1][1]).toEqual([7, 20, 0]);
+    expect(mockQuery.mock.calls[1][1]).toEqual([7, null, 20, 0]);
   });
 
   it('clamps limit to 100 and offset to 0', async () => {
     await listPublishHistory(7, { limit: 500, offset: -3 });
 
-    expect(mockQuery.mock.calls[1][1]).toEqual([7, 100, 0]);
+    expect(mockQuery.mock.calls[1][1]).toEqual([7, null, 100, 0]);
   });
 
   it('excludes the heavy publish_report column from the page query', async () => {

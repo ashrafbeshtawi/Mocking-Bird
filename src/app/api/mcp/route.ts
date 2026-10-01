@@ -64,18 +64,25 @@ const handler = createMcpHandler(
 
     const pageArgs = {
       limit: z.number().int().min(1).max(100).optional().describe('Page size, default 20, max 100'),
-      offset: z.number().int().min(0).optional().describe('Number of drafts to skip'),
+      offset: z.number().int().min(0).optional().describe('Number of items to skip'),
     };
+    const lastDays = z
+      .number()
+      .int()
+      .min(1)
+      .max(3650)
+      .optional()
+      .describe('Only items from the last N days, counted back from now (e.g. 7 for the past week)');
 
     server.registerTool(
       'list_drafts',
       {
         description:
-          'List saved post drafts, newest first. Paginated; the response includes `total`, so page with `offset` until you have them all.',
-        inputSchema: z.object(pageArgs),
+          'List saved post drafts, most recently updated first. Each draft has `created_at` and `updated_at` (ISO 8601, UTC); `last_days` filters on `updated_at`. Paginated; the response includes `total`, so page with `offset` until you have them all.',
+        inputSchema: z.object({ ...pageArgs, last_days: lastDays }),
       },
-      async ({ limit, offset }, extra) => {
-        return json(await listDrafts(userIdFrom(extra), { limit, offset }));
+      async ({ limit, offset, last_days }, extra) => {
+        return json(await listDrafts(userIdFrom(extra), { limit, offset, lastDays: last_days }));
       }
     );
 
@@ -83,14 +90,15 @@ const handler = createMcpHandler(
       'search_drafts',
       {
         description:
-          'Search drafts by text (case-insensitive substring match), newest first. Paginated like list_drafts.',
+          'Search drafts by text (case-insensitive substring match), most recently updated first. `last_days` filters on `updated_at`. Paginated like list_drafts.',
         inputSchema: z.object({
           query: z.string().min(1).describe('Text to search for in the draft body'),
           ...pageArgs,
+          last_days: lastDays,
         }),
       },
-      async ({ query, limit, offset }, extra) => {
-        return json(await listDrafts(userIdFrom(extra), { query, limit, offset }));
+      async ({ query, limit, offset, last_days }, extra) => {
+        return json(await listDrafts(userIdFrom(extra), { query, limit, offset, lastDays: last_days }));
       }
     );
 
@@ -98,11 +106,11 @@ const handler = createMcpHandler(
       'get_publish_history',
       {
         description:
-          'Publish history (what was posted where and whether it succeeded), newest first. Paginated: limit default 20 / max 100, offset default 0; the response includes `total`. Per-account report texts are omitted for efficiency.',
-        inputSchema: z.object(pageArgs),
+          'Publish history (what was posted where and whether it succeeded), newest first. Each entry has `created_at` (ISO 8601, UTC), the time the publish completed; `last_days` filters on it. Paginated: limit default 20 / max 100, offset default 0; the response includes `total`. Per-account report texts are omitted for efficiency.',
+        inputSchema: z.object({ ...pageArgs, last_days: lastDays }),
       },
-      async ({ limit, offset }, extra) => {
-        return json(await listPublishHistory(userIdFrom(extra), { limit, offset }));
+      async ({ limit, offset, last_days }, extra) => {
+        return json(await listPublishHistory(userIdFrom(extra), { limit, offset, lastDays: last_days }));
       }
     );
 
