@@ -38,6 +38,7 @@ import VideocamOutlinedIcon from '@mui/icons-material/VideocamOutlined';
 import SendIcon from '@mui/icons-material/Send';
 import CloseIcon from '@mui/icons-material/Close';
 import { PageHeader } from '@/components/PageHeader';
+import { PublishResults } from '@/components/publish/PublishResults';
 import { getPlatformConfig } from '@/lib/platformConfig';
 import { useDrafts, mapDraftMediaToUploaded, type Draft } from '@/hooks/useDrafts';
 import { useConnectedAccounts } from '@/hooks/useConnectedAccounts';
@@ -56,7 +57,8 @@ export default function DraftsPage() {
 
   const { drafts, total, totalPages, loading, error, refetch, deleteDrafts } = useDrafts({ page, query, platform });
   const { facebookPages, xAccounts, instagramAccounts, telegramChannels } = useConnectedAccounts();
-  const { publish, isPublishing, statusMessage } = usePublish();
+  const { publish, isPublishing, statusMessage, error: publishError, success: publishSuccess, results: publishResults, clearStatus } =
+    usePublish();
 
   const [previewDraft, setPreviewDraft] = useState<Draft | null>(null);
   // Drafts awaiting delete confirmation: one from a row button, or the selection.
@@ -164,6 +166,8 @@ export default function DraftsPage() {
         : [],
     });
 
+    // The results dialog shows the outcome per account; the draft stays when nothing went out.
+    setPreviewDraft(null);
     if (ok) {
       try {
         await deleteDrafts([previewDraft.id]);
@@ -171,14 +175,6 @@ export default function DraftsPage() {
       } catch {
         // publish went through; a stale draft in the list is not fatal
       }
-      setPreviewDraft(null);
-      setSnackbar({ open: true, message: 'Draft published', severity: 'success' });
-    } else {
-      setSnackbar({
-        open: true,
-        message: 'Publishing failed — see History for details',
-        severity: 'error',
-      });
     }
   };
 
@@ -448,6 +444,8 @@ export default function DraftsPage() {
           </Fade>
         )}
       </Container>
+
+      <PublishResults error={publishError} success={publishSuccess} results={publishResults} onClose={clearStatus} />
 
       {/* Publish preview / confirmation */}
       <Dialog
