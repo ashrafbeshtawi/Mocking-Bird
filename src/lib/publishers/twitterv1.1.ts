@@ -131,11 +131,19 @@ export class TwitterPublisherV1 {
           errorMessage = error.message;
         }
 
-        // Attempt to parse Twitter API v2 error structure
-        const twitterError = error as { data?: { errors?: { message: string; code?: number }[] } };
+        // X answers with either { errors: [{ message, code }] } or a problem
+        // object { title, detail } (e.g. 402 CreditsDepleted).
+        const twitterError = error as {
+          code?: number;
+          data?: { errors?: { message: string; code?: number }[]; title?: string; detail?: string };
+        };
         if (twitterError?.data?.errors && twitterError.data.errors.length > 0) {
           errorMessage = twitterError.data.errors[0].message;
           errorCode = twitterError.data.errors[0].code?.toString();
+          errorDetails = twitterError.data;
+        } else if (twitterError?.data?.detail || twitterError?.data?.title) {
+          errorMessage = [twitterError.data.title, twitterError.data.detail].filter(Boolean).join(': ');
+          errorCode = twitterError.code?.toString();
           errorDetails = twitterError.data;
         }
 
