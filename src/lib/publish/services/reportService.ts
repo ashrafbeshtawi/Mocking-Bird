@@ -7,7 +7,7 @@ import {
   ApiResponse,
   MediaProcessing
 } from '@/types/interfaces';
-import { PublishStatus, ReportLogger } from '../types';
+import { PublishStatus, ReportLogger, type CloudinaryMediaInfo } from '../types';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('ReportService');
@@ -21,6 +21,8 @@ export interface PublishDestination {
   account_name?: string;
   post_type?: 'feed' | 'story';
   success: boolean;
+  /** Why publishing to this destination failed. */
+  error?: string;
 }
 
 /**
@@ -98,7 +100,8 @@ export function extractPublishDestinations(
       const destination: PublishDestination = {
         platform,
         account_id: accountId,
-        success: false
+        success: false,
+        ...(result.error?.message && { error: result.error.message }),
       };
 
       // Add post_type for Instagram
@@ -155,7 +158,9 @@ export async function savePublishReport(
   content: string,
   report: string[],
   status: PublishStatus,
-  destinations: PublishDestination[] = []
+  destinations: PublishDestination[] = [],
+  /** The post as published; stored so failed destinations can be retried. */
+  post?: { text: string; media: CloudinaryMediaInfo[] }
 ): Promise<void> {
   const client = await pool.connect();
   try {
@@ -163,13 +168,16 @@ export async function savePublishReport(
     logger.info(`Saving publish report: userId=${userId}, status=${status}, destinations=${JSON.stringify(destinations)}`);
 
     await client.query(
-      'INSERT INTO publish_history (user_id, content, publish_report, publish_status, publish_destinations) VALUES ($1, $2, $3, $4, $5)',
+      `INSERT INTO publish_history (user_id, content, publish_report, publish_status, publish_destinations, post_text, media)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [
         parseInt(userId),
         content,
         report.join('\n'),
         status,
-        JSON.stringify(destinations)
+        JSON.stringify(destinations),
+        post?.text ?? null,
+        post ? JSON.stringify(post.media) : null,
       ]
     );
 

@@ -130,7 +130,7 @@ export async function GET(req: NextRequest) {
         }
 
         const { rows } = await client.query(
-          `SELECT id, content, publish_status, created_at, publish_report, publish_destinations
+          `SELECT id, content, publish_status, created_at, publish_report, publish_destinations, (post_text IS NOT NULL) AS retryable
            FROM publish_history
            WHERE id = $1 AND user_id = $2`,
           [parsedReportId, parsedUserId]
@@ -208,6 +208,7 @@ export async function GET(req: NextRequest) {
           publish_report: unknown;
           publish_destinations: unknown;
           created_at: string;
+          retryable: boolean;
         }>;
 
         if (useCursorMode) {
@@ -220,7 +221,7 @@ export async function GET(req: NextRequest) {
             const cursorWhereClause = whereClause +
               ` AND (created_at < $${queryParams.length + 1} OR (created_at = $${queryParams.length + 1} AND id < $${queryParams.length + 2}))`;
 
-            historyQuery = `SELECT id, content, publish_status, publish_report, publish_destinations, created_at
+            historyQuery = `SELECT id, content, publish_status, publish_report, publish_destinations, created_at, (post_text IS NOT NULL) AS retryable
                FROM publish_history
                ${cursorWhereClause}
                ORDER BY created_at DESC, id DESC
@@ -228,7 +229,7 @@ export async function GET(req: NextRequest) {
             historyParams = [...queryParams, cursorData.created_at, cursorData.id, safeLimit + 1];
           } else {
             // First page of cursor-based pagination (no cursor yet)
-            historyQuery = `SELECT id, content, publish_status, publish_report, publish_destinations, created_at
+            historyQuery = `SELECT id, content, publish_status, publish_report, publish_destinations, created_at, (post_text IS NOT NULL) AS retryable
                FROM publish_history
                ${whereClause}
                ORDER BY created_at DESC, id DESC
@@ -265,7 +266,7 @@ export async function GET(req: NextRequest) {
 
           // Fetch paginated history with publish_report and publish_destinations for expandable rows
           const { rows } = await client.query(
-            `SELECT id, content, publish_status, publish_report, publish_destinations, created_at
+            `SELECT id, content, publish_status, publish_report, publish_destinations, created_at, (post_text IS NOT NULL) AS retryable
              FROM publish_history
              ${whereClause}
              ORDER BY created_at DESC

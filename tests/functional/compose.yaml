@@ -25,6 +25,9 @@ services:
       NEXTAUTH_URL: https://localhost:3000
       CLOUDINARY_URL: cloudinary://123456:secret@testcloud
       CLOUDINARY_UPLOAD_PRESET: testpreset
+      # Placeholder keys like production has; no test reaches the X API.
+      X_API_KEY: functional-test-key
+      X_API_KEY_SECRET: functional-test-secret
     ports:
       - "3000:3000"
     depends_on:

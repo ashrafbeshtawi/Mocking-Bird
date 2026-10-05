@@ -196,7 +196,10 @@ export async function POST(req: NextRequest) {
       // Save to history
       const publishStatus = determinePublishStatus(successful, failed);
       const destinations = extractPublishDestinations(successful, failed);
-      await savePublishReport(pool, userId, contentToStore, reportLogger.getReport(), publishStatus, destinations);
+      await savePublishReport(pool, userId, contentToStore, reportLogger.getReport(), publishStatus, destinations, {
+        text: text.trim(),
+        media: cloudinaryMedia,
+      });
 
       // Send final result
       await sendEvent('complete', {
