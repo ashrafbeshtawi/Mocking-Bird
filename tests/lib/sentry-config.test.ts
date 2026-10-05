@@ -1,6 +1,7 @@
 jest.mock('@sentry/nextjs', () => ({
   init: jest.fn(),
   captureConsoleIntegration: jest.fn(() => ({ name: 'CaptureConsole' })),
+  extraErrorDataIntegration: jest.fn(() => ({ name: 'ExtraErrorData' })),
 }));
 
 import * as Sentry from '@sentry/nextjs';
@@ -33,16 +34,23 @@ describe('sentry.server.config', () => {
     expect(mockInit).toHaveBeenCalledWith(expect.objectContaining({ enabled: false }));
   });
 
-  it('reports to the configured DSN and captures console.error as events', () => {
+  it('reports to the configured DSN, captures console.error and error fields', () => {
     loadConfig('https://key@glitchtip.example/1');
 
     expect(mockInit).toHaveBeenCalledWith(
       expect.objectContaining({
         dsn: 'https://key@glitchtip.example/1',
         enabled: true,
-        integrations: [{ name: 'CaptureConsole' }],
+        integrations: [{ name: 'CaptureConsole' }, { name: 'ExtraErrorData' }],
       })
     );
     expect(Sentry.captureConsoleIntegration).toHaveBeenCalledWith({ levels: ['error'] });
+  });
+
+  it('keeps logged error details (e.g. API response bodies) in the event', () => {
+    loadConfig('https://key@glitchtip.example/1');
+
+    expect(mockInit).toHaveBeenCalledWith(expect.objectContaining({ normalizeDepth: 6 }));
+    expect(Sentry.extraErrorDataIntegration).toHaveBeenCalledWith({ depth: 5 });
   });
 });
