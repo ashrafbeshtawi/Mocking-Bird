@@ -20,6 +20,7 @@ import {
   DialogContentText,
   DialogActions,
   Button,
+  CircularProgress,
   Snackbar,
   Checkbox,
   Table,
@@ -50,6 +51,8 @@ import FacebookIcon from '@mui/icons-material/Facebook';
 import TwitterIcon from '@mui/icons-material/Twitter';
 import InstagramIcon from '@mui/icons-material/Instagram';
 import TelegramIcon from '@mui/icons-material/Telegram';
+import ReplayIcon from '@mui/icons-material/Replay';
+import { useConnectedAccounts } from '@/hooks/useConnectedAccounts';
 
 interface PublishDestination {
   platform: 'facebook' | 'twitter' | 'instagram' | 'telegram';
@@ -57,6 +60,7 @@ interface PublishDestination {
   account_name?: string;
   post_type?: 'feed' | 'story';
   success: boolean;
+  error?: string;
 }
 
 interface PublishHistoryItem {
@@ -66,6 +70,8 @@ interface PublishHistoryItem {
   publish_report?: string;
   publish_destinations?: PublishDestination[];
   created_at: string;
+  /** The entry stores the post, so failed destinations can be published again. */
+  retryable?: boolean;
 }
 
 const platformConfig = {
@@ -113,6 +119,9 @@ function HistoryRow({
   onCopy,
   expandedId,
   onToggleExpand,
+  onRetry,
+  isRetrying,
+  accountName,
 }: {
   item: PublishHistoryItem;
   isSelected: boolean;
@@ -121,8 +130,14 @@ function HistoryRow({
   onCopy: (content: string) => void;
   expandedId: number | null;
   onToggleExpand: (id: number) => void;
+  /** Retries the given failed destinations, or all failed ones when omitted. */
+  onRetry: (item: PublishHistoryItem, destinations?: PublishDestination[]) => void;
+  isRetrying: boolean;
+  accountName: (destination: PublishDestination) => string;
 }) {
   const status = statusConfig[item.publish_status] || statusConfig.failed;
+  const failedDestinations = (item.publish_destinations ?? []).filter((d) => !d.success);
+  const retryHint = item.retryable ? '' : ' (not available: this entry has no stored post)';
   const StatusIcon = status.icon;
   const isExpanded = expandedId === item.id;
 
@@ -146,7 +161,7 @@ function HistoryRow({
           />
         </TableCell>
         <TableCell padding="checkbox">
-          <IconButton size="small" onClick={() => onToggleExpand(item.id)}>
+          <IconButton size="small" onClick={() => onToggleExpand(item.id)} aria-label={`Show details of post ${item.id}`}>
             {isExpanded ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
           </IconButton>
         </TableCell>
@@ -242,6 +257,21 @@ function HistoryRow({
                 <ContentCopyIcon fontSize="small" />
               </IconButton>
             </Tooltip>
+            {failedDestinations.length > 0 && (
+              <Tooltip title={`Retry ${failedDestinations.length} failed destination${failedDestinations.length > 1 ? 's' : ''}${retryHint}`}>
+                <span>
+                  <IconButton
+                    size="small"
+                    aria-label={`Retry all failed destinations of post ${item.id}`}
+                    onClick={() => onRetry(item)}
+                    disabled={!item.retryable || isRetrying}
+                    sx={{ color: 'text.secondary', '&:hover': { color: 'warning.main' } }}
+                  >
+                    {isRetrying ? <CircularProgress size={16} /> : <ReplayIcon fontSize="small" />}
+                  </IconButton>
+                </span>
+              </Tooltip>
+            )}
             <Tooltip title="Download report">
               <IconButton
                 size="small"
@@ -274,6 +304,70 @@ function HistoryRow({
         <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={7}>
           <Collapse in={isExpanded} timeout="auto" unmountOnExit>
             <Box sx={{ py: 2, px: 1 }}>
+              {(item.publish_destinations?.length ?? 0) > 0 && (
+                <Box sx={{ mb: 2 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                    <Typography variant="subtitle2" fontWeight={600}>
+                      Destinations
+                    </Typography>
+                    {failedDestinations.length > 1 && (
+                      <Button
+                        size="small"
+                        startIcon={<ReplayIcon />}
+                        onClick={() => onRetry(item)}
+                        disabled={!item.retryable || isRetrying}
+                        sx={{ textTransform: 'none', ml: 'auto' }}
+                      >
+                        Retry all failed ({failedDestinations.length})
+                      </Button>
+                    )}
+                  </Box>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+                    {item.publish_destinations!.map((d) => {
+                      const platform = platformConfig[d.platform as keyof typeof platformConfig];
+                      const PlatformIcon = platform?.icon ?? ArticleIcon;
+                      const label = `${accountName(d)}${d.post_type === 'story' ? ' (Story)' : ''}`;
+                      return (
+                        <Box
+                          key={`${d.platform}-${d.account_id}-${d.post_type ?? ''}`}
+                          data-testid="history-destination"
+                          sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}
+                        >
+                          <PlatformIcon sx={{ fontSize: 18, color: platform?.color }} />
+                          <Typography variant="body2">{label}</Typography>
+                          {d.success ? (
+                            <CheckCircleIcon sx={{ fontSize: 16, color: '#22c55e' }} />
+                          ) : (
+                            <>
+                              <ErrorIcon sx={{ fontSize: 16, color: '#ef4444' }} />
+                              {d.error && (
+                                <Typography variant="caption" color="error">
+                                  {d.error}
+                                </Typography>
+                              )}
+                              <Tooltip title={item.retryable ? '' : 'Not available: this entry has no stored post'}>
+                                <span>
+                                  <Button
+                                    size="small"
+                                    variant="outlined"
+                                    startIcon={<ReplayIcon />}
+                                    onClick={() => onRetry(item, [d])}
+                                    disabled={!item.retryable || isRetrying}
+                                    aria-label={`Retry ${label}`}
+                                    sx={{ textTransform: 'none', py: 0, ml: 'auto' }}
+                                  >
+                                    Retry
+                                  </Button>
+                                </span>
+                              </Tooltip>
+                            </>
+                          )}
+                        </Box>
+                      );
+                    })}
+                  </Box>
+                </Box>
+              )}
               <Typography variant="subtitle2" gutterBottom fontWeight={600}>
                 Full Content
               </Typography>
@@ -375,6 +469,8 @@ export default function PublishHistoryPage() {
   const [itemToDelete, setItemToDelete] = useState<PublishHistoryItem | null>(null);
   const [bulkDeleteMode, setBulkDeleteMode] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [retryingId, setRetryingId] = useState<number | null>(null);
+  const { normalizedAccounts } = useConnectedAccounts();
 
   // Snackbar state
   const [snackbar, setSnackbar] = useState<{
@@ -472,6 +568,43 @@ export default function PublishHistoryPage() {
       setSelectedIds(new Set(history.map((item) => item.id)));
     } else {
       setSelectedIds(new Set());
+    }
+  };
+
+  const accountName = (destination: PublishDestination): string =>
+    normalizedAccounts[destination.platform]?.find((a) => a.id === destination.account_id)?.name ??
+    destination.account_name ??
+    destination.account_id;
+
+  const handleRetry = async (item: PublishHistoryItem, destinations?: PublishDestination[]) => {
+    setRetryingId(item.id);
+    try {
+      const response = await fetch('/api/publish/retry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          historyId: item.id,
+          destinations: destinations?.map(({ platform, account_id, post_type }) => ({ platform, account_id, post_type })),
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Retry failed');
+
+      setHistory((prev) =>
+        prev.map((h) =>
+          h.id === item.id ? { ...h, publish_status: data.publish_status, publish_destinations: data.publish_destinations } : h
+        )
+      );
+      setSnackbar({
+        open: true,
+        message: `${data.succeeded} of ${data.retried} destination${data.retried > 1 ? 's' : ''} published`,
+        severity: data.succeeded === data.retried ? 'success' : 'error',
+      });
+    } catch (err) {
+      setSnackbar({ open: true, message: (err as Error).message || 'Retry failed', severity: 'error' });
+    } finally {
+      setRetryingId(null);
     }
   };
 
@@ -744,6 +877,9 @@ export default function PublishHistoryPage() {
                       onCopy={handleCopyContent}
                       expandedId={expandedId}
                       onToggleExpand={handleToggleExpand}
+                      onRetry={handleRetry}
+                      isRetrying={retryingId === item.id}
+                      accountName={accountName}
                     />
                   ))}
                 </TableBody>
