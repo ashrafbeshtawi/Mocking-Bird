@@ -8,10 +8,26 @@ jest.mock('next/navigation', () => ({
 }));
 jest.mock('@/lib/fetch', () => ({ fetchWithAuth: jest.fn() }));
 jest.mock('@/hooks/useConnectedAccounts', () => ({
-  useConnectedAccounts: () => ({ facebookPages: [], xAccounts: [], instagramAccounts: [], telegramChannels: [] }),
+  useConnectedAccounts: () => ({
+    facebookPages: [{ page_id: 'p1', page_name: 'My Page' }],
+    xAccounts: [],
+    instagramAccounts: [],
+    telegramChannels: [],
+  }),
 }));
+let mockPublishState: Record<string, unknown> = {};
+const mockPublish = jest.fn();
 jest.mock('@/hooks/usePublish', () => ({
-  usePublish: () => ({ publish: jest.fn(), isPublishing: false, statusMessage: '' }),
+  usePublish: () => ({
+    publish: mockPublish,
+    isPublishing: false,
+    statusMessage: '',
+    error: null,
+    success: null,
+    results: null,
+    clearStatus: jest.fn(),
+    ...mockPublishState,
+  }),
 }));
 
 import { render, screen, waitFor, within } from '@testing-library/react';
@@ -42,6 +58,7 @@ describe('Drafts page', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockSearch = new URLSearchParams();
+    mockPublishState = {};
     mockFetch.mockImplementation((url: string, init?: RequestInit) =>
       Promise.resolve(
         init?.method === 'DELETE'
@@ -115,5 +132,39 @@ describe('Drafts page', () => {
     render(<DraftsPage />);
 
     expect(await screen.findByText('No drafts match')).toBeInTheDocument();
+  });
+
+  it('shows the per-account errors when publishing a draft fails', async () => {
+    mockPublish.mockResolvedValue(false);
+    mockPublishState = {
+      error: { message: 'All posts failed to publish' },
+      results: {
+        successful: [],
+        failed: [{ platform: 'facebook', page_id: 'p1', error: { message: 'Token expired', code: '190' } }],
+      },
+    };
+    render(<DraftsPage />);
+    await screen.findByText('first draft');
+
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText(/Token expired/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/Code: 190/)).toBeInTheDocument();
+  });
+
+  it('publishes a draft to its target accounts and keeps it when publishing fails', async () => {
+    mockPublish.mockResolvedValue(false);
+    const user = userEvent.setup();
+    render(<DraftsPage />);
+    await screen.findByText('first draft');
+
+    await user.click(screen.getAllByTitle('Publish draft')[0]);
+    await user.click(await screen.findByRole('button', { name: 'Publish to 1 destination' }));
+
+    await waitFor(() =>
+      expect(mockPublish).toHaveBeenCalledWith(
+        expect.objectContaining({ postText: 'first draft', selectedFacebookPages: ['p1'] })
+      )
+    );
+    expect(mockFetch).not.toHaveBeenCalledWith('/api/drafts', expect.objectContaining({ method: 'DELETE' }));
   });
 });
