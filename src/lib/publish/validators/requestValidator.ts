@@ -40,7 +40,8 @@ export function validateAccountArrays(
   xAccounts: string[],
   instagramPublishAccounts: string[] = [],
   instagramStoryAccounts: string[] = [],
-  telegramChannels: string[] = []
+  telegramChannels: string[] = [],
+  linkedinAccounts: string[] = []
 ): ValidationResult<void> {
   if (!Array.isArray(facebookPages) || !Array.isArray(xAccounts)) {
     return {
@@ -63,12 +64,20 @@ export function validateAccountArrays(
     };
   }
 
+  if (!Array.isArray(linkedinAccounts)) {
+    return {
+      success: false,
+      error: 'linkedinAccounts must be an array'
+    };
+  }
+
   const hasAnyAccount =
     facebookPages.length > 0 ||
     xAccounts.length > 0 ||
     instagramPublishAccounts.length > 0 ||
     instagramStoryAccounts.length > 0 ||
-    telegramChannels.length > 0;
+    telegramChannels.length > 0 ||
+    linkedinAccounts.length > 0;
 
   if (!hasAnyAccount) {
     return {
@@ -148,6 +157,10 @@ export async function parsePublishRequest(
     ? data.telegramChannels.filter((id): id is string => typeof id === 'string')
     : [];
 
+  const linkedinAccounts = Array.isArray(data.linkedinAccounts)
+    ? data.linkedinAccounts.filter((id): id is string => typeof id === 'string')
+    : [];
+
   const mediaValidation = validateCloudinaryMedia(
     Array.isArray(data.cloudinaryMedia) ? data.cloudinaryMedia : []
   );
@@ -165,6 +178,7 @@ export async function parsePublishRequest(
       instagramPublishAccounts,
       instagramStoryAccounts,
       telegramChannels,
+      linkedinAccounts,
       cloudinaryMedia: mediaValidation.data || [],
     },
   };

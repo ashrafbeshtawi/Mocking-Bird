@@ -4,6 +4,7 @@ import { FacebookPublisher, FacebookPageToken } from '@/lib/publishers/facebook'
 import { TwitterPublisherV1, TwitterAccountTokenV1 } from '@/lib/publishers/twitterv1.1';
 import { InstagramPublisher, InstagramAccountToken } from '@/lib/publishers/instagram';
 import { TelegramPublisher, TelegramChannelToken } from '@/lib/publishers/telegram';
+import { LinkedInPublisher, LinkedInAccountToken } from '@/lib/publishers/linkedin';
 import { ReportLogger, CloudinaryMediaInfo } from './types';
 import {
   mapFacebookSuccess,
@@ -14,6 +15,8 @@ import {
   mapInstagramFailed,
   mapTelegramSuccess,
   mapTelegramFailed,
+  mapLinkedInSuccess,
+  mapLinkedInFailed,
   formatFailedDetails
 } from './mappers/resultMappers';
 
@@ -47,6 +50,7 @@ export interface ExecutePublishOptions {
   instagramFeedTokens: InstagramAccountToken[];
   instagramStoryTokens: InstagramAccountToken[];
   telegramTokens: TelegramChannelToken[];
+  linkedinTokens: LinkedInAccountToken[];
   reportLogger: ReportLogger;
   onProgress?: ProgressCallback;
   onAccountProgress?: AccountProgressCallback;
@@ -73,13 +77,14 @@ export async function executePublish(
     instagramFeedTokens,
     instagramStoryTokens,
     telegramTokens,
+    linkedinTokens,
     reportLogger
   } = options;
 
   reportLogger.add(
     `Starting publishing process to ${facebookTokens.length} Facebook pages, ` +
     `${twitterTokens.length} X accounts, ${instagramFeedTokens.length} Instagram feed accounts, ` +
-    `${instagramStoryTokens.length} Instagram story accounts, ${telegramTokens.length} Telegram channels`
+    `${instagramStoryTokens.length} Instagram story accounts, ${telegramTokens.length} Telegram channels, ${linkedinTokens.length} LinkedIn accounts`
   );
 
   const facebookPublisher = new FacebookPublisher(pool);
@@ -287,21 +292,33 @@ export async function executePublish(
     publishPromises.push(Promise.resolve({ successful: [], failed: [] }));
   }
 
-  const [fbResults, xResults, igFeedResults, igStoryResults, telegramResults] = await Promise.all(publishPromises);
+  // LinkedIn publishing (uploads Cloudinary images itself)
+  publishPromises.push(
+    linkedinTokens.length > 0
+      ? new LinkedInPublisher(pool).publishToAccounts({ text: text.trim(), cloudinaryMedia }, linkedinTokens).then(res => ({
+          successful: mapLinkedInSuccess(res.successful),
+          failed: mapLinkedInFailed(res.failed)
+        }))
+      : Promise.resolve({ successful: [], failed: [] })
+  );
+
+  const [fbResults, xResults, igFeedResults, igStoryResults, telegramResults, linkedinResults] = await Promise.all(publishPromises);
 
   const allSuccessful = [
     ...fbResults.successful,
     ...xResults.successful,
     ...igFeedResults.successful,
     ...igStoryResults.successful,
-    ...telegramResults.successful
+    ...telegramResults.successful,
+    ...linkedinResults.successful
   ];
   const allFailed = [
     ...fbResults.failed,
     ...xResults.failed,
     ...igFeedResults.failed,
     ...igStoryResults.failed,
-    ...telegramResults.failed
+    ...telegramResults.failed,
+    ...linkedinResults.failed
   ];
 
   reportLogger.add(`Publishing complete. Successful posts: ${allSuccessful.length}, Failed posts: ${allFailed.length}`);
@@ -329,13 +346,14 @@ export async function executePublishWithProgress(
     instagramFeedTokens,
     instagramStoryTokens,
     telegramTokens,
+    linkedinTokens,
     reportLogger,
     onProgress,
     onAccountProgress
   } = options;
 
   const totalAccounts = facebookTokens.length + twitterTokens.length +
-    instagramFeedTokens.length + instagramStoryTokens.length + telegramTokens.length;
+    instagramFeedTokens.length + instagramStoryTokens.length + telegramTokens.length + linkedinTokens.length;
 
   const allSuccessful: SuccessfulPublishResult[] = [];
   const allFailed: FailedPublishResult[] = [];
@@ -384,6 +402,15 @@ export async function executePublishWithProgress(
       accountId: token.channel_id,
       accountName: token.channel_title,
       platform: 'Telegram',
+      status: 'pending'
+    });
+  });
+
+  linkedinTokens.forEach(token => {
+    accountsProgress.push({
+      accountId: token.linkedin_user_id,
+      accountName: token.name,
+      platform: 'LinkedIn',
       status: 'pending'
     });
   });
@@ -691,6 +718,29 @@ export async function executePublishWithProgress(
         }
       })());
     }
+  }
+
+  // LinkedIn publishing (parallel)
+  const linkedinPublisher = new LinkedInPublisher(pool);
+  for (const token of linkedinTokens) {
+    publishPromises.push((async () => {
+      await updateAccountStatus(token.linkedin_user_id, 'publishing');
+
+      try {
+        const result = await linkedinPublisher.publishToAccounts({ text: text.trim(), cloudinaryMedia }, [token]);
+        if (result.successful.length > 0) {
+          allSuccessful.push(...mapLinkedInSuccess(result.successful));
+          await updateAccountStatus(token.linkedin_user_id, 'completed');
+        }
+        if (result.failed.length > 0) {
+          allFailed.push(...mapLinkedInFailed(result.failed));
+          await updateAccountStatus(token.linkedin_user_id, 'failed', result.failed[0].error.message);
+        }
+      } catch (err) {
+        reportLogger.add(`Error publishing to LinkedIn ${token.name}: ${(err as Error).message}`);
+        await updateAccountStatus(token.linkedin_user_id, 'failed', (err as Error).message);
+      }
+    })());
   }
 
   // Wait for all publishing to complete in parallel

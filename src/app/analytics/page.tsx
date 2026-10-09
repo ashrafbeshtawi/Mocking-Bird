@@ -6,6 +6,7 @@ import FacebookIcon from '@mui/icons-material/Facebook';
 import InstagramIcon from '@mui/icons-material/Instagram';
 import XIcon from '@mui/icons-material/X';
 import TelegramIcon from '@mui/icons-material/Telegram';
+import LinkedInIcon from '@mui/icons-material/LinkedIn';
 import { PageHeader } from '@/components/PageHeader';
 import { TimeRangeSelector } from '@/components/analytics/TimeRangeSelector';
 import { ActivityChart } from '@/components/analytics/ActivityChart';
@@ -13,11 +14,12 @@ import { useAnalytics } from '@/hooks/useAnalytics';
 import type { TimeRange } from '@/types/analytics';
 import type { SvgIconComponent } from '@mui/icons-material';
 
-const platforms: { key: 'instagram' | 'facebook' | 'twitter' | 'telegram'; name: string; Icon: SvgIconComponent; color: string }[] = [
+const platforms: { key: 'instagram' | 'facebook' | 'twitter' | 'telegram' | 'linkedin'; name: string; Icon: SvgIconComponent; color: string }[] = [
   { key: 'instagram', name: 'Instagram', Icon: InstagramIcon, color: '#c13584' },
   { key: 'facebook', name: 'Facebook', Icon: FacebookIcon, color: '#3b5998' },
   { key: 'twitter', name: 'X', Icon: XIcon, color: '#1f1a12' },
   { key: 'telegram', name: 'Telegram', Icon: TelegramIcon, color: '#2b8bcc' },
+  { key: 'linkedin', name: 'LinkedIn', Icon: LinkedInIcon, color: '#0a66c2' },
 ];
 
 const heatmapDays = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];

@@ -72,12 +72,13 @@ export async function GET(req: NextRequest) {
         COALESCE(SUM(CASE WHEN platform = 'facebook' THEN 1 ELSE 0 END), 0)::int as facebook,
         COALESCE(SUM(CASE WHEN platform = 'twitter' THEN 1 ELSE 0 END), 0)::int as twitter,
         COALESCE(SUM(CASE WHEN platform = 'instagram' THEN 1 ELSE 0 END), 0)::int as instagram,
-        COALESCE(SUM(CASE WHEN platform = 'telegram' THEN 1 ELSE 0 END), 0)::int as telegram
+        COALESCE(SUM(CASE WHEN platform = 'telegram' THEN 1 ELSE 0 END), 0)::int as telegram,
+        COALESCE(SUM(CASE WHEN platform = 'linkedin' THEN 1 ELSE 0 END), 0)::int as linkedin
       FROM platform_posts`,
       [userId]
     );
 
-    const platformCounts: PlatformVolume = platformResult.rows[0] || { facebook: 0, twitter: 0, instagram: 0, telegram: 0 };
+    const platformCounts: PlatformVolume = platformResult.rows[0] || { facebook: 0, twitter: 0, instagram: 0, telegram: 0, linkedin: 0 };
 
     const mostUsedPlatform = Object.entries(platformCounts)
       .sort(([, a], [, b]) => b - a)[0];
@@ -140,12 +141,12 @@ export async function GET(req: NextRequest) {
         COUNT(*) as total,
         COUNT(*) FILTER (WHERE success = true) as success_count
       FROM destination_stats
-      WHERE platform IN ('facebook', 'twitter', 'instagram', 'telegram')
+      WHERE platform IN ('facebook', 'twitter', 'instagram', 'telegram', 'linkedin')
       GROUP BY platform`,
       [userId]
     );
 
-    const platformReliability: PlatformReliability = { facebook: 0, twitter: 0, instagram: 0, telegram: 0 };
+    const platformReliability: PlatformReliability = { facebook: 0, twitter: 0, instagram: 0, telegram: 0, linkedin: 0 };
     for (const row of reliabilityResult.rows) {
       const platform = row.platform as keyof PlatformReliability;
       if (platform in platformReliability) {

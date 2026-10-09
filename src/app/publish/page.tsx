@@ -61,6 +61,7 @@ function PublishPageInner() {
     xAccounts,
     instagramAccounts,
     telegramChannels,
+    linkedinAccounts,
     loading,
   } = useConnectedAccounts();
 
@@ -116,6 +117,7 @@ function PublishPageInner() {
     Record<string, InstagramSelection>
   >({});
   const [selectedTelegramChannels, setSelectedTelegramChannels] = useState<string[]>([]);
+  const [selectedLinkedInAccounts, setSelectedLinkedInAccounts] = useState<string[]>([]);
 
   // Publishing overlay visibility
   const [publishingHidden, setPublishingHidden] = useState(false);
@@ -161,6 +163,12 @@ function PublishPageInner() {
       setSelectedTelegramChannels(telegramChannels.map((c) => c.channel_id));
     }
   }, [telegramChannels]);
+
+  useEffect(() => {
+    if (linkedinAccounts.length > 0) {
+      setSelectedLinkedInAccounts(linkedinAccounts.map((a) => a.id));
+    }
+  }, [linkedinAccounts]);
 
   // Draft loading state
   const [draftTargets, setDraftTargets] = useState<Platform[] | null>(null);
@@ -233,6 +241,7 @@ function PublishPageInner() {
     setSelectedTelegramChannels(
       draftTargets.includes('telegram') ? telegramChannels.map((c) => c.channel_id) : []
     );
+    setSelectedLinkedInAccounts(draftTargets.includes('linkedin') ? linkedinAccounts.map((a) => a.id) : []);
     const instagram: Record<string, InstagramSelection> = {};
     instagramAccounts.forEach((a) => {
       instagram[a.id] = {
@@ -241,7 +250,7 @@ function PublishPageInner() {
       };
     });
     setSelectedInstagramAccounts(instagram);
-  }, [draftTargets, loading, facebookPages, xAccounts, telegramChannels, instagramAccounts, uploadedMedia.length]);
+  }, [draftTargets, loading, facebookPages, xAccounts, telegramChannels, linkedinAccounts, instagramAccounts, uploadedMedia.length]);
 
   // A published or queued draft is consumed: delete it and drop the ?draft param
   const consumeDraft = useCallback(async () => {
@@ -295,18 +304,27 @@ function PublishPageInner() {
     );
   }, []);
 
+  const handleLinkedInChange = useCallback((accountId: string) => {
+    setSelectedLinkedInAccounts((prev) =>
+      prev.includes(accountId)
+        ? prev.filter((id) => id !== accountId)
+        : [...prev, accountId]
+    );
+  }, []);
+
   const resetForm = useCallback(() => {
     setPostText('');
     setUploadedMedia([]);
     setSelectedFacebookPages(facebookPages.map((p) => p.page_id));
     setSelectedXAccounts(xAccounts.map((a) => a.id));
     setSelectedTelegramChannels(telegramChannels.map((c) => c.channel_id));
+    setSelectedLinkedInAccounts(linkedinAccounts.map((a) => a.id));
     const resetInstagram: Record<string, InstagramSelection> = {};
     instagramAccounts.forEach((a) => {
       resetInstagram[a.id] = { publish: false, story: false };
     });
     setSelectedInstagramAccounts(resetInstagram);
-  }, [facebookPages, xAccounts, instagramAccounts, telegramChannels]);
+  }, [facebookPages, xAccounts, instagramAccounts, telegramChannels, linkedinAccounts]);
 
   const handleHidePublishing = useCallback(() => {
     setPublishingHidden(true);
@@ -325,6 +343,7 @@ function PublishPageInner() {
       selectedXAccounts,
       selectedInstagramAccounts,
       selectedTelegramChannels,
+      selectedLinkedInAccounts,
     });
 
     if (wasSuccessful) {
@@ -350,6 +369,7 @@ function PublishPageInner() {
       selectedXAccounts.length > 0 ? 'twitter' : null,
       Object.values(selectedInstagramAccounts).some((s) => s.publish || s.story) ? 'instagram' : null,
       selectedTelegramChannels.length > 0 ? 'telegram' : null,
+      selectedLinkedInAccounts.length > 0 ? 'linkedin' : null,
     ].filter(Boolean);
 
     try {
@@ -396,7 +416,7 @@ function PublishPageInner() {
   const charCount = postText.length;
   const showTwitterWarning = charCount > TWITTER_CHAR_LIMIT && selectedXAccounts.length > 0;
   const hasAnyAccount =
-    facebookPages.length > 0 || xAccounts.length > 0 || instagramAccounts.length > 0 || telegramChannels.length > 0;
+    facebookPages.length > 0 || xAccounts.length > 0 || instagramAccounts.length > 0 || telegramChannels.length > 0 || linkedinAccounts.length > 0;
   const hasInstagramSelection = Object.values(selectedInstagramAccounts).some(
     (s) => s.publish || s.story
   );
@@ -413,13 +433,15 @@ function PublishPageInner() {
     (selectedFacebookPages.length > 0 ||
       selectedXAccounts.length > 0 ||
       hasInstagramSelection ||
-      selectedTelegramChannels.length > 0);
+      selectedTelegramChannels.length > 0 ||
+      selectedLinkedInAccounts.length > 0);
 
   const selectedCount =
     selectedFacebookPages.length +
     selectedXAccounts.length +
     Object.values(selectedInstagramAccounts).filter((s) => s.publish || s.story).length +
-    selectedTelegramChannels.length;
+    selectedTelegramChannels.length +
+    selectedLinkedInAccounts.length;
 
   if (loading) {
     return (
@@ -611,7 +633,7 @@ function PublishPageInner() {
                 No accounts connected
               </Typography>
               <Typography variant="body1" color="text.secondary">
-                Head to the Dashboard to connect your Facebook, Instagram, X, and Telegram accounts.
+                Head to the Dashboard to connect your Facebook, Instagram, X, Telegram, and LinkedIn accounts.
               </Typography>
             </Paper>
           </Fade>
@@ -664,14 +686,17 @@ function PublishPageInner() {
                   xAccounts={xAccounts}
                   instagramAccounts={instagramAccounts}
                   telegramChannels={telegramChannels}
+                  linkedinAccounts={linkedinAccounts}
                   selectedFacebookPages={selectedFacebookPages}
                   selectedXAccounts={selectedXAccounts}
                   selectedInstagramAccounts={selectedInstagramAccounts}
                   selectedTelegramChannels={selectedTelegramChannels}
+                  selectedLinkedInAccounts={selectedLinkedInAccounts}
                   onFacebookChange={handleFacebookChange}
                   onXChange={handleXChange}
                   onInstagramChange={handleInstagramChange}
                   onTelegramChange={handleTelegramChange}
+                  onLinkedInChange={handleLinkedInChange}
                   mediaSelected={uploadedMedia.length > 0}
                 />
               </Paper>
