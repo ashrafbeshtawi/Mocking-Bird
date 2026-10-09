@@ -7,6 +7,7 @@ import {
   Instagram as InstagramIcon,
   Twitter as TwitterIcon,
   Telegram as TelegramIcon,
+  LinkedIn as LinkedInIcon,
 } from '@mui/icons-material';
 
 interface ConnectButtonsProps {
@@ -96,6 +97,21 @@ export function ConnectButtons({
         }}
       >
         Add Telegram Channel
+      </Button>
+
+      <Button
+        variant="contained"
+        href="/api/linkedin/auth"
+        fullWidth
+        startIcon={<LinkedInIcon />}
+        sx={{
+          bgcolor: '#0a66c2',
+          '&:hover': { bgcolor: '#004182' },
+          color: '#fff',
+          maxWidth: { sm: 'fit-content' },
+        }}
+      >
+        Add LinkedIn Account
       </Button>
     </Box>
   );

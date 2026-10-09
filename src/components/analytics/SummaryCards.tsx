@@ -10,6 +10,7 @@ import FacebookIcon from '@mui/icons-material/Facebook';
 import TwitterIcon from '@mui/icons-material/Twitter';
 import InstagramIcon from '@mui/icons-material/Instagram';
 import TelegramIcon from '@mui/icons-material/Telegram';
+import LinkedInIcon from '@mui/icons-material/LinkedIn';
 import type { AnalyticsSummary } from '@/types/analytics';
 
 interface SummaryCardsProps {
@@ -22,6 +23,7 @@ const platformIcons: Record<string, typeof FacebookIcon> = {
   twitter: TwitterIcon,
   instagram: InstagramIcon,
   telegram: TelegramIcon,
+  linkedin: LinkedInIcon,
 };
 
 function getSuccessRateColor(rate: number): string {

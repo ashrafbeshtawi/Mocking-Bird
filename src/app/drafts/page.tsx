@@ -56,7 +56,7 @@ export default function DraftsPage() {
   const platform: Platform | 'all' = platformParam && PLATFORMS.includes(platformParam) ? platformParam : 'all';
 
   const { drafts, total, totalPages, loading, error, refetch, deleteDrafts } = useDrafts({ page, query, platform });
-  const { facebookPages, xAccounts, instagramAccounts, telegramChannels } = useConnectedAccounts();
+  const { facebookPages, xAccounts, instagramAccounts, telegramChannels, linkedinAccounts } = useConnectedAccounts();
   const { publish, isPublishing, statusMessage, error: publishError, success: publishSuccess, results: publishResults, clearStatus } =
     usePublish();
 
@@ -132,6 +132,8 @@ export default function DraftsPage() {
         return instagramAccounts.map((a) => `@${a.username}`);
       case 'telegram':
         return telegramChannels.map((c) => c.channel_title);
+      case 'linkedin':
+        return linkedinAccounts.map((a) => a.name);
     }
   };
 
@@ -164,6 +166,7 @@ export default function DraftsPage() {
       selectedTelegramChannels: targets.includes('telegram')
         ? telegramChannels.map((c) => c.channel_id)
         : [],
+      selectedLinkedInAccounts: targets.includes('linkedin') ? linkedinAccounts.map((a) => a.id) : [],
     });
 
     // The results dialog shows the outcome per account; the draft stays when nothing went out.

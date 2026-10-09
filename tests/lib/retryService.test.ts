@@ -54,7 +54,7 @@ describe('retryFailedDestinations', () => {
     const outcome = await retryFailedDestinations(pool, '7', 99);
 
     expect(outcome).toEqual(expect.objectContaining({ ok: true, publish_status: 'success', retried: 2, succeeded: 2 }));
-    expect(mockTokens).toHaveBeenCalledWith(pool, '7', [], ['x1'], [], [], ['tg1'], expect.anything());
+    expect(mockTokens).toHaveBeenCalledWith(pool, '7', [], ['x1'], [], [], ['tg1'], [], expect.anything());
     expect(mockExecute).toHaveBeenCalledWith(
       expect.objectContaining({ text: 'hello world', cloudinaryMedia: [image], mediaFiles: [{ buffer: Buffer.from('x') }] })
     );
@@ -79,7 +79,7 @@ describe('retryFailedDestinations', () => {
     const outcome = await retryFailedDestinations(pool, '7', 99, [{ platform: 'telegram', account_id: 'tg1' }]);
 
     expect(outcome).toEqual(expect.objectContaining({ ok: true, publish_status: 'partial_success', retried: 1, succeeded: 0 }));
-    expect(mockTokens).toHaveBeenCalledWith(pool, '7', [], [], [], [], ['tg1'], expect.anything());
+    expect(mockTokens).toHaveBeenCalledWith(pool, '7', [], [], [], [], ['tg1'], [], expect.anything());
     const destinations = JSON.parse(updateCall(query)[1][0]);
     expect(destinations[1]).toEqual({ platform: 'twitter', account_id: 'x1', success: false, error: 'CreditsDepleted' });
     expect(destinations[2]).toEqual({ platform: 'telegram', account_id: 'tg1', success: false, error: 'Still blocked' });

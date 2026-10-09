@@ -23,6 +23,7 @@ export interface PublishRequest {
   instagramPublishAccounts: string[];
   instagramStoryAccounts: string[];
   telegramChannels: string[];
+  linkedinAccounts: string[];
   cloudinaryMedia: CloudinaryMediaInfo[];
 }
 
@@ -75,4 +76,5 @@ export interface MissingAccounts {
   twitter: string[];
   instagram: string[];
   telegram: string[];
+  linkedin: string[];
 }
