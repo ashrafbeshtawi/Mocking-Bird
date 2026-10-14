@@ -167,4 +167,21 @@ describe('Drafts page', () => {
     );
     expect(mockFetch).not.toHaveBeenCalledWith('/api/drafts', expect.objectContaining({ method: 'DELETE' }));
   });
+
+  it('previews a draft image full size from the publish dialog', async () => {
+    mockFetch.mockResolvedValue(
+      listResponse([
+        { ...draft(1, 'with media'), media: [{ publicUrl: 'https://cdn/cat.jpg', resourceType: 'image', originalFilename: 'cat.jpg' }] },
+      ])
+    );
+    const user = userEvent.setup();
+    render(<DraftsPage />);
+    await screen.findByText('with media');
+
+    await user.click(screen.getByTitle('Publish draft'));
+    await user.click(await screen.findByRole('button', { name: 'Preview cat.jpg' }));
+
+    const preview = screen.getAllByRole('dialog').pop()!;
+    expect(within(preview).getByRole('img', { name: 'cat.jpg' })).toHaveAttribute('src', 'https://cdn/cat.jpg');
+  });
 });

@@ -42,6 +42,7 @@ import { PublishResults } from '@/components/publish/PublishResults';
 import { ContentFitBadge } from '@/components/publish/ContentFitBadge';
 import { getPlatformConfig } from '@/lib/platformConfig';
 import { contentKinds, needsChoice, resolveContent, type ContentSelection } from '@/lib/publish/contentRules';
+import { MediaPreviewDialog, type PreviewMedia } from '@/components/publish/MediaPreviewDialog';
 import { useDrafts, mapDraftMediaToUploaded, type Draft } from '@/hooks/useDrafts';
 import { useConnectedAccounts } from '@/hooks/useConnectedAccounts';
 import { usePublish } from '@/hooks/usePublish';
@@ -67,6 +68,7 @@ export default function DraftsPage() {
   const [previewDraft, setPreviewDraft] = useState<Draft | null>(null);
   // What to send to platforms that cannot take the whole previewed draft
   const [previewSelection, setPreviewSelection] = useState<ContentSelection>({});
+  const [previewMedia, setPreviewMedia] = useState<PreviewMedia | null>(null);
   // Drafts awaiting delete confirmation: one from a row button, or the selection.
   const [deleting, setDeleting] = useState<Draft[] | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -523,25 +525,44 @@ export default function DraftsPage() {
                 Media
               </Typography>
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
-                {previewDraft!.media!.map((m, i) =>
-                  m.resourceType === 'video' ? (
-                    <Chip key={i} icon={<VideocamOutlinedIcon />} label={m.originalFilename ?? 'video'} />
+                {previewDraft!.media!.map((m, i) => {
+                  const media: PreviewMedia = {
+                    url: m.publicUrl,
+                    resourceType: m.resourceType ?? 'image',
+                    name: m.originalFilename ?? (m.resourceType === 'video' ? 'video' : 'media'),
+                  };
+                  return media.resourceType === 'video' ? (
+                    <Chip
+                      key={i}
+                      icon={<VideocamOutlinedIcon />}
+                      label={media.name}
+                      onClick={() => setPreviewMedia(media)}
+                      aria-label={`Preview ${media.name}`}
+                    />
                   ) : (
                     <Box
                       key={i}
-                      component="img"
-                      src={m.publicUrl}
-                      alt={m.originalFilename ?? 'media'}
-                      sx={{
-                        height: 80,
-                        borderRadius: 2,
-                        border: '1px solid',
-                        borderColor: 'divider',
-                        objectFit: 'cover',
-                      }}
-                    />
-                  )
-                )}
+                      component="button"
+                      type="button"
+                      onClick={() => setPreviewMedia(media)}
+                      aria-label={`Preview ${media.name}`}
+                      sx={{ p: 0, border: 0, background: 'none', cursor: 'zoom-in', lineHeight: 0 }}
+                    >
+                      <Box
+                        component="img"
+                        src={media.url}
+                        alt={media.name}
+                        sx={{
+                          height: 80,
+                          borderRadius: 2,
+                          border: '1px solid',
+                          borderColor: 'divider',
+                          objectFit: 'cover',
+                        }}
+                      />
+                    </Box>
+                  );
+                })}
               </Box>
             </>
           )}
@@ -613,6 +634,8 @@ export default function DraftsPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <MediaPreviewDialog media={previewMedia} onClose={() => setPreviewMedia(null)} />
 
       {/* Delete confirmation */}
       <Dialog open={!!deleting} onClose={() => setDeleting(null)} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 4 } }}>
