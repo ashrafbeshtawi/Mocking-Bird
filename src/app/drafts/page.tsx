@@ -61,7 +61,7 @@ export default function DraftsPage() {
   const platform: Platform | 'all' = platformParam && PLATFORMS.includes(platformParam) ? platformParam : 'all';
 
   const { drafts, total, totalPages, loading, error, refetch, deleteDrafts } = useDrafts({ page, query, platform });
-  const { facebookPages, xAccounts, instagramAccounts, telegramChannels, linkedinAccounts } = useConnectedAccounts();
+  const { facebookPages, xAccounts, instagramAccounts, telegramChannels, linkedinAccounts, youtubeChannels } = useConnectedAccounts();
   const { publish, isPublishing, statusMessage, error: publishError, success: publishSuccess, results: publishResults, clearStatus } =
     usePublish();
 
@@ -142,6 +142,8 @@ export default function DraftsPage() {
         return telegramChannels.map((c) => c.channel_title);
       case 'linkedin':
         return linkedinAccounts.map((a) => a.name);
+      case 'youtube':
+        return youtubeChannels.map((c) => c.name);
     }
   };
 
@@ -186,6 +188,7 @@ export default function DraftsPage() {
         ? telegramChannels.map((c) => c.channel_id)
         : [],
       selectedLinkedInAccounts: targets.includes('linkedin') ? linkedinAccounts.map((a) => a.id) : [],
+      selectedYouTubeChannels: targets.includes('youtube') ? youtubeChannels.map((c) => c.id) : [],
       contentSelection: previewSelection,
     });
 

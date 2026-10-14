@@ -8,6 +8,7 @@ import {
   Twitter as TwitterIcon,
   Telegram as TelegramIcon,
   LinkedIn as LinkedInIcon,
+  YouTube as YouTubeIcon,
 } from '@mui/icons-material';
 
 interface ConnectButtonsProps {
@@ -112,6 +113,21 @@ export function ConnectButtons({
         }}
       >
         Add LinkedIn Account
+      </Button>
+
+      <Button
+        variant="contained"
+        href="/api/youtube/auth"
+        fullWidth
+        startIcon={<YouTubeIcon />}
+        sx={{
+          bgcolor: '#ff0000',
+          '&:hover': { bgcolor: '#cc0000' },
+          color: '#fff',
+          maxWidth: { sm: 'fit-content' },
+        }}
+      >
+        Add YouTube Channel
       </Button>
     </Box>
   );

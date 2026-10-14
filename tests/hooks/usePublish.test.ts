@@ -41,6 +41,7 @@ describe('usePublish destination filtering', () => {
         selectedInstagramAccounts: { ig1: { publish: true, story: false } },
         selectedTelegramChannels: [],
         selectedLinkedInAccounts: [],
+        selectedYouTubeChannels: [],
         contentSelection: { twitter: ['text', 'video'], instagram: ['text', 'image'] },
       })
     );
@@ -64,6 +65,7 @@ describe('usePublish destination filtering', () => {
         selectedInstagramAccounts: { ig1: { publish: true, story: false } },
         selectedTelegramChannels: [],
         selectedLinkedInAccounts: [],
+        selectedYouTubeChannels: [],
       })
     );
 
@@ -86,6 +88,7 @@ describe('usePublish destination filtering', () => {
         selectedInstagramAccounts: {},
         selectedTelegramChannels: [],
         selectedLinkedInAccounts: [],
+        selectedYouTubeChannels: [],
       });
     });
 
@@ -106,6 +109,7 @@ describe('usePublish destination filtering', () => {
         selectedInstagramAccounts: {},
         selectedTelegramChannels: [],
         selectedLinkedInAccounts: [],
+        selectedYouTubeChannels: [],
       })
     );
 
@@ -125,6 +129,7 @@ describe('usePublish destination filtering', () => {
         selectedInstagramAccounts: { ig1: { publish: true, story: false } },
         selectedTelegramChannels: [],
         selectedLinkedInAccounts: [],
+        selectedYouTubeChannels: [],
       });
     });
 

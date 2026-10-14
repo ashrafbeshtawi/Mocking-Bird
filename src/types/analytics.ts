@@ -20,6 +20,7 @@ export interface PlatformVolume {
   instagram: number;
   telegram: number;
   linkedin: number;
+  youtube: number;
 }
 
 export interface PlatformReliability {
@@ -28,6 +29,7 @@ export interface PlatformReliability {
   instagram: number;
   telegram: number;
   linkedin: number;
+  youtube: number;
 }
 
 export interface AnalyticsResponse {

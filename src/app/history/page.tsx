@@ -52,11 +52,12 @@ import TwitterIcon from '@mui/icons-material/Twitter';
 import InstagramIcon from '@mui/icons-material/Instagram';
 import TelegramIcon from '@mui/icons-material/Telegram';
 import LinkedInIcon from '@mui/icons-material/LinkedIn';
+import YouTubeIcon from '@mui/icons-material/YouTube';
 import ReplayIcon from '@mui/icons-material/Replay';
 import { useConnectedAccounts } from '@/hooks/useConnectedAccounts';
 
 interface PublishDestination {
-  platform: 'facebook' | 'twitter' | 'instagram' | 'telegram' | 'linkedin';
+  platform: 'facebook' | 'twitter' | 'instagram' | 'telegram' | 'linkedin' | 'youtube';
   account_id: string;
   account_name?: string;
   post_type?: 'feed' | 'story';
@@ -81,6 +82,7 @@ const platformConfig = {
   instagram: { icon: InstagramIcon, color: '#E1306C', label: 'Instagram' },
   telegram: { icon: TelegramIcon, color: '#0088cc', label: 'Telegram' },
   linkedin: { icon: LinkedInIcon, color: '#0a66c2', label: 'LinkedIn' },
+  youtube: { icon: YouTubeIcon, color: '#ff0000', label: 'YouTube' },
 };
 
 interface PaginatedResponse {
@@ -824,6 +826,7 @@ export default function PublishHistoryPage() {
                   <MenuItem value="instagram">Instagram</MenuItem>
                   <MenuItem value="telegram">Telegram</MenuItem>
                   <MenuItem value="linkedin">LinkedIn</MenuItem>
+                  <MenuItem value="youtube">YouTube</MenuItem>
                 </Select>
               </FormControl>
               <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 130 } }}>

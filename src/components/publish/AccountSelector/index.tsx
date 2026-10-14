@@ -21,6 +21,7 @@ import type {
   InstagramAccount,
   TelegramChannel,
   LinkedInAccount,
+  YouTubeChannel,
   InstagramSelection,
   Platform,
 } from '@/types/accounts';
@@ -31,16 +32,19 @@ interface AccountSelectorProps {
   instagramAccounts: InstagramAccount[];
   telegramChannels: TelegramChannel[];
   linkedinAccounts: LinkedInAccount[];
+  youtubeChannels: YouTubeChannel[];
   selectedFacebookPages: string[];
   selectedXAccounts: string[];
   selectedInstagramAccounts: Record<string, InstagramSelection>;
   selectedTelegramChannels: string[];
   selectedLinkedInAccounts: string[];
+  selectedYouTubeChannels: string[];
   onFacebookChange: (pageId: string) => void;
   onXChange: (accountId: string) => void;
   onInstagramChange: (accountId: string, type: 'publish' | 'story') => void;
   onTelegramChange: (channelId: string) => void;
   onLinkedInChange: (accountId: string) => void;
+  onYouTubeChange: (channelId: string) => void;
   /** Kinds present in the post; drives the per-row fit badges. */
   contentKinds: ContentKind[];
   contentSelection: ContentSelection;
@@ -53,16 +57,19 @@ export function AccountSelector({
   instagramAccounts,
   telegramChannels,
   linkedinAccounts,
+  youtubeChannels,
   selectedFacebookPages,
   selectedXAccounts,
   selectedInstagramAccounts,
   selectedTelegramChannels,
   selectedLinkedInAccounts,
+  selectedYouTubeChannels,
   onFacebookChange,
   onXChange,
   onInstagramChange,
   onTelegramChange,
   onLinkedInChange,
+  onYouTubeChange,
   contentKinds,
   contentSelection,
   onContentSelect,
@@ -81,7 +88,8 @@ export function AccountSelector({
     xAccounts.length > 0 ||
     instagramAccounts.length > 0 ||
     telegramChannels.length > 0 ||
-    linkedinAccounts.length > 0;
+    linkedinAccounts.length > 0 ||
+    youtubeChannels.length > 0;
 
   if (!hasAnyAccount) {
     return (
@@ -383,6 +391,56 @@ export function AccountSelector({
                   edge="end"
                   checked={isSelected}
                   onChange={() => onLinkedInChange(account.id)}
+                  sx={{
+                    color: 'grey.400',
+                    '&.Mui-checked': { color: config.color },
+                  }}
+                />
+              </ListItemSecondaryAction>
+            </ListItem>
+          );
+        })}
+        {/* YouTube Channels */}
+        {youtubeChannels.map((channel) => {
+          const config = PLATFORM_CONFIG.youtube;
+          const Icon = config.icon;
+          const isSelected = selectedYouTubeChannels.includes(channel.id);
+
+          return (
+            <ListItem
+              key={`yt-${channel.id}`}
+              sx={{
+                py: 1,
+                px: 1.5,
+                borderRadius: 2,
+                mb: 0.5,
+                cursor: 'pointer',
+                transition: 'background-color 0.2s',
+                bgcolor: isSelected ? `${config.color}10` : 'transparent',
+                '&:hover': {
+                  bgcolor: isSelected ? `${config.color}15` : 'action.hover',
+                },
+              }}
+              onClick={() => onYouTubeChange(channel.id)}
+            >
+              <ListItemIcon sx={{ minWidth: 40 }}>
+                <Icon sx={{ color: config.color, fontSize: 24 }} />
+              </ListItemIcon>
+              <ListItemText
+                primary={
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <Typography variant="body2" fontWeight={500}>
+                      {channel.name}
+                    </Typography>
+                    {badge('youtube')}
+                  </Box>
+                }
+              />
+              <ListItemSecondaryAction>
+                <Checkbox
+                  edge="end"
+                  checked={isSelected}
+                  onChange={() => onYouTubeChange(channel.id)}
                   sx={{
                     color: 'grey.400',
                     '&.Mui-checked': { color: config.color },

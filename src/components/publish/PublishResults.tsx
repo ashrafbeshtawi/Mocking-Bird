@@ -21,6 +21,7 @@ import InstagramIcon from '@mui/icons-material/Instagram';
 import XIcon from '@mui/icons-material/X';
 import TelegramIcon from '@mui/icons-material/Telegram';
 import LinkedInIcon from '@mui/icons-material/LinkedIn';
+import YouTubeIcon from '@mui/icons-material/YouTube';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
 import CelebrationIcon from '@mui/icons-material/Celebration';
@@ -57,6 +58,7 @@ const PLATFORM_CONFIG: Record<string, { icon: React.ElementType; color: string; 
   x: { icon: XIcon, color: '#000000', label: 'X (Twitter)' },
   telegram: { icon: TelegramIcon, color: '#0088cc', label: 'Telegram' },
   linkedin: { icon: LinkedInIcon, color: '#0a66c2', label: 'LinkedIn' },
+  youtube: { icon: YouTubeIcon, color: '#ff0000', label: 'YouTube' },
 };
 
 export function PublishResults({ error, success, results, onClose }: PublishResultsProps) {
@@ -71,6 +73,7 @@ export function PublishResults({ error, success, results, onClose }: PublishResu
         return `${item.instagram_account_id || 'Account'} (${postType})`;
       case 'x':
       case 'linkedin':
+      case 'youtube':
         return item.account_id || 'Account';
       case 'telegram':
         return item.telegram_channel_id || 'Channel';

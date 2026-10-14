@@ -11,6 +11,7 @@ const PLATFORM_EXISTS_SQL: Record<Platform, string> = {
   twitter: 'SELECT EXISTS (SELECT 1 FROM connected_x_accounts_v1_1 WHERE user_id = $1) AS connected',
   telegram: 'SELECT EXISTS (SELECT 1 FROM connected_telegram_channels WHERE user_id = $1) AS connected',
   linkedin: 'SELECT EXISTS (SELECT 1 FROM connected_linkedin_accounts WHERE user_id = $1) AS connected',
+  youtube: 'SELECT EXISTS (SELECT 1 FROM connected_youtube_channels WHERE user_id = $1) AS connected',
 };
 
 /**
