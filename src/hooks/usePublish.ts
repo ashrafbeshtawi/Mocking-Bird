@@ -1,8 +1,10 @@
 'use client';
 
 import { useState, useCallback, useRef } from 'react';
-import type { InstagramSelection } from '@/types/accounts';
+import type { InstagramSelection, Platform } from '@/types/accounts';
 import type { UploadedMedia } from '@/components/publish/MediaUploader';
+import { contentKinds, needsChoice, resolveContent, type ContentSelection } from '@/lib/publish/contentRules';
+import { PLATFORM_CONFIG } from '@/lib/platformConfig';
 
 interface PublishResult {
   platform: string;
@@ -34,6 +36,8 @@ interface PublishParams {
   selectedInstagramAccounts: Record<string, InstagramSelection>;
   selectedTelegramChannels: string[];
   selectedLinkedInAccounts: string[];
+  /** What the user chose to send to platforms that cannot take the whole post. */
+  contentSelection?: ContentSelection;
 }
 
 interface ProgressUpdate {
@@ -119,15 +123,8 @@ export function usePublish(): UsePublishReturn {
   }, []);
 
   const publish = useCallback(
-    async ({
-      postText,
-      uploadedMedia,
-      selectedFacebookPages,
-      selectedXAccounts,
-      selectedInstagramAccounts,
-      selectedTelegramChannels,
-      selectedLinkedInAccounts,
-    }: PublishParams): Promise<boolean> => {
+    async (params: PublishParams): Promise<boolean> => {
+      const { postText, uploadedMedia } = params;
       silencedRef.current = false;
       setIsPublishing(true);
       setError(null);
@@ -136,6 +133,40 @@ export function usePublish(): UsePublishReturn {
       setProgress(null);
       setStepProgress({ stepIndex: 0, totalSteps: 5 });
       setAccountsProgress([]);
+
+      // A selected platform that can take part of the post must have a choice made;
+      // one that cannot take it at all is simply left out.
+      const kinds = contentKinds(postText, uploadedMedia);
+      const isSelected: Record<Platform, boolean> = {
+        facebook: params.selectedFacebookPages.length > 0,
+        twitter: params.selectedXAccounts.length > 0,
+        instagram: Object.values(params.selectedInstagramAccounts).some((s) => s.publish || s.story),
+        telegram: params.selectedTelegramChannels.length > 0,
+        linkedin: params.selectedLinkedInAccounts.length > 0,
+      };
+      const undecided = (Object.keys(isSelected) as Platform[]).filter(
+        (platform) => isSelected[platform] && needsChoice(platform, kinds, params.contentSelection?.[platform])
+      );
+      if (undecided.length > 0) {
+        setError({
+          message: `Choose what to send to ${undecided.map((p) => PLATFORM_CONFIG[p].label).join(', ')}.`,
+        });
+        setIsPublishing(false);
+        setStatusMessage('');
+        return false;
+      }
+
+      const contentSelection: ContentSelection = {};
+      const isSendable = (platform: Platform): boolean => {
+        const sent = resolveContent(platform, kinds, params.contentSelection?.[platform]);
+        if (sent && sent.length < kinds.length) contentSelection[platform] = sent;
+        return sent !== null;
+      };
+      const selectedFacebookPages = isSendable('facebook') ? params.selectedFacebookPages : [];
+      const selectedXAccounts = isSendable('twitter') ? params.selectedXAccounts : [];
+      const selectedInstagramAccounts = isSendable('instagram') ? params.selectedInstagramAccounts : {};
+      const selectedTelegramChannels = isSendable('telegram') ? params.selectedTelegramChannels : [];
+      const selectedLinkedInAccounts = isSendable('linkedin') ? params.selectedLinkedInAccounts : [];
 
       // Validation
       const hasInstagramSelection = Object.values(selectedInstagramAccounts).some(
@@ -184,6 +215,7 @@ export function usePublish(): UsePublishReturn {
         instagramStoryAccounts,
         telegramChannels: selectedTelegramChannels,
         linkedinAccounts: selectedLinkedInAccounts,
+        contentSelection,
         // Send Cloudinary media info instead of raw files
         cloudinaryMedia: uploadedMedia.map((media) => ({
           publicId: media.publicId,

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import pool from '@/lib/db';
 import { createLogger } from '@/lib/logger';
 import { validateTextContent, validateAccountArrays, parsePublishRequest } from '@/lib/publish/validators/requestValidator';
-import { processCloudinaryMedia, validateMediaMix } from '@/lib/publish/validators/mediaValidator';
+import { processCloudinaryMedia } from '@/lib/publish/validators/mediaValidator';
 import { fetchAllTokens, validateMissingAccounts, formatMissingAccounts, hasMissingAccounts } from '@/lib/publish/services/tokenService';
 import { createReportLogger, buildAndSaveResponse, buildErrorResponse } from '@/lib/publish/services/reportService';
 import { executePublish } from '@/lib/publish/orchestrator';
@@ -34,28 +34,10 @@ export async function POST(req: Request) {
       return buildErrorResponse(reportLogger.getReport(), 400, parseResult.error || 'Failed to parse request');
     }
 
-    const { text, facebookPages, xAccounts, instagramPublishAccounts, instagramStoryAccounts, telegramChannels, linkedinAccounts, cloudinaryMedia } = parseResult.data;
+    const { text, facebookPages, xAccounts, instagramPublishAccounts, instagramStoryAccounts, telegramChannels, linkedinAccounts, cloudinaryMedia, contentSelection } = parseResult.data;
     reportLogger.add(`Request payload parsed. Text length: ${text?.length || 0}, Facebook pages: ${facebookPages?.length || 0}, X accounts: ${xAccounts?.length || 0}, Instagram feed: ${instagramPublishAccounts?.length || 0}, Instagram stories: ${instagramStoryAccounts?.length || 0}, Telegram channels: ${telegramChannels?.length || 0}, LinkedIn accounts: ${linkedinAccounts?.length || 0}, Cloudinary media: ${cloudinaryMedia?.length || 0}`);
 
-    // 3. Check for mixed media types
-    if (cloudinaryMedia.length > 0) {
-      const mixCheck = validateMediaMix(cloudinaryMedia);
-      if (mixCheck.mixed) {
-        reportLogger.add(`Error: Mixed media types detected. Images: ${mixCheck.imageCount}, Videos: ${mixCheck.videoCount}`);
-        return await buildAndSaveResponse({
-          pool,
-          userId,
-          report: reportLogger.getReport(),
-          contentToStore: text + (cloudinaryMedia.length > 0 ? ` [${cloudinaryMedia.length} media files attached]` : ''),
-          successful: [],
-          failed: [],
-          status: 400,
-          error: 'We do not support mixing images and videos in a single post. Please upload either only images or only videos.'
-        });
-      }
-    }
-
-    // 4. Validate text content
+    // 3. Validate text content
     const hasAnyAccount = facebookPages.length > 0 || xAccounts.length > 0 || instagramPublishAccounts.length > 0 || instagramStoryAccounts.length > 0 || telegramChannels.length > 0 || linkedinAccounts.length > 0;
     const textValidation = validateTextContent(text, cloudinaryMedia.length > 0, hasAnyAccount);
     if (!textValidation.success) {
@@ -77,7 +59,7 @@ export async function POST(req: Request) {
       });
     }
 
-    // 5. Validate account arrays
+    // 4. Validate account arrays
     const accountValidation = validateAccountArrays(facebookPages, xAccounts, instagramPublishAccounts, instagramStoryAccounts, telegramChannels, linkedinAccounts);
     if (!accountValidation.success) {
       reportLogger.add(`WARN: ${accountValidation.error}`);
@@ -93,7 +75,7 @@ export async function POST(req: Request) {
       });
     }
 
-    // 6. Process Cloudinary media (download for Facebook/Twitter)
+    // 5. Process Cloudinary media (download for Facebook/Twitter)
     // We only need to download if we have Facebook or Twitter accounts (Telegram and Instagram use Cloudinary URLs directly)
     const needsDownload = facebookPages.length > 0 || xAccounts.length > 0;
     const mediaResult = needsDownload
@@ -120,7 +102,7 @@ export async function POST(req: Request) {
       });
     }
 
-    // 7. Fetch tokens
+    // 6. Fetch tokens
     const { facebookTokens, twitterTokens, instagramFeedTokens, instagramStoryTokens, telegramTokens, linkedinTokens } = await fetchAllTokens(
       pool,
       userId,
@@ -133,7 +115,7 @@ export async function POST(req: Request) {
       reportLogger
     );
 
-    // 8. Validate missing accounts
+    // 7. Validate missing accounts
     const allInstagramAccountIds = [...new Set([...instagramPublishAccounts, ...instagramStoryAccounts])];
     const allInstagramTokens = [...instagramFeedTokens, ...instagramStoryTokens].filter(
       (token, index, self) => index === self.findIndex(t => t.instagram_account_id === token.instagram_account_id)
@@ -155,7 +137,7 @@ export async function POST(req: Request) {
       });
     }
 
-    // 9. Execute publishing
+    // 8. Execute publishing
     const publishResult = await executePublish({
       pool,
       text: text.trim(),
@@ -167,13 +149,14 @@ export async function POST(req: Request) {
       instagramStoryTokens,
       telegramTokens,
       linkedinTokens,
-      reportLogger
+      reportLogger,
+      contentSelection
     });
 
     const { successful, failed } = publishResult;
     const contentToStore = text + (cloudinaryMedia.length > 0 ? ` [${cloudinaryMedia.length} media files attached]` : '');
 
-    // 10. Build response based on results
+    // 9. Build response based on results
     const mediaProcessing = cloudinaryMedia.length > 0 ? {
       totalFiles: cloudinaryMedia.length,
       processedFiles: needsDownload ? mediaResult.files.length : cloudinaryMedia.length,

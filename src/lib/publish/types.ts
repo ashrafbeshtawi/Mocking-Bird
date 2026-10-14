@@ -1,4 +1,5 @@
 import { MediaFile, SuccessfulPublishResult, FailedPublishResult } from '@/types/interfaces';
+import type { ContentSelection } from './contentRules';
 
 /**
  * Cloudinary media info sent from the frontend
@@ -25,6 +26,8 @@ export interface PublishRequest {
   telegramChannels: string[];
   linkedinAccounts: string[];
   cloudinaryMedia: CloudinaryMediaInfo[];
+  /** Per platform, which kinds of the post to send; a platform without an entry gets everything. */
+  contentSelection: ContentSelection;
 }
 
 /**

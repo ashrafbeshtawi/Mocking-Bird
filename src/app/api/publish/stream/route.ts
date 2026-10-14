@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import pool from '@/lib/db';
 import { createLogger } from '@/lib/logger';
 import { validateUserId, validateTextContent, validateAccountArrays, parsePublishRequest } from '@/lib/publish/validators/requestValidator';
-import { processCloudinaryMedia, validateMediaMix } from '@/lib/publish/validators/mediaValidator';
+import { processCloudinaryMedia } from '@/lib/publish/validators/mediaValidator';
 import { fetchAllTokens, validateMissingAccounts, formatMissingAccounts, hasMissingAccounts } from '@/lib/publish/services/tokenService';
 import { createReportLogger, savePublishReport, determinePublishStatus, extractPublishDestinations } from '@/lib/publish/services/reportService';
 import { executePublishWithProgress, type ProgressCallback, type AccountProgressCallback, type AccountProgress } from '@/lib/publish/orchestrator';
@@ -64,20 +64,8 @@ export async function POST(req: NextRequest) {
         return;
       }
 
-      const { text, facebookPages, xAccounts, instagramPublishAccounts, instagramStoryAccounts, telegramChannels, linkedinAccounts, cloudinaryMedia } = parseResult.data;
+      const { text, facebookPages, xAccounts, instagramPublishAccounts, instagramStoryAccounts, telegramChannels, linkedinAccounts, cloudinaryMedia, contentSelection } = parseResult.data;
       reportLogger.add(`Request payload parsed`);
-
-      // Check for mixed media types
-      if (cloudinaryMedia.length > 0) {
-        const mixCheck = validateMediaMix(cloudinaryMedia);
-        if (mixCheck.mixed) {
-          await sendEvent('error', {
-            message: 'Cannot mix images and videos in a single post'
-          });
-          await writer.close();
-          return;
-        }
-      }
 
       // Validate text content
       const hasAnyAccount = facebookPages.length > 0 || xAccounts.length > 0 || instagramPublishAccounts.length > 0 || instagramStoryAccounts.length > 0 || telegramChannels.length > 0 || linkedinAccounts.length > 0;
@@ -181,6 +169,7 @@ export async function POST(req: NextRequest) {
         telegramTokens,
         linkedinTokens,
         reportLogger,
+        contentSelection,
         onProgress,
         onAccountProgress
       });

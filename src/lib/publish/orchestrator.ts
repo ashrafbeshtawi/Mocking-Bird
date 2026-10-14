@@ -6,6 +6,8 @@ import { InstagramPublisher, InstagramAccountToken } from '@/lib/publishers/inst
 import { TelegramPublisher, TelegramChannelToken } from '@/lib/publishers/telegram';
 import { LinkedInPublisher, LinkedInAccountToken } from '@/lib/publishers/linkedin';
 import { ReportLogger, CloudinaryMediaInfo } from './types';
+import type { ContentSelection } from './contentRules';
+import type { Platform } from '@/types/accounts';
 import {
   mapFacebookSuccess,
   mapFacebookFailed,
@@ -52,6 +54,7 @@ export interface ExecutePublishOptions {
   telegramTokens: TelegramChannelToken[];
   linkedinTokens: LinkedInAccountToken[];
   reportLogger: ReportLogger;
+  contentSelection?: ContentSelection;
   onProgress?: ProgressCallback;
   onAccountProgress?: AccountProgressCallback;
 }
@@ -59,6 +62,20 @@ export interface ExecutePublishOptions {
 export interface ExecutePublishResult {
   successful: SuccessfulPublishResult[];
   failed: FailedPublishResult[];
+}
+
+/** The part of the post that goes to one platform, per its content selection. */
+function contentFor(
+  platform: Platform,
+  { text, mediaFiles, cloudinaryMedia, contentSelection }: ExecutePublishOptions
+): { text: string; mediaFiles: MediaFile[]; cloudinaryMedia: CloudinaryMediaInfo[] } {
+  const kinds = contentSelection?.[platform];
+  if (!kinds) return { text, mediaFiles, cloudinaryMedia };
+  return {
+    text: kinds.includes('text') ? text : '',
+    mediaFiles: mediaFiles.filter((f) => kinds.includes(f.mimetype.startsWith('video/') ? 'video' : 'image')),
+    cloudinaryMedia: cloudinaryMedia.filter((m) => kinds.includes(m.resourceType)),
+  };
 }
 
 /**
@@ -69,9 +86,6 @@ export async function executePublish(
 ): Promise<ExecutePublishResult> {
   const {
     pool,
-    text,
-    mediaFiles,
-    cloudinaryMedia,
     facebookTokens,
     twitterTokens,
     instagramFeedTokens,
@@ -96,16 +110,22 @@ export async function executePublish(
     ? new TelegramPublisher(pool)
     : null;
 
+  const facebook = contentFor('facebook', options);
+  const twitter = contentFor('twitter', options);
+  const instagram = contentFor('instagram', options);
+  const telegram = contentFor('telegram', options);
+  const linkedin = contentFor('linkedin', options);
+
   // Facebook and Twitter use downloaded media files (buffers)
   const facebookOptions = {
-    text: text.trim() || undefined,
-    files: mediaFiles.length > 0 ? mediaFiles : undefined
+    text: facebook.text.trim() || undefined,
+    files: facebook.mediaFiles.length > 0 ? facebook.mediaFiles : undefined
   };
 
   // Instagram uses Cloudinary URLs directly (no need to download)
   const instagramOptions = {
-    text: text.trim() || undefined,
-    cloudinaryMedia: cloudinaryMedia.length > 0 ? cloudinaryMedia : undefined
+    text: instagram.text.trim() || undefined,
+    cloudinaryMedia: instagram.cloudinaryMedia.length > 0 ? instagram.cloudinaryMedia : undefined
   };
 
   const publishPromises: Promise<{ successful: SuccessfulPublishResult[]; failed: FailedPublishResult[] }>[] = [];
@@ -153,7 +173,7 @@ export async function executePublish(
   // Twitter publishing
   if (twitterTokens.length > 0) {
     publishPromises.push(
-      twitterPublisher.publishToAccounts(text, twitterTokens, mediaFiles).then(res => ({
+      twitterPublisher.publishToAccounts(twitter.text, twitterTokens, twitter.mediaFiles).then(res => ({
         successful: mapTwitterSuccess(
           res.successful.map(item => ({
             ...item,
@@ -269,8 +289,8 @@ export async function executePublish(
   // Telegram publishing (uses Cloudinary URLs directly)
   if (telegramTokens.length > 0 && telegramPublisher) {
     const telegramOptions = {
-      text: text.trim() || '',
-      cloudinaryMedia: cloudinaryMedia.length > 0 ? cloudinaryMedia : undefined
+      text: telegram.text.trim() || '',
+      cloudinaryMedia: telegram.cloudinaryMedia.length > 0 ? telegram.cloudinaryMedia : undefined
     };
     publishPromises.push(
       telegramPublisher.publishToChannels(telegramOptions, telegramTokens).then(res => ({
@@ -295,7 +315,7 @@ export async function executePublish(
   // LinkedIn publishing (uploads Cloudinary images itself)
   publishPromises.push(
     linkedinTokens.length > 0
-      ? new LinkedInPublisher(pool).publishToAccounts({ text: text.trim(), cloudinaryMedia }, linkedinTokens).then(res => ({
+      ? new LinkedInPublisher(pool).publishToAccounts({ text: linkedin.text.trim(), cloudinaryMedia: linkedin.cloudinaryMedia }, linkedinTokens).then(res => ({
           successful: mapLinkedInSuccess(res.successful),
           failed: mapLinkedInFailed(res.failed)
         }))
@@ -338,9 +358,6 @@ export async function executePublishWithProgress(
 ): Promise<ExecutePublishResult> {
   const {
     pool,
-    text,
-    mediaFiles,
-    cloudinaryMedia,
     facebookTokens,
     twitterTokens,
     instagramFeedTokens,
@@ -460,19 +477,25 @@ export async function executePublishWithProgress(
     ? new TelegramPublisher(pool)
     : null;
 
+  const facebook = contentFor('facebook', options);
+  const twitter = contentFor('twitter', options);
+  const instagram = contentFor('instagram', options);
+  const telegram = contentFor('telegram', options);
+  const linkedin = contentFor('linkedin', options);
+
   const facebookOptions = {
-    text: text.trim() || undefined,
-    files: mediaFiles.length > 0 ? mediaFiles : undefined
+    text: facebook.text.trim() || undefined,
+    files: facebook.mediaFiles.length > 0 ? facebook.mediaFiles : undefined
   };
 
   const instagramOptions = {
-    text: text.trim() || undefined,
-    cloudinaryMedia: cloudinaryMedia.length > 0 ? cloudinaryMedia : undefined
+    text: instagram.text.trim() || undefined,
+    cloudinaryMedia: instagram.cloudinaryMedia.length > 0 ? instagram.cloudinaryMedia : undefined
   };
 
   const telegramOptions = {
-    text: text.trim() || '',
-    cloudinaryMedia: cloudinaryMedia.length > 0 ? cloudinaryMedia : undefined
+    text: telegram.text.trim() || '',
+    cloudinaryMedia: telegram.cloudinaryMedia.length > 0 ? telegram.cloudinaryMedia : undefined
   };
 
   // Create all publish promises (parallel execution)
@@ -536,7 +559,7 @@ export async function executePublishWithProgress(
       await updateAccountStatus(token.x_user_id, 'publishing');
 
       try {
-        const result = await twitterPublisher.publishToAccounts(text, [token], mediaFiles);
+        const result = await twitterPublisher.publishToAccounts(twitter.text, [token], twitter.mediaFiles);
         if (result.successful.length > 0) {
           const mapped = mapTwitterSuccess(
             result.successful.map(item => ({
@@ -727,7 +750,7 @@ export async function executePublishWithProgress(
       await updateAccountStatus(token.linkedin_user_id, 'publishing');
 
       try {
-        const result = await linkedinPublisher.publishToAccounts({ text: text.trim(), cloudinaryMedia }, [token]);
+        const result = await linkedinPublisher.publishToAccounts({ text: linkedin.text.trim(), cloudinaryMedia: linkedin.cloudinaryMedia }, [token]);
         if (result.successful.length > 0) {
           allSuccessful.push(...mapLinkedInSuccess(result.successful));
           await updateAccountStatus(token.linkedin_user_id, 'completed');
