@@ -32,13 +32,15 @@ import { useConnectedAccounts } from '@/hooks/useConnectedAccounts';
 import { usePublish } from '@/hooks/usePublish';
 import { PostComposer } from '@/components/publish/PostComposer';
 import { AccountSelector } from '@/components/publish/AccountSelector';
+import { YouTubeTitleField } from '@/components/publish/YouTubeTitleField';
+import { youtubeTitleError } from '@/lib/youtube';
 import { PublishResults } from '@/components/publish/PublishResults';
 import { PageHeader } from '@/components/PageHeader';
 import type { UploadedMedia } from '@/components/publish/MediaUploader';
 import { mapDraftMediaToUploaded } from '@/hooks/useDrafts';
 import type { InstagramSelection, Platform } from '@/types/accounts';
 import { TWITTER_CHAR_LIMIT } from '@/types/accounts';
-import { contentKinds, needsChoice, resolveContent, type ContentKind, type ContentSelection } from '@/lib/publish/contentRules';
+import { contentKinds, fitContent, needsChoice, resolveContent, type ContentKind, type ContentSelection } from '@/lib/publish/contentRules';
 import { PLATFORM_CONFIG } from '@/lib/platformConfig';
 
 export default function PublishPage() {
@@ -122,6 +124,7 @@ function PublishPageInner() {
   const [selectedTelegramChannels, setSelectedTelegramChannels] = useState<string[]>([]);
   const [selectedLinkedInAccounts, setSelectedLinkedInAccounts] = useState<string[]>([]);
   const [selectedYouTubeChannels, setSelectedYouTubeChannels] = useState<string[]>([]);
+  const [youtubeTitle, setYoutubeTitle] = useState('');
   // What to send to platforms that cannot take the whole post
   const [contentSelection, setContentSelection] = useState<ContentSelection>({});
 
@@ -341,6 +344,7 @@ function PublishPageInner() {
     setPostText('');
     setUploadedMedia([]);
     setContentSelection({});
+    setYoutubeTitle('');
     setSelectedFacebookPages(facebookPages.map((p) => p.page_id));
     setSelectedXAccounts(xAccounts.map((a) => a.id));
     setSelectedTelegramChannels(telegramChannels.map((c) => c.channel_id));
@@ -372,6 +376,7 @@ function PublishPageInner() {
       selectedTelegramChannels,
       selectedLinkedInAccounts,
       selectedYouTubeChannels,
+      youtubeTitle,
       contentSelection,
     });
 
@@ -457,6 +462,7 @@ function PublishPageInner() {
     youtube: selectedYouTubeChannels.length,
   };
   const platforms = Object.keys(selectedPerPlatform) as Platform[];
+  const showYouTubeTitle = selectedYouTubeChannels.length > 0 && fitContent('youtube', kinds).status !== 'unsupported';
   // Selected destinations whose platform can take the post (or has a choice made)
   const selectedCount = platforms.reduce(
     (count, platform) =>
@@ -473,7 +479,8 @@ function PublishPageInner() {
     !isSavingDraft &&
     (postText.trim() !== '' || uploadedMedia.length > 0);
   const canPublish =
-    !isPublishing && !isMediaUploading && !isSavingDraft && selectedCount > 0 && undecided.length === 0;
+    !isPublishing && !isMediaUploading && !isSavingDraft && selectedCount > 0 && undecided.length === 0 &&
+    !(showYouTubeTitle && youtubeTitleError(youtubeTitle.trim()));
 
   if (loading) {
     return (
@@ -736,6 +743,11 @@ function PublishPageInner() {
                   contentSelection={contentSelection}
                   onContentSelect={handleContentSelect}
                 />
+                {showYouTubeTitle && (
+                  <Box sx={{ mt: 2 }}>
+                    <YouTubeTitleField value={youtubeTitle} onChange={setYoutubeTitle} />
+                  </Box>
+                )}
               </Paper>
 
               {/* Publish Buttons */}

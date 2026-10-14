@@ -1,7 +1,7 @@
 import { randomBytes } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { publicUrl } from '@/lib/publicUrl';
-import { YOUTUBE_CALLBACK_PATH, YOUTUBE_STATE_COOKIE } from '@/lib/youtubeAuth';
+import { YOUTUBE_CALLBACK_PATH, YOUTUBE_STATE_COOKIE } from '@/lib/youtube';
 
 /**
  * Starts the YouTube OAuth flow: redirects to Google's consent screen asking for

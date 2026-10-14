@@ -4,6 +4,7 @@ import { useState, useCallback, useRef } from 'react';
 import type { InstagramSelection, Platform } from '@/types/accounts';
 import type { UploadedMedia } from '@/components/publish/MediaUploader';
 import { contentKinds, needsChoice, resolveContent, type ContentSelection } from '@/lib/publish/contentRules';
+import { youtubeTitleError } from '@/lib/youtube';
 import { PLATFORM_CONFIG } from '@/lib/platformConfig';
 
 interface PublishResult {
@@ -37,6 +38,8 @@ interface PublishParams {
   selectedTelegramChannels: string[];
   selectedLinkedInAccounts: string[];
   selectedYouTubeChannels: string[];
+  /** Title for YouTube uploads; blank uses the video's file name. */
+  youtubeTitle?: string;
   /** What the user chose to send to platforms that cannot take the whole post. */
   contentSelection?: ContentSelection;
 }
@@ -190,6 +193,15 @@ export function usePublish(): UsePublishReturn {
         return false;
       }
 
+      const youtubeTitle = selectedYouTubeChannels.length > 0 ? (params.youtubeTitle ?? '').trim() : '';
+      const titleError = youtubeTitleError(youtubeTitle);
+      if (titleError) {
+        setError({ message: titleError });
+        setIsPublishing(false);
+        setStatusMessage('');
+        return false;
+      }
+
       if (postText.trim() === '' && uploadedMedia.length === 0) {
         setError({ message: 'Post text or media cannot be empty.' });
         setIsPublishing(false);
@@ -220,6 +232,7 @@ export function usePublish(): UsePublishReturn {
         telegramChannels: selectedTelegramChannels,
         linkedinAccounts: selectedLinkedInAccounts,
         youtubeChannels: selectedYouTubeChannels,
+        youtubeTitle,
         contentSelection,
         // Send Cloudinary media info instead of raw files
         cloudinaryMedia: uploadedMedia.map((media) => ({

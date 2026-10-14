@@ -41,8 +41,10 @@ import { PageHeader } from '@/components/PageHeader';
 import { PublishResults } from '@/components/publish/PublishResults';
 import { ContentFitBadge } from '@/components/publish/ContentFitBadge';
 import { getPlatformConfig } from '@/lib/platformConfig';
-import { contentKinds, needsChoice, resolveContent, type ContentSelection } from '@/lib/publish/contentRules';
+import { contentKinds, fitContent, needsChoice, resolveContent, type ContentSelection } from '@/lib/publish/contentRules';
 import { MediaPreviewDialog, type PreviewMedia } from '@/components/publish/MediaPreviewDialog';
+import { YouTubeTitleField } from '@/components/publish/YouTubeTitleField';
+import { youtubeTitleError } from '@/lib/youtube';
 import { useDrafts, mapDraftMediaToUploaded, type Draft } from '@/hooks/useDrafts';
 import { useConnectedAccounts } from '@/hooks/useConnectedAccounts';
 import { usePublish } from '@/hooks/usePublish';
@@ -68,6 +70,7 @@ export default function DraftsPage() {
   const [previewDraft, setPreviewDraft] = useState<Draft | null>(null);
   // What to send to platforms that cannot take the whole previewed draft
   const [previewSelection, setPreviewSelection] = useState<ContentSelection>({});
+  const [previewYoutubeTitle, setPreviewYoutubeTitle] = useState('');
   const [previewMedia, setPreviewMedia] = useState<PreviewMedia | null>(null);
   // Drafts awaiting delete confirmation: one from a row button, or the selection.
   const [deleting, setDeleting] = useState<Draft[] | null>(null);
@@ -165,6 +168,7 @@ export default function DraftsPage() {
 
   const openPreview = (draft: Draft) => {
     setPreviewSelection({});
+    setPreviewYoutubeTitle('');
     setPreviewDraft(draft);
   };
 
@@ -189,6 +193,7 @@ export default function DraftsPage() {
         : [],
       selectedLinkedInAccounts: targets.includes('linkedin') ? linkedinAccounts.map((a) => a.id) : [],
       selectedYouTubeChannels: targets.includes('youtube') ? youtubeChannels.map((c) => c.id) : [],
+      youtubeTitle: previewYoutubeTitle,
       contentSelection: previewSelection,
     });
 
@@ -606,6 +611,13 @@ export default function DraftsPage() {
             })}
           </Box>
 
+          {previewDraft?.target_platforms.includes('youtube') && youtubeChannels.length > 0 &&
+            fitContent('youtube', previewKinds).status !== 'unsupported' && (
+              <Box sx={{ mt: 2 }}>
+                <YouTubeTitleField value={previewYoutubeTitle} onChange={setPreviewYoutubeTitle} />
+              </Box>
+            )}
+
           {isPublishing && (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mt: 2 }}>
               <CircularProgress size={18} />
@@ -627,7 +639,7 @@ export default function DraftsPage() {
           <Button
             onClick={handleConfirmPublish}
             variant="contained"
-            disabled={isPublishing || previewDestinationCount === 0 || isPreviewUndecided}
+            disabled={isPublishing || previewDestinationCount === 0 || isPreviewUndecided || youtubeTitleError(previewYoutubeTitle.trim()) !== null}
             endIcon={isPublishing ? <CircularProgress size={16} color="inherit" /> : <SendIcon />}
             sx={{ borderRadius: 2 }}
           >

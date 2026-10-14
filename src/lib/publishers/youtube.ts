@@ -1,12 +1,11 @@
 import { Pool } from 'pg';
 import { createLogger } from '@/lib/logger';
 import { CloudinaryMediaInfo } from '@/lib/publish/types';
-import { GOOGLE_TOKEN_URL } from '@/lib/youtubeAuth';
+import { GOOGLE_TOKEN_URL, YOUTUBE_TITLE_MAX } from '@/lib/youtube';
 
 const logger = createLogger('YouTubePublisher');
 
 const UPLOAD_URL = 'https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status';
-const TITLE_MAX = 100;
 const DESCRIPTION_MAX = 5000;
 // Refresh tokens this close to expiry, so they cannot lapse mid-upload.
 const TOKEN_EXPIRY_MARGIN_MS = 5 * 60_000;
@@ -22,6 +21,9 @@ export interface YouTubeChannelToken {
 }
 
 export interface YouTubePublishOptions {
+  /** The video's title; blank uses the video's file name. */
+  title: string;
+  /** The post text, used as the video's description. */
   text: string;
   cloudinaryMedia?: CloudinaryMediaInfo[];
 }
@@ -46,14 +48,15 @@ const truncate = (text: string, max: number) => [...text].slice(0, max).join('')
 const sanitize = (text: string) => text.replace(/</g, '‹').replace(/>/g, '›');
 
 /**
- * Title and description for an upload: the first line of the post text is the
- * title, the whole text the description. Without text, the file name is the title.
+ * Title and description for an upload: the given title, or the video's file name
+ * when it is blank, and the post text as the description.
  */
-export function videoMetadata(text: string, fileName: string): { title: string; description: string } {
-  const clean = sanitize(text.trim());
-  const firstLine = clean.split('\n').find((line) => line.trim() !== '')?.trim();
-  const title = firstLine || sanitize(fileName.replace(/\.[^.]+$/, '')) || 'Untitled video';
-  return { title: truncate(title, TITLE_MAX), description: truncate(clean, DESCRIPTION_MAX) };
+export function videoMetadata(title: string, text: string, fileName: string): { title: string; description: string } {
+  const videoTitle = title.trim() || fileName.replace(/\.[^.]+$/, '') || 'Untitled video';
+  return {
+    title: truncate(sanitize(videoTitle), YOUTUBE_TITLE_MAX),
+    description: truncate(sanitize(text.trim()), DESCRIPTION_MAX),
+  };
 }
 
 export class YouTubePublisher {
@@ -116,7 +119,7 @@ export class YouTubePublisher {
         'X-Upload-Content-Type': contentType,
       },
       body: JSON.stringify({
-        snippet: videoMetadata(options.text, video.originalFilename),
+        snippet: videoMetadata(options.title, options.text, video.originalFilename),
         status: { privacyStatus: PRIVACY_STATUS, selfDeclaredMadeForKids: false },
       }),
     });

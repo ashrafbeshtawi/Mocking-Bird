@@ -57,6 +57,8 @@ export interface ExecutePublishOptions {
   telegramTokens: TelegramChannelToken[];
   linkedinTokens: LinkedInAccountToken[];
   youtubeTokens: YouTubeChannelToken[];
+  /** Title for YouTube uploads; blank uses the video's file name. */
+  youtubeTitle?: string;
   reportLogger: ReportLogger;
   contentSelection?: ContentSelection;
   onProgress?: ProgressCallback;
@@ -331,7 +333,7 @@ export async function executePublish(
   // YouTube publishing (uploads the Cloudinary video itself)
   publishPromises.push(
     youtubeTokens.length > 0
-      ? new YouTubePublisher(pool).publishToAccounts({ text: youtube.text.trim(), cloudinaryMedia: youtube.cloudinaryMedia }, youtubeTokens).then(res => ({
+      ? new YouTubePublisher(pool).publishToAccounts({ title: options.youtubeTitle ?? '', text: youtube.text.trim(), cloudinaryMedia: youtube.cloudinaryMedia }, youtubeTokens).then(res => ({
           successful: mapYouTubeSuccess(res.successful),
           failed: mapYouTubeFailed(res.failed)
         }))
@@ -802,7 +804,7 @@ export async function executePublishWithProgress(
       await updateAccountStatus(token.channel_id, 'publishing');
 
       try {
-        const result = await youtubePublisher.publishToAccounts({ text: youtube.text.trim(), cloudinaryMedia: youtube.cloudinaryMedia }, [token]);
+        const result = await youtubePublisher.publishToAccounts({ title: options.youtubeTitle ?? '', text: youtube.text.trim(), cloudinaryMedia: youtube.cloudinaryMedia }, [token]);
         if (result.successful.length > 0) {
           allSuccessful.push(...mapYouTubeSuccess(result.successful));
           await updateAccountStatus(token.channel_id, 'completed');

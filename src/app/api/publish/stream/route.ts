@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
         return;
       }
 
-      const { text, facebookPages, xAccounts, instagramPublishAccounts, instagramStoryAccounts, telegramChannels, linkedinAccounts, youtubeChannels, cloudinaryMedia, contentSelection } = parseResult.data;
+      const { text, facebookPages, xAccounts, instagramPublishAccounts, instagramStoryAccounts, telegramChannels, linkedinAccounts, youtubeChannels, youtubeTitle, cloudinaryMedia, contentSelection } = parseResult.data;
       reportLogger.add(`Request payload parsed`);
 
       // Validate text content
@@ -171,6 +171,7 @@ export async function POST(req: NextRequest) {
         linkedinTokens,
         youtubeTokens,
         reportLogger,
+        youtubeTitle,
         contentSelection,
         onProgress,
         onAccountProgress
@@ -192,6 +193,7 @@ export async function POST(req: NextRequest) {
       await savePublishReport(pool, userId, contentToStore, reportLogger.getReport(), publishStatus, destinations, {
         text: text.trim(),
         media: cloudinaryMedia,
+        youtubeTitle,
       });
 
       // Send final result

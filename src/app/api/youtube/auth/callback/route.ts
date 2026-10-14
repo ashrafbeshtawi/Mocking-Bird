@@ -3,7 +3,7 @@ import { publicUrl } from '@/lib/publicUrl';
 import { getAuthUserId } from '@/lib/api-auth';
 import { createLogger } from '@/lib/logger';
 import pool from '@/lib/db';
-import { GOOGLE_TOKEN_URL, YOUTUBE_CALLBACK_PATH, YOUTUBE_STATE_COOKIE } from '@/lib/youtubeAuth';
+import { GOOGLE_TOKEN_URL, YOUTUBE_CALLBACK_PATH, YOUTUBE_STATE_COOKIE } from '@/lib/youtube';
 
 const logger = createLogger('YouTubeAuthCallback');
 

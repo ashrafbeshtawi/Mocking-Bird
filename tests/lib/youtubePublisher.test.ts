@@ -22,19 +22,19 @@ const json = (body: object) =>
   new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
 
 describe('videoMetadata', () => {
-  it('titles the video with the first line and describes it with the whole text', () => {
-    expect(videoMetadata('\nLaunch day <3\nWe shipped it.', 'clip.mp4')).toEqual({
-      title: 'Launch day ‹3',
-      description: 'Launch day ‹3\nWe shipped it.',
+  it('uses the title as given and the post text as the description', () => {
+    expect(videoMetadata(' Launch day ', 'We shipped <it>.', 'clip.mp4')).toEqual({
+      title: 'Launch day',
+      description: 'We shipped ‹it›.',
     });
   });
 
-  it('titles the video with the file name when there is no text', () => {
-    expect(videoMetadata('', 'launch-day.mp4')).toEqual({ title: 'launch-day', description: '' });
+  it('titles the video with its file name when the title is blank', () => {
+    expect(videoMetadata('', '', 'launch-day.mp4')).toEqual({ title: 'launch-day', description: '' });
   });
 
   it('cuts the title to 100 characters', () => {
-    expect(videoMetadata('a'.repeat(150), 'clip.mp4').title).toHaveLength(100);
+    expect(videoMetadata('a'.repeat(150), '', 'clip.mp4').title).toHaveLength(100);
   });
 });
 
@@ -66,7 +66,7 @@ describe('YouTubePublisher', () => {
 
   it('uploads the video as private with the post text as its metadata', async () => {
     const { successful, failed } = await publisher.publishToAccounts(
-      { text: 'Launch day', cloudinaryMedia: [video] },
+      { title: 'Launch day', text: 'We shipped it.', cloudinaryMedia: [video] },
       [channel(3_600_000)]
     );
 
@@ -75,14 +75,14 @@ describe('YouTubePublisher', () => {
     const [, init] = callTo('https://www.googleapis.com/upload/');
     expect(init.headers).toMatchObject({ Authorization: 'Bearer access', 'X-Upload-Content-Length': '3' });
     expect(JSON.parse(init.body)).toEqual({
-      snippet: { title: 'Launch day', description: 'Launch day' },
+      snippet: { title: 'Launch day', description: 'We shipped it.' },
       status: { privacyStatus: 'private', selfDeclaredMadeForKids: false },
     });
     expect(callTo('https://oauth2.googleapis.com/token')).toBeUndefined();
   });
 
   it('refreshes and stores an access token that is about to expire', async () => {
-    await publisher.publishToAccounts({ text: '', cloudinaryMedia: [video] }, [channel(60_000)]);
+    await publisher.publishToAccounts({ title: '', text: '', cloudinaryMedia: [video] }, [channel(60_000)]);
 
     expect(callTo('https://oauth2.googleapis.com/token')).toBeDefined();
     expect(query).toHaveBeenCalledWith(expect.stringContaining('UPDATE connected_youtube_channels'), ['fresh', 3599, 'UC123', 'refresh']);
@@ -92,13 +92,13 @@ describe('YouTubePublisher', () => {
   it('asks to reconnect when the refresh token is rejected', async () => {
     fetchMock.mockImplementation(async () => new Response('{"error":"invalid_grant"}', { status: 400 }));
 
-    const { failed } = await publisher.publishToAccounts({ text: '', cloudinaryMedia: [video] }, [channel(0)]);
+    const { failed } = await publisher.publishToAccounts({ title: '', text: '', cloudinaryMedia: [video] }, [channel(0)]);
 
     expect(failed[0].error.message).toMatch(/Reconnect the channel/);
   });
 
   it('fails a post that is not exactly one video', async () => {
-    const { failed } = await publisher.publishToAccounts({ text: 'hi', cloudinaryMedia: [video, video] }, [channel(3_600_000)]);
+    const { failed } = await publisher.publishToAccounts({ title: '', text: 'hi', cloudinaryMedia: [video, video] }, [channel(3_600_000)]);
 
     expect(failed[0].error.message).toBe('YouTube uploads take exactly one video.');
     expect(fetchMock).not.toHaveBeenCalled();

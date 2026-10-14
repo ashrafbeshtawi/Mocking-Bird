@@ -1,5 +1,6 @@
 import { PublishRequest, CloudinaryMediaInfo } from '../types';
 import { parseContentSelection } from '../contentRules';
+import { youtubeTitleError } from '@/lib/youtube';
 
 export interface ValidationResult<T> {
   success: boolean;
@@ -175,6 +176,12 @@ export async function parsePublishRequest(
     ? data.youtubeChannels.filter((id): id is string => typeof id === 'string')
     : [];
 
+  const youtubeTitle = typeof data.youtubeTitle === 'string' ? data.youtubeTitle.trim() : '';
+  const titleError = youtubeTitleError(youtubeTitle);
+  if (titleError) {
+    return { success: false, error: titleError };
+  }
+
   const mediaValidation = validateCloudinaryMedia(
     Array.isArray(data.cloudinaryMedia) ? data.cloudinaryMedia : []
   );
@@ -194,6 +201,7 @@ export async function parsePublishRequest(
       telegramChannels,
       linkedinAccounts,
       youtubeChannels,
+      youtubeTitle,
       cloudinaryMedia: mediaValidation.data || [],
       contentSelection: parseContentSelection(data.contentSelection),
     },
