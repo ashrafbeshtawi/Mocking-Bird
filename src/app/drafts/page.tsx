@@ -41,7 +41,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { PublishResults } from '@/components/publish/PublishResults';
 import { ContentFitBadge } from '@/components/publish/ContentFitBadge';
 import { getPlatformConfig } from '@/lib/platformConfig';
-import { contentKinds, resolveContent, type ContentSelection } from '@/lib/publish/contentRules';
+import { contentKinds, needsChoice, resolveContent, type ContentSelection } from '@/lib/publish/contentRules';
 import { useDrafts, mapDraftMediaToUploaded, type Draft } from '@/hooks/useDrafts';
 import { useConnectedAccounts } from '@/hooks/useConnectedAccounts';
 import { usePublish } from '@/hooks/usePublish';
@@ -145,6 +145,9 @@ export default function DraftsPage() {
   const previewKinds = previewDraft ? draftKinds(previewDraft) : [];
   const isPreviewSendable = (platform: Platform) =>
     resolveContent(platform, previewKinds, previewSelection[platform]) !== null;
+  const previewNeedsChoice = (platform: Platform) =>
+    accountNamesFor(platform).length > 0 && needsChoice(platform, previewKinds, previewSelection[platform]);
+  const isPreviewUndecided = previewDraft?.target_platforms.some(previewNeedsChoice) ?? false;
 
   /** Accounts the confirm button would actually publish to. */
   const previewDestinationCount = previewDraft
@@ -552,6 +555,7 @@ export default function DraftsPage() {
             {previewDraft?.target_platforms.map((platform) => {
               const names = accountNamesFor(platform);
               const skipped = !isPreviewSendable(platform);
+              const undecided = previewNeedsChoice(platform);
               return (
                 <Box key={platform} sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                   {renderPlatformChips([platform])}
@@ -562,11 +566,13 @@ export default function DraftsPage() {
                     onSelect={(kinds) => setPreviewSelection((prev) => ({ ...prev, [platform]: kinds }))}
                   />
                   <Typography variant="caption" color={names.length && !skipped ? 'text.secondary' : 'warning.main'}>
-                    {skipped
-                      ? 'will be skipped'
-                      : names.length
-                        ? names.join(', ')
-                        : 'no connected accounts'}
+                    {undecided
+                      ? 'choose what to send'
+                      : skipped
+                        ? 'will be skipped'
+                        : names.length
+                          ? names.join(', ')
+                          : 'no connected accounts'}
                   </Typography>
                 </Box>
               );
@@ -594,7 +600,7 @@ export default function DraftsPage() {
           <Button
             onClick={handleConfirmPublish}
             variant="contained"
-            disabled={isPublishing || previewDestinationCount === 0}
+            disabled={isPublishing || previewDestinationCount === 0 || isPreviewUndecided}
             endIcon={isPublishing ? <CircularProgress size={16} color="inherit" /> : <SendIcon />}
             sx={{ borderRadius: 2 }}
           >

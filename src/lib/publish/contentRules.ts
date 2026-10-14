@@ -92,6 +92,11 @@ export function resolveContent(
   return null;
 }
 
+/** Whether the platform can take part of the post but the user has not yet chosen which part. */
+export function needsChoice(platform: Platform, kinds: ContentKind[], selection?: ContentKind[]): boolean {
+  return fitContent(platform, kinds).status === 'partial' && resolveContent(platform, kinds, selection) === null;
+}
+
 const KIND_LABELS: Record<ContentKind, string> = { text: 'text', image: 'images', video: 'video' };
 
 /** "text + images", "video" */

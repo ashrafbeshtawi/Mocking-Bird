@@ -2,6 +2,7 @@ import {
   contentKinds,
   fitContent,
   resolveContent,
+  needsChoice,
   describeKinds,
   parseContentSelection,
 } from '@/lib/publish/contentRules';
@@ -61,6 +62,16 @@ describe('resolveContent', () => {
   it('ignores a choice that is not one of the offered options', () => {
     expect(resolveContent('twitter', ['text', 'image', 'video'], ['text'])).toBeNull();
     expect(resolveContent('instagram', ['text'], ['text'])).toBeNull();
+  });
+});
+
+describe('needsChoice', () => {
+  it('is true only for a partial fit without a valid choice', () => {
+    const mixed = ['text', 'image', 'video'] as const;
+    expect(needsChoice('twitter', [...mixed])).toBe(true);
+    expect(needsChoice('twitter', [...mixed], ['text', 'video'])).toBe(false);
+    expect(needsChoice('facebook', [...mixed])).toBe(false);
+    expect(needsChoice('instagram', ['text'])).toBe(false);
   });
 });
 

@@ -3,7 +3,8 @@
 import { useState, useCallback, useRef } from 'react';
 import type { InstagramSelection, Platform } from '@/types/accounts';
 import type { UploadedMedia } from '@/components/publish/MediaUploader';
-import { contentKinds, resolveContent, type ContentSelection } from '@/lib/publish/contentRules';
+import { contentKinds, needsChoice, resolveContent, type ContentSelection } from '@/lib/publish/contentRules';
+import { PLATFORM_CONFIG } from '@/lib/platformConfig';
 
 interface PublishResult {
   platform: string;
@@ -132,8 +133,27 @@ export function usePublish(): UsePublishReturn {
       setStepProgress({ stepIndex: 0, totalSteps: 5 });
       setAccountsProgress([]);
 
-      // Destinations whose platform cannot take the post (or has no choice made yet) are left out.
+      // A selected platform that can take part of the post must have a choice made;
+      // one that cannot take it at all is simply left out.
       const kinds = contentKinds(postText, uploadedMedia);
+      const isSelected: Record<Platform, boolean> = {
+        facebook: params.selectedFacebookPages.length > 0,
+        twitter: params.selectedXAccounts.length > 0,
+        instagram: Object.values(params.selectedInstagramAccounts).some((s) => s.publish || s.story),
+        telegram: params.selectedTelegramChannels.length > 0,
+      };
+      const undecided = (Object.keys(isSelected) as Platform[]).filter(
+        (platform) => isSelected[platform] && needsChoice(platform, kinds, params.contentSelection?.[platform])
+      );
+      if (undecided.length > 0) {
+        setError({
+          message: `Choose what to send to ${undecided.map((p) => PLATFORM_CONFIG[p].label).join(', ')}.`,
+        });
+        setIsPublishing(false);
+        setStatusMessage('');
+        return false;
+      }
+
       const contentSelection: ContentSelection = {};
       const isSendable = (platform: Platform): boolean => {
         const sent = resolveContent(platform, kinds, params.contentSelection?.[platform]);

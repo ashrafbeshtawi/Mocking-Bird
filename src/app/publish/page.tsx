@@ -38,7 +38,8 @@ import type { UploadedMedia } from '@/components/publish/MediaUploader';
 import { mapDraftMediaToUploaded } from '@/hooks/useDrafts';
 import type { InstagramSelection, Platform } from '@/types/accounts';
 import { TWITTER_CHAR_LIMIT } from '@/types/accounts';
-import { contentKinds, resolveContent, type ContentKind, type ContentSelection } from '@/lib/publish/contentRules';
+import { contentKinds, needsChoice, resolveContent, type ContentKind, type ContentSelection } from '@/lib/publish/contentRules';
+import { PLATFORM_CONFIG } from '@/lib/platformConfig';
 
 export default function PublishPage() {
   // useSearchParams needs a Suspense boundary in the app router
@@ -407,21 +408,30 @@ function PublishPageInner() {
   const hasAnyAccount =
     facebookPages.length > 0 || xAccounts.length > 0 || instagramAccounts.length > 0 || telegramChannels.length > 0;
   const kinds = contentKinds(postText, uploadedMedia);
+  const selectedPerPlatform: Record<Platform, number> = {
+    facebook: selectedFacebookPages.length,
+    twitter: selectedXAccounts.length,
+    instagram: Object.values(selectedInstagramAccounts).filter((s) => s.publish || s.story).length,
+    telegram: selectedTelegramChannels.length,
+  };
+  const platforms = Object.keys(selectedPerPlatform) as Platform[];
   // Selected destinations whose platform can take the post (or has a choice made)
-  const isSendable = (platform: Platform) => resolveContent(platform, kinds, contentSelection[platform]) !== null;
-  const selectedCount =
-    (isSendable('facebook') ? selectedFacebookPages.length : 0) +
-    (isSendable('twitter') ? selectedXAccounts.length : 0) +
-    (isSendable('instagram')
-      ? Object.values(selectedInstagramAccounts).filter((s) => s.publish || s.story).length
-      : 0) +
-    (isSendable('telegram') ? selectedTelegramChannels.length : 0);
+  const selectedCount = platforms.reduce(
+    (count, platform) =>
+      count + (resolveContent(platform, kinds, contentSelection[platform]) !== null ? selectedPerPlatform[platform] : 0),
+    0
+  );
+  // Selected platforms that can take part of the post but have no choice made yet
+  const undecided = platforms.filter(
+    (platform) => selectedPerPlatform[platform] > 0 && needsChoice(platform, kinds, contentSelection[platform])
+  );
   const canSaveDraft =
     !isPublishing &&
     !isMediaUploading &&
     !isSavingDraft &&
     (postText.trim() !== '' || uploadedMedia.length > 0);
-  const canPublish = !isPublishing && !isMediaUploading && !isSavingDraft && selectedCount > 0;
+  const canPublish =
+    !isPublishing && !isMediaUploading && !isSavingDraft && selectedCount > 0 && undecided.length === 0;
 
   if (loading) {
     return (
@@ -692,10 +702,15 @@ function PublishPageInner() {
                 }}
               >
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Typography variant="body2" sx={{ fontSize: 13, color: 'text.secondary' }}>
-                    {selectedCount > 0
-                      ? `Publishing to ${selectedCount} destination${selectedCount > 1 ? 's' : ''}`
-                      : 'Select at least one account'}
+                  <Typography
+                    variant="body2"
+                    sx={{ fontSize: 13, color: undecided.length > 0 ? 'warning.main' : 'text.secondary' }}
+                  >
+                    {undecided.length > 0
+                      ? `Choose what to send to ${undecided.map((p) => PLATFORM_CONFIG[p].label).join(', ')}`
+                      : selectedCount > 0
+                        ? `Publishing to ${selectedCount} destination${selectedCount > 1 ? 's' : ''}`
+                        : 'Select at least one account'}
                   </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', gap: 2 }}>

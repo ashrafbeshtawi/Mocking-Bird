@@ -29,7 +29,7 @@ describe('usePublish destination filtering', () => {
     global.fetch = jest.fn().mockResolvedValue(emptyStream());
   });
 
-  it('sends only the chosen part to X and leaves Instagram out when the post cannot go there', async () => {
+  it('sends each platform its chosen part of a mixed post', async () => {
     const { result } = renderHook(() => usePublish());
 
     await act(() =>
@@ -40,18 +40,58 @@ describe('usePublish destination filtering', () => {
         selectedXAccounts: ['x1'],
         selectedInstagramAccounts: { ig1: { publish: true, story: false } },
         selectedTelegramChannels: [],
-        contentSelection: { twitter: ['text', 'video'], instagram: ['text'] },
+        contentSelection: { twitter: ['text', 'video'], instagram: ['text', 'image'] },
       })
     );
 
     const body = sentBody();
     expect(body.facebookPages).toEqual(['p1']);
     expect(body.xAccounts).toEqual(['x1']);
-    expect(body.instagramPublishAccounts).toEqual([]);
-    expect(body.contentSelection).toEqual({ twitter: ['text', 'video'] });
+    expect(body.instagramPublishAccounts).toEqual(['ig1']);
+    expect(body.contentSelection).toEqual({ twitter: ['text', 'video'], instagram: ['text', 'image'] });
   });
 
-  it('leaves X out while no choice is made for a mixed post', async () => {
+  it('leaves Instagram out of a text-only post without blocking the others', async () => {
+    const { result } = renderHook(() => usePublish());
+
+    await act(() =>
+      result.current.publish({
+        postText: 'text only',
+        uploadedMedia: [],
+        selectedFacebookPages: ['p1'],
+        selectedXAccounts: [],
+        selectedInstagramAccounts: { ig1: { publish: true, story: false } },
+        selectedTelegramChannels: [],
+      })
+    );
+
+    const body = sentBody();
+    expect(body.facebookPages).toEqual(['p1']);
+    expect(body.instagramPublishAccounts).toEqual([]);
+    expect(body.contentSelection).toEqual({});
+  });
+
+  it('refuses to publish while a selected X account has no choice made for a mixed post', async () => {
+    const { result } = renderHook(() => usePublish());
+
+    let ok = true;
+    await act(async () => {
+      ok = await result.current.publish({
+        postText: 'hello',
+        uploadedMedia: [image, video],
+        selectedFacebookPages: ['p1'],
+        selectedXAccounts: ['x1'],
+        selectedInstagramAccounts: {},
+        selectedTelegramChannels: [],
+      });
+    });
+
+    expect(ok).toBe(false);
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(result.current.error?.message).toBe('Choose what to send to X.');
+  });
+
+  it('publishes once the undecided X account is unselected', async () => {
     const { result } = renderHook(() => usePublish());
 
     await act(() =>
@@ -59,13 +99,13 @@ describe('usePublish destination filtering', () => {
         postText: 'hello',
         uploadedMedia: [image, video],
         selectedFacebookPages: ['p1'],
-        selectedXAccounts: ['x1'],
+        selectedXAccounts: [],
         selectedInstagramAccounts: {},
         selectedTelegramChannels: [],
       })
     );
 
-    expect(sentBody().xAccounts).toEqual([]);
+    expect(sentBody().facebookPages).toEqual(['p1']);
   });
 
   it('refuses to publish when no destination can take the post', async () => {
