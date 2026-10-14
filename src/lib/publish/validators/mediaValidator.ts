@@ -5,32 +5,6 @@ import { createLogger } from '@/lib/logger';
 const logger = createLogger('MediaValidator');
 
 /**
- * Checks if media files contain mixed types (images and videos)
- */
-export function validateMediaMix(cloudinaryMedia: CloudinaryMediaInfo[]): {
-  mixed: boolean;
-  imageCount: number;
-  videoCount: number;
-} {
-  let imageCount = 0;
-  let videoCount = 0;
-
-  for (const media of cloudinaryMedia) {
-    if (media.resourceType === 'image') {
-      imageCount++;
-    } else if (media.resourceType === 'video') {
-      videoCount++;
-    }
-  }
-
-  return {
-    mixed: imageCount > 0 && videoCount > 0,
-    imageCount,
-    videoCount,
-  };
-}
-
-/**
  * Downloads a file from a URL and returns it as a buffer
  */
 async function downloadToBuffer(

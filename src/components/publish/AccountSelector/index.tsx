@@ -5,7 +5,6 @@ import {
   Typography,
   Box,
   Checkbox,
-  Chip,
   List,
   ListItem,
   ListItemIcon,
@@ -14,12 +13,15 @@ import {
   Tooltip,
 } from '@mui/material';
 import { PLATFORM_CONFIG } from '@/lib/platformConfig';
+import { ContentFitBadge } from '@/components/publish/ContentFitBadge';
+import { fitContent, type ContentKind, type ContentSelection } from '@/lib/publish/contentRules';
 import type {
   ConnectedPage,
   ConnectedXAccount,
   InstagramAccount,
   TelegramChannel,
   InstagramSelection,
+  Platform,
 } from '@/types/accounts';
 
 interface AccountSelectorProps {
@@ -35,9 +37,11 @@ interface AccountSelectorProps {
   onXChange: (accountId: string) => void;
   onInstagramChange: (accountId: string, type: 'publish' | 'story') => void;
   onTelegramChange: (channelId: string) => void;
-  mediaSelected: boolean;
+  /** Kinds present in the post; drives the per-row fit badges. */
+  contentKinds: ContentKind[];
+  contentSelection: ContentSelection;
+  onContentSelect: (platform: Platform, kinds: ContentKind[]) => void;
 }
-
 
 export function AccountSelector({
   facebookPages,
@@ -52,8 +56,19 @@ export function AccountSelector({
   onXChange,
   onInstagramChange,
   onTelegramChange,
-  mediaSelected,
+  contentKinds,
+  contentSelection,
+  onContentSelect,
 }: AccountSelectorProps) {
+  const badge = (platform: Platform) => (
+    <ContentFitBadge
+      platform={platform}
+      kinds={contentKinds}
+      selection={contentSelection[platform]}
+      onSelect={(kinds) => onContentSelect(platform, kinds)}
+    />
+  );
+  const isInstagramPossible = fitContent('instagram', contentKinds).status !== 'unsupported';
   const hasAnyAccount =
     facebookPages.length > 0 ||
     xAccounts.length > 0 ||
@@ -113,6 +128,7 @@ export function AccountSelector({
                     <Typography variant="body2" fontWeight={500}>
                       {page.page_name}
                     </Typography>
+                    {badge('facebook')}
                   </Box>
                 }
               />
@@ -163,6 +179,7 @@ export function AccountSelector({
                     <Typography variant="body2" fontWeight={500}>
                       @{account.name}
                     </Typography>
+                    {badge('twitter')}
                   </Box>
                 }
               />
@@ -199,7 +216,7 @@ export function AccountSelector({
                 mb: 0.5,
                 transition: 'background-color 0.2s',
                 bgcolor: isSelected ? `${config.color}10` : 'transparent',
-                opacity: mediaSelected ? 1 : 0.6,
+                opacity: isInstagramPossible ? 1 : 0.6,
               }}
             >
               <ListItemIcon sx={{ minWidth: 40 }}>
@@ -211,19 +228,7 @@ export function AccountSelector({
                     <Typography variant="body2" fontWeight={500}>
                       @{account.username}
                     </Typography>
-                    {!mediaSelected && (
-                      <Chip
-                        label="Media required"
-                        size="small"
-                        sx={{
-                          fontSize: '0.6rem',
-                          height: 18,
-                          bgcolor: 'warning.light',
-                          color: 'warning.contrastText',
-                          ml: 0.5,
-                        }}
-                      />
-                    )}
+                    {badge('instagram')}
                   </Box>
                 }
               />
@@ -235,7 +240,7 @@ export function AccountSelector({
                         size="small"
                         checked={publishChecked}
                         onChange={() => onInstagramChange(account.id, 'publish')}
-                        disabled={!mediaSelected}
+                        disabled={!isInstagramPossible}
                         sx={{
                           color: 'grey.400',
                           '&.Mui-checked': { color: config.color },
@@ -253,7 +258,7 @@ export function AccountSelector({
                         size="small"
                         checked={storyChecked}
                         onChange={() => onInstagramChange(account.id, 'story')}
-                        disabled={!mediaSelected}
+                        disabled={!isInstagramPossible}
                         sx={{
                           color: 'grey.400',
                           '&.Mui-checked': { color: config.color },
@@ -303,6 +308,7 @@ export function AccountSelector({
                     <Typography variant="body2" fontWeight={500}>
                       {channel.channel_title}
                     </Typography>
+                    {badge('telegram')}
                   </Box>
                 }
                 secondary={

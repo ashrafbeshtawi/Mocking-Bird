@@ -39,13 +39,17 @@ import SendIcon from '@mui/icons-material/Send';
 import CloseIcon from '@mui/icons-material/Close';
 import { PageHeader } from '@/components/PageHeader';
 import { PublishResults } from '@/components/publish/PublishResults';
+import { ContentFitBadge } from '@/components/publish/ContentFitBadge';
 import { getPlatformConfig } from '@/lib/platformConfig';
+import { contentKinds, resolveContent, type ContentSelection } from '@/lib/publish/contentRules';
 import { useDrafts, mapDraftMediaToUploaded, type Draft } from '@/hooks/useDrafts';
 import { useConnectedAccounts } from '@/hooks/useConnectedAccounts';
 import { usePublish } from '@/hooks/usePublish';
 import { PLATFORMS, type InstagramSelection, type Platform } from '@/types/accounts';
 
 const SEARCH_DEBOUNCE_MS = 300;
+
+const draftKinds = (draft: Draft) => contentKinds(draft.text, mapDraftMediaToUploaded(draft.media));
 
 export default function DraftsPage() {
   const router = useRouter();
@@ -61,6 +65,8 @@ export default function DraftsPage() {
     usePublish();
 
   const [previewDraft, setPreviewDraft] = useState<Draft | null>(null);
+  // What to send to platforms that cannot take the whole previewed draft
+  const [previewSelection, setPreviewSelection] = useState<ContentSelection>({});
   // Drafts awaiting delete confirmation: one from a row button, or the selection.
   const [deleting, setDeleting] = useState<Draft[] | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -136,14 +142,22 @@ export default function DraftsPage() {
   };
 
   const previewHasMedia = (previewDraft?.media?.length ?? 0) > 0;
+  const previewKinds = previewDraft ? draftKinds(previewDraft) : [];
+  const isPreviewSendable = (platform: Platform) =>
+    resolveContent(platform, previewKinds, previewSelection[platform]) !== null;
 
   /** Accounts the confirm button would actually publish to. */
   const previewDestinationCount = previewDraft
-    ? previewDraft.target_platforms.reduce((count, platform) => {
-        if (platform === 'instagram' && !previewHasMedia) return count;
-        return count + accountNamesFor(platform).length;
-      }, 0)
+    ? previewDraft.target_platforms.reduce(
+        (count, platform) => count + (isPreviewSendable(platform) ? accountNamesFor(platform).length : 0),
+        0
+      )
     : 0;
+
+  const openPreview = (draft: Draft) => {
+    setPreviewSelection({});
+    setPreviewDraft(draft);
+  };
 
   const handleConfirmPublish = async () => {
     if (!previewDraft) return;
@@ -152,7 +166,7 @@ export default function DraftsPage() {
 
     const instagram: Record<string, InstagramSelection> = {};
     instagramAccounts.forEach((a) => {
-      instagram[a.id] = { publish: targets.includes('instagram') && media.length > 0, story: false };
+      instagram[a.id] = { publish: targets.includes('instagram'), story: false };
     });
 
     const ok = await publish({
@@ -164,6 +178,7 @@ export default function DraftsPage() {
       selectedTelegramChannels: targets.includes('telegram')
         ? telegramChannels.map((c) => c.channel_id)
         : [],
+      contentSelection: previewSelection,
     });
 
     // The results dialog shows the outcome per account; the draft stays when nothing went out.
@@ -213,6 +228,15 @@ export default function DraftsPage() {
         />
       );
     });
+
+  /** Platform chips plus, for each, how the draft fits that platform. */
+  const renderPlatformFit = (draft: Draft) =>
+    draft.target_platforms.map((platform) => (
+      <Box key={platform} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+        {renderPlatformChips([platform])}
+        <ContentFitBadge platform={platform} kinds={draftKinds(draft)} />
+      </Box>
+    ));
 
   if (loading && drafts.length === 0 && !isFiltered) {
     return (
@@ -389,7 +413,7 @@ export default function DraftsPage() {
                         {draft.text || <em>(no text)</em>}
                       </Typography>
                       <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 0.75, mt: 1.5 }}>
-                        {renderPlatformChips(draft.target_platforms)}
+                        {renderPlatformFit(draft)}
                         {(draft.media?.length ?? 0) > 0 && (
                           <Chip
                             icon={<ImageOutlinedIcon sx={{ fontSize: 14 }} />}
@@ -406,7 +430,7 @@ export default function DraftsPage() {
                     <IconButton
                       size="small"
                       color="primary"
-                      onClick={() => setPreviewDraft(draft)}
+                      onClick={() => openPreview(draft)}
                       title="Publish draft"
                     >
                       <SendIcon fontSize="small" />
@@ -527,13 +551,19 @@ export default function DraftsPage() {
             )}
             {previewDraft?.target_platforms.map((platform) => {
               const names = accountNamesFor(platform);
-              const skipped = platform === 'instagram' && !previewHasMedia;
+              const skipped = !isPreviewSendable(platform);
               return (
                 <Box key={platform} sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                   {renderPlatformChips([platform])}
+                  <ContentFitBadge
+                    platform={platform}
+                    kinds={previewKinds}
+                    selection={previewSelection[platform]}
+                    onSelect={(kinds) => setPreviewSelection((prev) => ({ ...prev, [platform]: kinds }))}
+                  />
                   <Typography variant="caption" color={names.length && !skipped ? 'text.secondary' : 'warning.main'}>
                     {skipped
-                      ? 'needs media — will be skipped'
+                      ? 'will be skipped'
                       : names.length
                         ? names.join(', ')
                         : 'no connected accounts'}

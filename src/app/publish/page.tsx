@@ -38,6 +38,7 @@ import type { UploadedMedia } from '@/components/publish/MediaUploader';
 import { mapDraftMediaToUploaded } from '@/hooks/useDrafts';
 import type { InstagramSelection, Platform } from '@/types/accounts';
 import { TWITTER_CHAR_LIMIT } from '@/types/accounts';
+import { contentKinds, resolveContent, type ContentKind, type ContentSelection } from '@/lib/publish/contentRules';
 
 export default function PublishPage() {
   // useSearchParams needs a Suspense boundary in the app router
@@ -116,6 +117,8 @@ function PublishPageInner() {
     Record<string, InstagramSelection>
   >({});
   const [selectedTelegramChannels, setSelectedTelegramChannels] = useState<string[]>([]);
+  // What to send to platforms that cannot take the whole post
+  const [contentSelection, setContentSelection] = useState<ContentSelection>({});
 
   // Publishing overlay visibility
   const [publishingHidden, setPublishingHidden] = useState(false);
@@ -295,9 +298,14 @@ function PublishPageInner() {
     );
   }, []);
 
+  const handleContentSelect = useCallback((platform: Platform, kinds: ContentKind[]) => {
+    setContentSelection((prev) => ({ ...prev, [platform]: kinds }));
+  }, []);
+
   const resetForm = useCallback(() => {
     setPostText('');
     setUploadedMedia([]);
+    setContentSelection({});
     setSelectedFacebookPages(facebookPages.map((p) => p.page_id));
     setSelectedXAccounts(xAccounts.map((a) => a.id));
     setSelectedTelegramChannels(telegramChannels.map((c) => c.channel_id));
@@ -325,6 +333,7 @@ function PublishPageInner() {
       selectedXAccounts,
       selectedInstagramAccounts,
       selectedTelegramChannels,
+      contentSelection,
     });
 
     if (wasSuccessful) {
@@ -397,29 +406,22 @@ function PublishPageInner() {
   const showTwitterWarning = charCount > TWITTER_CHAR_LIMIT && selectedXAccounts.length > 0;
   const hasAnyAccount =
     facebookPages.length > 0 || xAccounts.length > 0 || instagramAccounts.length > 0 || telegramChannels.length > 0;
-  const hasInstagramSelection = Object.values(selectedInstagramAccounts).some(
-    (s) => s.publish || s.story
-  );
+  const kinds = contentKinds(postText, uploadedMedia);
+  // Selected destinations whose platform can take the post (or has a choice made)
+  const isSendable = (platform: Platform) => resolveContent(platform, kinds, contentSelection[platform]) !== null;
+  const selectedCount =
+    (isSendable('facebook') ? selectedFacebookPages.length : 0) +
+    (isSendable('twitter') ? selectedXAccounts.length : 0) +
+    (isSendable('instagram')
+      ? Object.values(selectedInstagramAccounts).filter((s) => s.publish || s.story).length
+      : 0) +
+    (isSendable('telegram') ? selectedTelegramChannels.length : 0);
   const canSaveDraft =
     !isPublishing &&
     !isMediaUploading &&
     !isSavingDraft &&
     (postText.trim() !== '' || uploadedMedia.length > 0);
-  const canPublish =
-    !isPublishing &&
-    !isMediaUploading &&
-    !isSavingDraft &&
-    (postText.trim() !== '' || uploadedMedia.length > 0) &&
-    (selectedFacebookPages.length > 0 ||
-      selectedXAccounts.length > 0 ||
-      hasInstagramSelection ||
-      selectedTelegramChannels.length > 0);
-
-  const selectedCount =
-    selectedFacebookPages.length +
-    selectedXAccounts.length +
-    Object.values(selectedInstagramAccounts).filter((s) => s.publish || s.story).length +
-    selectedTelegramChannels.length;
+  const canPublish = !isPublishing && !isMediaUploading && !isSavingDraft && selectedCount > 0;
 
   if (loading) {
     return (
@@ -672,7 +674,9 @@ function PublishPageInner() {
                   onXChange={handleXChange}
                   onInstagramChange={handleInstagramChange}
                   onTelegramChange={handleTelegramChange}
-                  mediaSelected={uploadedMedia.length > 0}
+                  contentKinds={kinds}
+                  contentSelection={contentSelection}
+                  onContentSelect={handleContentSelect}
                 />
               </Paper>
 

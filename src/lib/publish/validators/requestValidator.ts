@@ -1,4 +1,5 @@
 import { PublishRequest, CloudinaryMediaInfo } from '../types';
+import { parseContentSelection } from '../contentRules';
 
 export interface ValidationResult<T> {
   success: boolean;
@@ -166,6 +167,7 @@ export async function parsePublishRequest(
       instagramStoryAccounts,
       telegramChannels,
       cloudinaryMedia: mediaValidation.data || [],
+      contentSelection: parseContentSelection(data.contentSelection),
     },
   };
 }
