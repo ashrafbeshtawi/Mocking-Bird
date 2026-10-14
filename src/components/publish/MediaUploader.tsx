@@ -4,6 +4,8 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Box, Button, LinearProgress, Typography, Alert } from '@mui/material';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
 import CloudDoneIcon from '@mui/icons-material/CloudDone';
+import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
+import { MediaPreviewDialog } from '@/components/publish/MediaPreviewDialog';
 import {
   uploadToCloudinaryClient,
   getCloudinaryClientConfig,
@@ -36,6 +38,7 @@ interface UploadingFile {
 export function MediaUploader({ uploadedMedia, onMediaChange, onUploadingChange }: MediaUploaderProps) {
   const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [preview, setPreview] = useState<UploadedMedia | null>(null);
 
   // null = config still loading; only a definite "not configured" hides the uploader
   const [isConfigured, setIsConfigured] = useState<boolean | null>(null);
@@ -228,25 +231,47 @@ export function MediaUploader({ uploadedMedia, onMediaChange, onUploadingChange 
                 key={`${media.publicId}-${idx}`}
                 sx={{ position: 'relative', width: 120, height: 120 }}
               >
-                {isImage && (
-                  <img
-                    src={media.previewUrl}
-                    alt={media.originalFilename}
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'cover',
-                      borderRadius: 8,
-                    }}
-                  />
-                )}
-                {isVideo && (
-                  <video
-                    src={media.previewUrl}
-                    controls
-                    style={{ width: '100%', height: '100%', borderRadius: 8 }}
-                  />
-                )}
+                <Box
+                  component="button"
+                  type="button"
+                  onClick={() => setPreview(media)}
+                  aria-label={`Preview ${media.originalFilename}`}
+                  sx={{ p: 0, border: 0, width: '100%', height: '100%', cursor: 'zoom-in', background: 'none' }}
+                >
+                  {isImage && (
+                    <img
+                      src={media.previewUrl}
+                      alt={media.originalFilename}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                        borderRadius: 8,
+                      }}
+                    />
+                  )}
+                  {isVideo && (
+                    <>
+                      <video
+                        src={media.previewUrl}
+                        muted
+                        preload="metadata"
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8 }}
+                      />
+                      <PlayCircleOutlineIcon
+                        sx={{
+                          position: 'absolute',
+                          top: '50%',
+                          left: '50%',
+                          transform: 'translate(-50%, -50%)',
+                          fontSize: 40,
+                          color: 'white',
+                          pointerEvents: 'none',
+                        }}
+                      />
+                    </>
+                  )}
+                </Box>
                 {/* Cloud upload indicator */}
                 <Box
                   sx={{
@@ -283,6 +308,11 @@ export function MediaUploader({ uploadedMedia, onMediaChange, onUploadingChange 
           })}
         </Box>
       )}
+
+      <MediaPreviewDialog
+        media={preview && { url: preview.previewUrl, resourceType: preview.resourceType, name: preview.originalFilename }}
+        onClose={() => setPreview(null)}
+      />
     </Box>
   );
 }
