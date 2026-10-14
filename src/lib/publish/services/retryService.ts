@@ -98,6 +98,7 @@ export async function retryFailedDestinations(
     const instagramFeed = accountsOf('instagram', 'feed');
     const instagramStory = accountsOf('instagram', 'story');
     const telegramChannels = accountsOf('telegram');
+    const linkedinAccounts = accountsOf('linkedin');
 
     // Facebook and X upload the files themselves; the other platforms take the URLs.
     const needsDownload = facebookPages.length > 0 || xAccounts.length > 0;
@@ -106,7 +107,7 @@ export async function retryFailedDestinations(
       : { files: [] };
 
     const tokens = await fetchAllTokens(
-      pool, userId, facebookPages, xAccounts, instagramFeed, instagramStory, telegramChannels, reportLogger
+      pool, userId, facebookPages, xAccounts, instagramFeed, instagramStory, telegramChannels, linkedinAccounts, reportLogger
     );
     const { successful, failed } = await executePublish({
       pool,

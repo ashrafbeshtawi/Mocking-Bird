@@ -63,6 +63,7 @@ function PublishPageInner() {
     xAccounts,
     instagramAccounts,
     telegramChannels,
+    linkedinAccounts,
     loading,
   } = useConnectedAccounts();
 
@@ -118,6 +119,7 @@ function PublishPageInner() {
     Record<string, InstagramSelection>
   >({});
   const [selectedTelegramChannels, setSelectedTelegramChannels] = useState<string[]>([]);
+  const [selectedLinkedInAccounts, setSelectedLinkedInAccounts] = useState<string[]>([]);
   // What to send to platforms that cannot take the whole post
   const [contentSelection, setContentSelection] = useState<ContentSelection>({});
 
@@ -165,6 +167,12 @@ function PublishPageInner() {
       setSelectedTelegramChannels(telegramChannels.map((c) => c.channel_id));
     }
   }, [telegramChannels]);
+
+  useEffect(() => {
+    if (linkedinAccounts.length > 0) {
+      setSelectedLinkedInAccounts(linkedinAccounts.map((a) => a.id));
+    }
+  }, [linkedinAccounts]);
 
   // Draft loading state
   const [draftTargets, setDraftTargets] = useState<Platform[] | null>(null);
@@ -237,6 +245,7 @@ function PublishPageInner() {
     setSelectedTelegramChannels(
       draftTargets.includes('telegram') ? telegramChannels.map((c) => c.channel_id) : []
     );
+    setSelectedLinkedInAccounts(draftTargets.includes('linkedin') ? linkedinAccounts.map((a) => a.id) : []);
     const instagram: Record<string, InstagramSelection> = {};
     instagramAccounts.forEach((a) => {
       instagram[a.id] = {
@@ -245,7 +254,7 @@ function PublishPageInner() {
       };
     });
     setSelectedInstagramAccounts(instagram);
-  }, [draftTargets, loading, facebookPages, xAccounts, telegramChannels, instagramAccounts, uploadedMedia.length]);
+  }, [draftTargets, loading, facebookPages, xAccounts, telegramChannels, linkedinAccounts, instagramAccounts, uploadedMedia.length]);
 
   // A published or queued draft is consumed: delete it and drop the ?draft param
   const consumeDraft = useCallback(async () => {
@@ -299,6 +308,14 @@ function PublishPageInner() {
     );
   }, []);
 
+  const handleLinkedInChange = useCallback((accountId: string) => {
+    setSelectedLinkedInAccounts((prev) =>
+      prev.includes(accountId)
+        ? prev.filter((id) => id !== accountId)
+        : [...prev, accountId]
+    );
+  }, []);
+
   const handleContentSelect = useCallback((platform: Platform, kinds: ContentKind[]) => {
     setContentSelection((prev) => ({ ...prev, [platform]: kinds }));
   }, []);
@@ -310,12 +327,13 @@ function PublishPageInner() {
     setSelectedFacebookPages(facebookPages.map((p) => p.page_id));
     setSelectedXAccounts(xAccounts.map((a) => a.id));
     setSelectedTelegramChannels(telegramChannels.map((c) => c.channel_id));
+    setSelectedLinkedInAccounts(linkedinAccounts.map((a) => a.id));
     const resetInstagram: Record<string, InstagramSelection> = {};
     instagramAccounts.forEach((a) => {
       resetInstagram[a.id] = { publish: false, story: false };
     });
     setSelectedInstagramAccounts(resetInstagram);
-  }, [facebookPages, xAccounts, instagramAccounts, telegramChannels]);
+  }, [facebookPages, xAccounts, instagramAccounts, telegramChannels, linkedinAccounts]);
 
   const handleHidePublishing = useCallback(() => {
     setPublishingHidden(true);
@@ -334,6 +352,7 @@ function PublishPageInner() {
       selectedXAccounts,
       selectedInstagramAccounts,
       selectedTelegramChannels,
+      selectedLinkedInAccounts,
       contentSelection,
     });
 
@@ -360,6 +379,7 @@ function PublishPageInner() {
       selectedXAccounts.length > 0 ? 'twitter' : null,
       Object.values(selectedInstagramAccounts).some((s) => s.publish || s.story) ? 'instagram' : null,
       selectedTelegramChannels.length > 0 ? 'telegram' : null,
+      selectedLinkedInAccounts.length > 0 ? 'linkedin' : null,
     ].filter(Boolean);
 
     try {
@@ -406,13 +426,14 @@ function PublishPageInner() {
   const charCount = postText.length;
   const showTwitterWarning = charCount > TWITTER_CHAR_LIMIT && selectedXAccounts.length > 0;
   const hasAnyAccount =
-    facebookPages.length > 0 || xAccounts.length > 0 || instagramAccounts.length > 0 || telegramChannels.length > 0;
+    facebookPages.length > 0 || xAccounts.length > 0 || instagramAccounts.length > 0 || telegramChannels.length > 0 || linkedinAccounts.length > 0;
   const kinds = contentKinds(postText, uploadedMedia);
   const selectedPerPlatform: Record<Platform, number> = {
     facebook: selectedFacebookPages.length,
     twitter: selectedXAccounts.length,
     instagram: Object.values(selectedInstagramAccounts).filter((s) => s.publish || s.story).length,
     telegram: selectedTelegramChannels.length,
+    linkedin: selectedLinkedInAccounts.length,
   };
   const platforms = Object.keys(selectedPerPlatform) as Platform[];
   // Selected destinations whose platform can take the post (or has a choice made)
@@ -623,7 +644,7 @@ function PublishPageInner() {
                 No accounts connected
               </Typography>
               <Typography variant="body1" color="text.secondary">
-                Head to the Dashboard to connect your Facebook, Instagram, X, and Telegram accounts.
+                Head to the Dashboard to connect your Facebook, Instagram, X, Telegram, and LinkedIn accounts.
               </Typography>
             </Paper>
           </Fade>
@@ -676,14 +697,17 @@ function PublishPageInner() {
                   xAccounts={xAccounts}
                   instagramAccounts={instagramAccounts}
                   telegramChannels={telegramChannels}
+                  linkedinAccounts={linkedinAccounts}
                   selectedFacebookPages={selectedFacebookPages}
                   selectedXAccounts={selectedXAccounts}
                   selectedInstagramAccounts={selectedInstagramAccounts}
                   selectedTelegramChannels={selectedTelegramChannels}
+                  selectedLinkedInAccounts={selectedLinkedInAccounts}
                   onFacebookChange={handleFacebookChange}
                   onXChange={handleXChange}
                   onInstagramChange={handleInstagramChange}
                   onTelegramChange={handleTelegramChange}
+                  onLinkedInChange={handleLinkedInChange}
                   contentKinds={kinds}
                   contentSelection={contentSelection}
                   onContentSelect={handleContentSelect}

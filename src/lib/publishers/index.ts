@@ -6,3 +6,6 @@ export type { TwitterAccountTokenV1, TwitterPublishResult, TwitterPublishError }
 
 export { TelegramPublisher } from './telegram';
 export type { TelegramChannelToken, TelegramPublishResult, TelegramPublishError, TelegramPublishOptions } from './telegram';
+
+export { LinkedInPublisher } from './linkedin';
+export type { LinkedInAccountToken, LinkedInPublishResult, LinkedInPublishError, LinkedInPublishOptions } from './linkedin';

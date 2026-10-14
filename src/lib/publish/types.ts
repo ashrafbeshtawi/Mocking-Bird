@@ -24,6 +24,7 @@ export interface PublishRequest {
   instagramPublishAccounts: string[];
   instagramStoryAccounts: string[];
   telegramChannels: string[];
+  linkedinAccounts: string[];
   cloudinaryMedia: CloudinaryMediaInfo[];
   /** Per platform, which kinds of the post to send; a platform without an entry gets everything. */
   contentSelection: ContentSelection;
@@ -78,4 +79,5 @@ export interface MissingAccounts {
   twitter: string[];
   instagram: string[];
   telegram: string[];
+  linkedin: string[];
 }

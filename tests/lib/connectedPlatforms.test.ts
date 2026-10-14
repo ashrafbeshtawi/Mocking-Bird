@@ -27,7 +27,7 @@ describe('getConnectedPlatformTypes', () => {
     const result = await getConnectedPlatformTypes(42);
 
     expect(result).toEqual(['twitter', 'telegram']);
-    expect(mockQuery).toHaveBeenCalledTimes(4);
+    expect(mockQuery).toHaveBeenCalledTimes(5);
     expect(mockQuery.mock.calls[0][1]).toEqual([42]);
   });
 

@@ -16,7 +16,7 @@ const logger = createLogger('ReportService');
  * Represents a publish destination for storage
  */
 export interface PublishDestination {
-  platform: 'facebook' | 'twitter' | 'instagram' | 'telegram';
+  platform: 'facebook' | 'twitter' | 'instagram' | 'telegram' | 'linkedin';
   account_id: string;
   account_name?: string;
   post_type?: 'feed' | 'story';
@@ -33,7 +33,7 @@ function normalizePlatform(platform: string): PublishDestination['platform'] {
   if (normalized === 'x' || normalized === 'twitter') {
     return 'twitter';
   }
-  if (normalized === 'facebook' || normalized === 'instagram' || normalized === 'telegram') {
+  if (normalized === 'facebook' || normalized === 'instagram' || normalized === 'telegram' || normalized === 'linkedin') {
     return normalized as PublishDestination['platform'];
   }
   // Default fallback - log unknown platforms

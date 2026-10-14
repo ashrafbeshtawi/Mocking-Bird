@@ -35,6 +35,13 @@ describe('fitContent', () => {
       status: 'partial',
       options: [['image'], ['video']],
     });
+    expect(fitContent('linkedin', ['text', 'image', 'video'])).toEqual({
+      status: 'partial',
+      options: [
+        ['text', 'image'],
+        ['text', 'video'],
+      ],
+    });
   });
 
   it('rejects text-only on Instagram and accepts media with a caption', () => {

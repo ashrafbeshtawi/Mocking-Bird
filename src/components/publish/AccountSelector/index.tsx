@@ -20,6 +20,7 @@ import type {
   ConnectedXAccount,
   InstagramAccount,
   TelegramChannel,
+  LinkedInAccount,
   InstagramSelection,
   Platform,
 } from '@/types/accounts';
@@ -29,14 +30,17 @@ interface AccountSelectorProps {
   xAccounts: ConnectedXAccount[];
   instagramAccounts: InstagramAccount[];
   telegramChannels: TelegramChannel[];
+  linkedinAccounts: LinkedInAccount[];
   selectedFacebookPages: string[];
   selectedXAccounts: string[];
   selectedInstagramAccounts: Record<string, InstagramSelection>;
   selectedTelegramChannels: string[];
+  selectedLinkedInAccounts: string[];
   onFacebookChange: (pageId: string) => void;
   onXChange: (accountId: string) => void;
   onInstagramChange: (accountId: string, type: 'publish' | 'story') => void;
   onTelegramChange: (channelId: string) => void;
+  onLinkedInChange: (accountId: string) => void;
   /** Kinds present in the post; drives the per-row fit badges. */
   contentKinds: ContentKind[];
   contentSelection: ContentSelection;
@@ -48,14 +52,17 @@ export function AccountSelector({
   xAccounts,
   instagramAccounts,
   telegramChannels,
+  linkedinAccounts,
   selectedFacebookPages,
   selectedXAccounts,
   selectedInstagramAccounts,
   selectedTelegramChannels,
+  selectedLinkedInAccounts,
   onFacebookChange,
   onXChange,
   onInstagramChange,
   onTelegramChange,
+  onLinkedInChange,
   contentKinds,
   contentSelection,
   onContentSelect,
@@ -73,7 +80,8 @@ export function AccountSelector({
     facebookPages.length > 0 ||
     xAccounts.length > 0 ||
     instagramAccounts.length > 0 ||
-    telegramChannels.length > 0;
+    telegramChannels.length > 0 ||
+    linkedinAccounts.length > 0;
 
   if (!hasAnyAccount) {
     return (
@@ -324,6 +332,57 @@ export function AccountSelector({
                   edge="end"
                   checked={isSelected}
                   onChange={() => onTelegramChange(channel.channel_id)}
+                  sx={{
+                    color: 'grey.400',
+                    '&.Mui-checked': { color: config.color },
+                  }}
+                />
+              </ListItemSecondaryAction>
+            </ListItem>
+          );
+        })}
+
+        {/* LinkedIn Accounts */}
+        {linkedinAccounts.map((account) => {
+          const config = PLATFORM_CONFIG.linkedin;
+          const Icon = config.icon;
+          const isSelected = selectedLinkedInAccounts.includes(account.id);
+
+          return (
+            <ListItem
+              key={`li-${account.id}`}
+              sx={{
+                py: 1,
+                px: 1.5,
+                borderRadius: 2,
+                mb: 0.5,
+                cursor: 'pointer',
+                transition: 'background-color 0.2s',
+                bgcolor: isSelected ? `${config.color}10` : 'transparent',
+                '&:hover': {
+                  bgcolor: isSelected ? `${config.color}15` : 'action.hover',
+                },
+              }}
+              onClick={() => onLinkedInChange(account.id)}
+            >
+              <ListItemIcon sx={{ minWidth: 40 }}>
+                <Icon sx={{ color: config.color, fontSize: 24 }} />
+              </ListItemIcon>
+              <ListItemText
+                primary={
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <Typography variant="body2" fontWeight={500}>
+                      {account.name}
+                    </Typography>
+                    {badge('linkedin')}
+                  </Box>
+                }
+              />
+              <ListItemSecondaryAction>
+                <Checkbox
+                  edge="end"
+                  checked={isSelected}
+                  onChange={() => onLinkedInChange(account.id)}
                   sx={{
                     color: 'grey.400',
                     '&.Mui-checked': { color: config.color },

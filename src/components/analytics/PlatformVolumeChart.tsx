@@ -14,6 +14,7 @@ const PLATFORM_COLORS: Record<string, string> = {
   twitter: '#1da1f2',
   instagram: '#E1306C',
   telegram: '#0088cc',
+  linkedin: '#0a66c2',
 };
 
 export function PlatformVolumeChart({ data, loading }: PlatformVolumeChartProps) {

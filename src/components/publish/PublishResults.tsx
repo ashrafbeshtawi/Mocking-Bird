@@ -20,6 +20,7 @@ import FacebookIcon from '@mui/icons-material/Facebook';
 import InstagramIcon from '@mui/icons-material/Instagram';
 import XIcon from '@mui/icons-material/X';
 import TelegramIcon from '@mui/icons-material/Telegram';
+import LinkedInIcon from '@mui/icons-material/LinkedIn';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
 import CelebrationIcon from '@mui/icons-material/Celebration';
@@ -55,6 +56,7 @@ const PLATFORM_CONFIG: Record<string, { icon: React.ElementType; color: string; 
   instagram: { icon: InstagramIcon, color: '#E1306C', label: 'Instagram' },
   x: { icon: XIcon, color: '#000000', label: 'X (Twitter)' },
   telegram: { icon: TelegramIcon, color: '#0088cc', label: 'Telegram' },
+  linkedin: { icon: LinkedInIcon, color: '#0a66c2', label: 'LinkedIn' },
 };
 
 export function PublishResults({ error, success, results, onClose }: PublishResultsProps) {
@@ -68,6 +70,7 @@ export function PublishResults({ error, success, results, onClose }: PublishResu
         const postType = item.post_type === 'story' ? 'Story' : 'Feed';
         return `${item.instagram_account_id || 'Account'} (${postType})`;
       case 'x':
+      case 'linkedin':
         return item.account_id || 'Account';
       case 'telegram':
         return item.telegram_channel_id || 'Channel';

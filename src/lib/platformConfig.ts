@@ -2,6 +2,7 @@ import FacebookIcon from '@mui/icons-material/Facebook';
 import InstagramIcon from '@mui/icons-material/Instagram';
 import XIcon from '@mui/icons-material/X';
 import TelegramIcon from '@mui/icons-material/Telegram';
+import LinkedInIcon from '@mui/icons-material/LinkedIn';
 import type { SvgIconComponent } from '@mui/icons-material';
 import type { Platform } from '@/types/accounts';
 
@@ -33,6 +34,11 @@ export const PLATFORM_CONFIG: Record<Platform, PlatformConfig> = {
     label: 'Telegram',
     icon: TelegramIcon,
     color: '#0088cc',
+  },
+  linkedin: {
+    label: 'LinkedIn',
+    icon: LinkedInIcon,
+    color: '#0a66c2',
   },
 };
 

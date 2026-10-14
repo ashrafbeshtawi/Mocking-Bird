@@ -103,7 +103,6 @@ export function PostComposer({
         slotProps={{
           input: {
             style: { fontSize: '1.1rem' },
-            sx: { textAlign: 'right', direction: 'rtl' },
           },
         }}
       />

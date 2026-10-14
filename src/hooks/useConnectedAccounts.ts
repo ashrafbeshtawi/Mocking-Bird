@@ -7,6 +7,7 @@ import type {
   ConnectedXAccount,
   InstagramAccount,
   TelegramChannel,
+  LinkedInAccount,
   AccountData,
 } from '@/types/accounts';
 
@@ -16,12 +17,14 @@ interface UseConnectedAccountsReturn {
   xAccounts: ConnectedXAccount[];
   instagramAccounts: InstagramAccount[];
   telegramChannels: TelegramChannel[];
+  linkedinAccounts: LinkedInAccount[];
   // Normalized data for dashboard
   normalizedAccounts: {
     facebook: AccountData[];
     instagram: AccountData[];
     twitter: AccountData[];
     telegram: AccountData[];
+    linkedin: AccountData[];
   };
   // State
   loading: boolean;
@@ -35,6 +38,7 @@ export function useConnectedAccounts(): UseConnectedAccountsReturn {
   const [xAccounts, setXAccounts] = useState<ConnectedXAccount[]>([]);
   const [instagramAccounts, setInstagramAccounts] = useState<InstagramAccount[]>([]);
   const [telegramChannels, setTelegramChannels] = useState<TelegramChannel[]>([]);
+  const [linkedinAccounts, setLinkedinAccounts] = useState<LinkedInAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,11 +47,12 @@ export function useConnectedAccounts(): UseConnectedAccountsReturn {
     setError(null);
 
     try {
-      const [fbRes, instaRes, twitterRes, telegramRes] = await Promise.allSettled([
+      const [fbRes, instaRes, twitterRes, telegramRes, linkedinRes] = await Promise.allSettled([
         fetchWithAuth('/api/facebook/get-pages'),
         fetchWithAuth('/api/instagram'),
         fetchWithAuth('/api/twitter-v1.1/get-accounts'),
         fetchWithAuth('/api/telegram/get-channels'),
+        fetchWithAuth('/api/linkedin/get-accounts'),
       ]);
 
       // Process Facebook pages
@@ -80,6 +85,14 @@ export function useConnectedAccounts(): UseConnectedAccountsReturn {
         setTelegramChannels(data.channels || []);
       } else {
         setTelegramChannels([]);
+      }
+
+      // Process LinkedIn accounts
+      if (linkedinRes.status === 'fulfilled' && linkedinRes.value.ok) {
+        const data = await linkedinRes.value.json();
+        setLinkedinAccounts(data.accounts || []);
+      } else {
+        setLinkedinAccounts([]);
       }
     } catch (err) {
       console.error('Error fetching accounts:', err);
@@ -116,13 +129,20 @@ export function useConnectedAccounts(): UseConnectedAccountsReturn {
       details: c.channel_username ? `@${c.channel_username}` : undefined,
       platform: 'telegram' as const,
     })),
-  }), [facebookPages, instagramAccounts, xAccounts, telegramChannels]);
+    linkedin: linkedinAccounts.map((a) => ({
+      id: a.id,
+      name: a.name,
+      details: new Date(a.expiresAt) <= new Date() ? 'Expired, reconnect' : undefined,
+      platform: 'linkedin' as const,
+    })),
+  }), [facebookPages, instagramAccounts, xAccounts, telegramChannels, linkedinAccounts]);
 
   return {
     facebookPages,
     xAccounts,
     instagramAccounts,
     telegramChannels,
+    linkedinAccounts,
     normalizedAccounts,
     loading,
     error,

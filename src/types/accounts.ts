@@ -1,8 +1,8 @@
 // Account types for social media platforms
 
-export type Platform = 'facebook' | 'instagram' | 'twitter' | 'telegram';
+export type Platform = 'facebook' | 'instagram' | 'twitter' | 'telegram' | 'linkedin';
 
-export const PLATFORMS: readonly Platform[] = ['facebook', 'instagram', 'twitter', 'telegram'];
+export const PLATFORMS: readonly Platform[] = ['facebook', 'instagram', 'twitter', 'telegram', 'linkedin'];
 
 // Facebook page from API
 export interface ConnectedPage {
@@ -14,6 +14,13 @@ export interface ConnectedPage {
 export interface ConnectedXAccount {
   id: string;
   name: string;
+}
+
+// LinkedIn account from API
+export interface LinkedInAccount {
+  id: string;
+  name: string;
+  expiresAt: string;
 }
 
 // Instagram account from API
@@ -49,6 +56,7 @@ export const API_CONFIG: Record<Platform, ApiConfig> = {
   instagram: { deleteUrl: '/api/instagram', idParamName: 'instagram_account_id' },
   twitter: { deleteUrl: '/api/twitter-v1.1/delete-account', idParamName: 'x_user_id' },
   telegram: { deleteUrl: '/api/telegram/delete-channel', idParamName: 'channel_id' },
+  linkedin: { deleteUrl: '/api/linkedin/delete-account', idParamName: 'linkedin_user_id' },
 };
 
 // Twitter character limit

@@ -64,11 +64,11 @@ export async function POST(req: NextRequest) {
         return;
       }
 
-      const { text, facebookPages, xAccounts, instagramPublishAccounts, instagramStoryAccounts, telegramChannels, cloudinaryMedia, contentSelection } = parseResult.data;
+      const { text, facebookPages, xAccounts, instagramPublishAccounts, instagramStoryAccounts, telegramChannels, linkedinAccounts, cloudinaryMedia, contentSelection } = parseResult.data;
       reportLogger.add(`Request payload parsed`);
 
       // Validate text content
-      const hasAnyAccount = facebookPages.length > 0 || xAccounts.length > 0 || instagramPublishAccounts.length > 0 || instagramStoryAccounts.length > 0 || telegramChannels.length > 0;
+      const hasAnyAccount = facebookPages.length > 0 || xAccounts.length > 0 || instagramPublishAccounts.length > 0 || instagramStoryAccounts.length > 0 || telegramChannels.length > 0 || linkedinAccounts.length > 0;
       const textValidation = validateTextContent(text, cloudinaryMedia.length > 0, hasAnyAccount);
       if (!textValidation.success) {
         await sendEvent('error', { message: textValidation.error });
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Validate account arrays
-      const accountValidation = validateAccountArrays(facebookPages, xAccounts, instagramPublishAccounts, instagramStoryAccounts, telegramChannels);
+      const accountValidation = validateAccountArrays(facebookPages, xAccounts, instagramPublishAccounts, instagramStoryAccounts, telegramChannels, linkedinAccounts);
       if (!accountValidation.success) {
         await sendEvent('error', { message: accountValidation.error });
         await writer.close();
@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
       });
 
       // Fetch tokens
-      const { facebookTokens, twitterTokens, instagramFeedTokens, instagramStoryTokens, telegramTokens } = await fetchAllTokens(
+      const { facebookTokens, twitterTokens, instagramFeedTokens, instagramStoryTokens, telegramTokens, linkedinTokens } = await fetchAllTokens(
         pool,
         userId,
         facebookPages,
@@ -119,6 +119,7 @@ export async function POST(req: NextRequest) {
         instagramPublishAccounts,
         instagramStoryAccounts,
         telegramChannels,
+        linkedinAccounts,
         reportLogger
       );
 
@@ -127,7 +128,7 @@ export async function POST(req: NextRequest) {
       const allInstagramTokens = [...instagramFeedTokens, ...instagramStoryTokens].filter(
         (token, index, self) => index === self.findIndex(t => t.instagram_account_id === token.instagram_account_id)
       );
-      const missing = validateMissingAccounts(facebookPages, xAccounts, allInstagramAccountIds, telegramChannels, facebookTokens, twitterTokens, allInstagramTokens, telegramTokens);
+      const missing = validateMissingAccounts(facebookPages, xAccounts, allInstagramAccountIds, telegramChannels, facebookTokens, twitterTokens, allInstagramTokens, telegramTokens, linkedinAccounts, linkedinTokens);
       if (hasMissingAccounts(missing)) {
         const missingAccounts = formatMissingAccounts(missing);
         await sendEvent('error', {
@@ -166,6 +167,7 @@ export async function POST(req: NextRequest) {
         instagramFeedTokens,
         instagramStoryTokens,
         telegramTokens,
+        linkedinTokens,
         reportLogger,
         contentSelection,
         onProgress,

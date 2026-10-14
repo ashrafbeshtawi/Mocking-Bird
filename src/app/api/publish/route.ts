@@ -34,11 +34,11 @@ export async function POST(req: Request) {
       return buildErrorResponse(reportLogger.getReport(), 400, parseResult.error || 'Failed to parse request');
     }
 
-    const { text, facebookPages, xAccounts, instagramPublishAccounts, instagramStoryAccounts, telegramChannels, cloudinaryMedia, contentSelection } = parseResult.data;
-    reportLogger.add(`Request payload parsed. Text length: ${text?.length || 0}, Facebook pages: ${facebookPages?.length || 0}, X accounts: ${xAccounts?.length || 0}, Instagram feed: ${instagramPublishAccounts?.length || 0}, Instagram stories: ${instagramStoryAccounts?.length || 0}, Telegram channels: ${telegramChannels?.length || 0}, Cloudinary media: ${cloudinaryMedia?.length || 0}`);
+    const { text, facebookPages, xAccounts, instagramPublishAccounts, instagramStoryAccounts, telegramChannels, linkedinAccounts, cloudinaryMedia, contentSelection } = parseResult.data;
+    reportLogger.add(`Request payload parsed. Text length: ${text?.length || 0}, Facebook pages: ${facebookPages?.length || 0}, X accounts: ${xAccounts?.length || 0}, Instagram feed: ${instagramPublishAccounts?.length || 0}, Instagram stories: ${instagramStoryAccounts?.length || 0}, Telegram channels: ${telegramChannels?.length || 0}, LinkedIn accounts: ${linkedinAccounts?.length || 0}, Cloudinary media: ${cloudinaryMedia?.length || 0}`);
 
     // 3. Validate text content
-    const hasAnyAccount = facebookPages.length > 0 || xAccounts.length > 0 || instagramPublishAccounts.length > 0 || instagramStoryAccounts.length > 0 || telegramChannels.length > 0;
+    const hasAnyAccount = facebookPages.length > 0 || xAccounts.length > 0 || instagramPublishAccounts.length > 0 || instagramStoryAccounts.length > 0 || telegramChannels.length > 0 || linkedinAccounts.length > 0;
     const textValidation = validateTextContent(text, cloudinaryMedia.length > 0, hasAnyAccount);
     if (!textValidation.success) {
       reportLogger.add(`WARN: Invalid text input and no media files. Text: ${text?.substring(0, 100)}`);
@@ -60,7 +60,7 @@ export async function POST(req: Request) {
     }
 
     // 4. Validate account arrays
-    const accountValidation = validateAccountArrays(facebookPages, xAccounts, instagramPublishAccounts, instagramStoryAccounts, telegramChannels);
+    const accountValidation = validateAccountArrays(facebookPages, xAccounts, instagramPublishAccounts, instagramStoryAccounts, telegramChannels, linkedinAccounts);
     if (!accountValidation.success) {
       reportLogger.add(`WARN: ${accountValidation.error}`);
       return await buildAndSaveResponse({
@@ -103,7 +103,7 @@ export async function POST(req: Request) {
     }
 
     // 6. Fetch tokens
-    const { facebookTokens, twitterTokens, instagramFeedTokens, instagramStoryTokens, telegramTokens } = await fetchAllTokens(
+    const { facebookTokens, twitterTokens, instagramFeedTokens, instagramStoryTokens, telegramTokens, linkedinTokens } = await fetchAllTokens(
       pool,
       userId,
       facebookPages,
@@ -111,6 +111,7 @@ export async function POST(req: Request) {
       instagramPublishAccounts,
       instagramStoryAccounts,
       telegramChannels,
+      linkedinAccounts,
       reportLogger
     );
 
@@ -119,7 +120,7 @@ export async function POST(req: Request) {
     const allInstagramTokens = [...instagramFeedTokens, ...instagramStoryTokens].filter(
       (token, index, self) => index === self.findIndex(t => t.instagram_account_id === token.instagram_account_id)
     );
-    const missing = validateMissingAccounts(facebookPages, xAccounts, allInstagramAccountIds, telegramChannels, facebookTokens, twitterTokens, allInstagramTokens, telegramTokens);
+    const missing = validateMissingAccounts(facebookPages, xAccounts, allInstagramAccountIds, telegramChannels, facebookTokens, twitterTokens, allInstagramTokens, telegramTokens, linkedinAccounts, linkedinTokens);
     if (hasMissingAccounts(missing)) {
       const missingAccounts = formatMissingAccounts(missing);
       reportLogger.add(`ERROR: Missing accounts detected. Details: ${missingAccounts.join(', ')}`);
@@ -147,6 +148,7 @@ export async function POST(req: Request) {
       instagramFeedTokens,
       instagramStoryTokens,
       telegramTokens,
+      linkedinTokens,
       reportLogger,
       contentSelection
     });

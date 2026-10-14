@@ -35,6 +35,7 @@ interface PublishParams {
   selectedXAccounts: string[];
   selectedInstagramAccounts: Record<string, InstagramSelection>;
   selectedTelegramChannels: string[];
+  selectedLinkedInAccounts: string[];
   /** What the user chose to send to platforms that cannot take the whole post. */
   contentSelection?: ContentSelection;
 }
@@ -141,6 +142,7 @@ export function usePublish(): UsePublishReturn {
         twitter: params.selectedXAccounts.length > 0,
         instagram: Object.values(params.selectedInstagramAccounts).some((s) => s.publish || s.story),
         telegram: params.selectedTelegramChannels.length > 0,
+        linkedin: params.selectedLinkedInAccounts.length > 0,
       };
       const undecided = (Object.keys(isSelected) as Platform[]).filter(
         (platform) => isSelected[platform] && needsChoice(platform, kinds, params.contentSelection?.[platform])
@@ -164,6 +166,7 @@ export function usePublish(): UsePublishReturn {
       const selectedXAccounts = isSendable('twitter') ? params.selectedXAccounts : [];
       const selectedInstagramAccounts = isSendable('instagram') ? params.selectedInstagramAccounts : {};
       const selectedTelegramChannels = isSendable('telegram') ? params.selectedTelegramChannels : [];
+      const selectedLinkedInAccounts = isSendable('linkedin') ? params.selectedLinkedInAccounts : [];
 
       // Validation
       const hasInstagramSelection = Object.values(selectedInstagramAccounts).some(
@@ -174,7 +177,8 @@ export function usePublish(): UsePublishReturn {
         selectedFacebookPages.length === 0 &&
         selectedXAccounts.length === 0 &&
         !hasInstagramSelection &&
-        selectedTelegramChannels.length === 0
+        selectedTelegramChannels.length === 0 &&
+        selectedLinkedInAccounts.length === 0
       ) {
         setError({ message: 'Please select at least one page or account to publish to.' });
         setIsPublishing(false);
@@ -210,6 +214,7 @@ export function usePublish(): UsePublishReturn {
         instagramPublishAccounts,
         instagramStoryAccounts,
         telegramChannels: selectedTelegramChannels,
+        linkedinAccounts: selectedLinkedInAccounts,
         contentSelection,
         // Send Cloudinary media info instead of raw files
         cloudinaryMedia: uploadedMedia.map((media) => ({

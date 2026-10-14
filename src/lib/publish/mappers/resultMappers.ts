@@ -10,6 +10,7 @@ import {
   TelegramFailedItem,
   TelegramSuccessItem
 } from '@/types/interfaces';
+import type { LinkedInPublishResult, LinkedInPublishError } from '@/lib/publishers/linkedin';
 
 /**
  * Maps Facebook failed items to standardized FailedPublishResult
@@ -134,6 +135,28 @@ export function mapTelegramSuccess(successful: TelegramSuccessItem[]): Successfu
     platform: item.platform,
     telegram_channel_id: item.channel_id,
     telegram_message_id: item.message_id.toString()
+  }));
+}
+
+/**
+ * Maps LinkedIn failed items to standardized FailedPublishResult
+ */
+export function mapLinkedInFailed(failed: LinkedInPublishError[]): FailedPublishResult[] {
+  return failed.map(item => ({
+    platform: item.platform,
+    account_id: item.account_id,
+    error: { message: item.error.message, code: item.error.code }
+  }));
+}
+
+/**
+ * Maps LinkedIn successful items to standardized SuccessfulPublishResult
+ */
+export function mapLinkedInSuccess(successful: LinkedInPublishResult[]): SuccessfulPublishResult[] {
+  return successful.map(item => ({
+    platform: item.platform,
+    account_id: item.account_id,
+    post_id: item.post_id
   }));
 }
 

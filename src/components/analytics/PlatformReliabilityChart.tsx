@@ -5,6 +5,7 @@ import FacebookIcon from '@mui/icons-material/Facebook';
 import TwitterIcon from '@mui/icons-material/Twitter';
 import InstagramIcon from '@mui/icons-material/Instagram';
 import TelegramIcon from '@mui/icons-material/Telegram';
+import LinkedInIcon from '@mui/icons-material/LinkedIn';
 import type { PlatformReliability } from '@/types/analytics';
 
 interface PlatformReliabilityChartProps {
@@ -17,6 +18,7 @@ const PLATFORM_CONFIG: Record<string, { icon: typeof FacebookIcon; color: string
   twitter: { icon: TwitterIcon, color: '#1da1f2', label: 'Twitter' },
   instagram: { icon: InstagramIcon, color: '#E1306C', label: 'Instagram' },
   telegram: { icon: TelegramIcon, color: '#0088cc', label: 'Telegram' },
+  linkedin: { icon: LinkedInIcon, color: '#0a66c2', label: 'LinkedIn' },
 };
 
 function getReliabilityColor(rate: number): string {
