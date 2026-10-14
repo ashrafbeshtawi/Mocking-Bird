@@ -4,7 +4,8 @@ jest.mock('@/lib/cloudinary/clientUpload', () => ({
   uploadToCloudinaryClient: jest.fn(),
 }));
 
-import { render, screen } from '@testing-library/react';
+import { render, screen, within, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { getCloudinaryClientConfig } from '@/lib/cloudinary/clientUpload';
 import { MediaUploader } from '@/components/publish/MediaUploader';
 
@@ -28,5 +29,27 @@ describe('MediaUploader', () => {
 
     expect(await screen.findByRole('button')).toBeInTheDocument();
     expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('opens a full-size preview of an uploaded image and closes it', async () => {
+    mockConfig.mockResolvedValue({ cloudName: 'mycloud', uploadPreset: 'preset' });
+    const user = userEvent.setup();
+    const media = {
+      publicId: 'p1',
+      publicUrl: 'https://cdn/cat.jpg',
+      resourceType: 'image' as const,
+      format: 'jpg',
+      originalFilename: 'cat.jpg',
+      previewUrl: 'https://cdn/cat.jpg',
+    };
+
+    render(<MediaUploader uploadedMedia={[media]} onMediaChange={jest.fn()} />);
+
+    await user.click(await screen.findByRole('button', { name: 'Preview cat.jpg' }));
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByRole('img', { name: 'cat.jpg' })).toHaveAttribute('src', 'https://cdn/cat.jpg');
+
+    await user.click(within(dialog).getByRole('button', { name: 'Close preview' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 });
