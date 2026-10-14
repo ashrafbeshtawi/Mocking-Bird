@@ -1,11 +1,11 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { Box, Button, LinearProgress, Typography, Alert, Dialog, IconButton } from '@mui/material';
+import { Box, Button, LinearProgress, Typography, Alert } from '@mui/material';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
 import CloudDoneIcon from '@mui/icons-material/CloudDone';
-import CloseIcon from '@mui/icons-material/Close';
 import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
+import { MediaPreviewDialog } from '@/components/publish/MediaPreviewDialog';
 import {
   uploadToCloudinaryClient,
   getCloudinaryClientConfig,
@@ -309,28 +309,10 @@ export function MediaUploader({ uploadedMedia, onMediaChange, onUploadingChange 
         </Box>
       )}
 
-      <Dialog open={!!preview} onClose={() => setPreview(null)} maxWidth="lg">
-        {preview && (
-          <Box sx={{ position: 'relative', bgcolor: 'black', lineHeight: 0 }}>
-            <IconButton
-              onClick={() => setPreview(null)}
-              aria-label="Close preview"
-              sx={{ position: 'absolute', top: 8, right: 8, zIndex: 1, color: 'white', bgcolor: 'rgba(0,0,0,0.5)' }}
-            >
-              <CloseIcon />
-            </IconButton>
-            {preview.resourceType === 'video' ? (
-              <video src={preview.previewUrl} controls autoPlay style={{ maxWidth: '90vw', maxHeight: '85vh' }} />
-            ) : (
-              <img
-                src={preview.previewUrl}
-                alt={preview.originalFilename}
-                style={{ maxWidth: '90vw', maxHeight: '85vh', objectFit: 'contain' }}
-              />
-            )}
-          </Box>
-        )}
-      </Dialog>
+      <MediaPreviewDialog
+        media={preview && { url: preview.previewUrl, resourceType: preview.resourceType, name: preview.originalFilename }}
+        onClose={() => setPreview(null)}
+      />
     </Box>
   );
 }
