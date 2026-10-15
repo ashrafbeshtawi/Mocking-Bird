@@ -22,6 +22,7 @@ import type {
   TelegramChannel,
   LinkedInAccount,
   YouTubeChannel,
+  TikTokAccount,
   InstagramSelection,
   Platform,
 } from '@/types/accounts';
@@ -33,18 +34,21 @@ interface AccountSelectorProps {
   telegramChannels: TelegramChannel[];
   linkedinAccounts: LinkedInAccount[];
   youtubeChannels: YouTubeChannel[];
+  tiktokAccounts: TikTokAccount[];
   selectedFacebookPages: string[];
   selectedXAccounts: string[];
   selectedInstagramAccounts: Record<string, InstagramSelection>;
   selectedTelegramChannels: string[];
   selectedLinkedInAccounts: string[];
   selectedYouTubeChannels: string[];
+  selectedTikTokAccounts: string[];
   onFacebookChange: (pageId: string) => void;
   onXChange: (accountId: string) => void;
   onInstagramChange: (accountId: string, type: 'publish' | 'story') => void;
   onTelegramChange: (channelId: string) => void;
   onLinkedInChange: (accountId: string) => void;
   onYouTubeChange: (channelId: string) => void;
+  onTikTokChange: (openId: string) => void;
   /** Kinds present in the post; drives the per-row fit badges. */
   contentKinds: ContentKind[];
   contentSelection: ContentSelection;
@@ -58,18 +62,21 @@ export function AccountSelector({
   telegramChannels,
   linkedinAccounts,
   youtubeChannels,
+  tiktokAccounts,
   selectedFacebookPages,
   selectedXAccounts,
   selectedInstagramAccounts,
   selectedTelegramChannels,
   selectedLinkedInAccounts,
   selectedYouTubeChannels,
+  selectedTikTokAccounts,
   onFacebookChange,
   onXChange,
   onInstagramChange,
   onTelegramChange,
   onLinkedInChange,
   onYouTubeChange,
+  onTikTokChange,
   contentKinds,
   contentSelection,
   onContentSelect,
@@ -89,7 +96,8 @@ export function AccountSelector({
     instagramAccounts.length > 0 ||
     telegramChannels.length > 0 ||
     linkedinAccounts.length > 0 ||
-    youtubeChannels.length > 0;
+    youtubeChannels.length > 0 ||
+    tiktokAccounts.length > 0;
 
   if (!hasAnyAccount) {
     return (
@@ -441,6 +449,56 @@ export function AccountSelector({
                   edge="end"
                   checked={isSelected}
                   onChange={() => onYouTubeChange(channel.id)}
+                  sx={{
+                    color: 'grey.400',
+                    '&.Mui-checked': { color: config.color },
+                  }}
+                />
+              </ListItemSecondaryAction>
+            </ListItem>
+          );
+        })}
+        {/* TikTok Accounts */}
+        {tiktokAccounts.map((account) => {
+          const config = PLATFORM_CONFIG.tiktok;
+          const Icon = config.icon;
+          const isSelected = selectedTikTokAccounts.includes(account.id);
+
+          return (
+            <ListItem
+              key={`tt-${account.id}`}
+              sx={{
+                py: 1,
+                px: 1.5,
+                borderRadius: 2,
+                mb: 0.5,
+                cursor: 'pointer',
+                transition: 'background-color 0.2s',
+                bgcolor: isSelected ? `${config.color}10` : 'transparent',
+                '&:hover': {
+                  bgcolor: isSelected ? `${config.color}15` : 'action.hover',
+                },
+              }}
+              onClick={() => onTikTokChange(account.id)}
+            >
+              <ListItemIcon sx={{ minWidth: 40 }}>
+                <Icon sx={{ color: config.color, fontSize: 24 }} />
+              </ListItemIcon>
+              <ListItemText
+                primary={
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <Typography variant="body2" fontWeight={500}>
+                      {account.name}
+                    </Typography>
+                    {badge('tiktok')}
+                  </Box>
+                }
+              />
+              <ListItemSecondaryAction>
+                <Checkbox
+                  edge="end"
+                  checked={isSelected}
+                  onChange={() => onTikTokChange(account.id)}
                   sx={{
                     color: 'grey.400',
                     '&.Mui-checked': { color: config.color },

@@ -1,5 +1,6 @@
 import { MediaFile, SuccessfulPublishResult, FailedPublishResult } from '@/types/interfaces';
 import type { ContentSelection } from './contentRules';
+import type { TikTokPostSettings } from '@/lib/tiktok';
 
 /**
  * Cloudinary media info sent from the frontend
@@ -28,6 +29,8 @@ export interface PublishRequest {
   youtubeChannels: string[];
   /** Title for YouTube uploads; blank uses the video's file name. */
   youtubeTitle: string;
+  tiktokAccounts: string[];
+  tiktokSettings: TikTokPostSettings;
   cloudinaryMedia: CloudinaryMediaInfo[];
   /** Per platform, which kinds of the post to send; a platform without an entry gets everything. */
   contentSelection: ContentSelection;
@@ -84,4 +87,5 @@ export interface MissingAccounts {
   telegram: string[];
   linkedin: string[];
   youtube: string[];
+  tiktok: string[];
 }

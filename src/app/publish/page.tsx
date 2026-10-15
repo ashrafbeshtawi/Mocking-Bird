@@ -34,6 +34,8 @@ import { PostComposer } from '@/components/publish/PostComposer';
 import { AccountSelector } from '@/components/publish/AccountSelector';
 import { YouTubeTitleField } from '@/components/publish/YouTubeTitleField';
 import { youtubeTitleError } from '@/lib/youtube';
+import { TikTokSettingsField } from '@/components/publish/TikTokSettingsField';
+import { EMPTY_TIKTOK_SETTINGS, type TikTokPostSettings } from '@/lib/tiktok';
 import { PublishResults } from '@/components/publish/PublishResults';
 import { PageHeader } from '@/components/PageHeader';
 import type { UploadedMedia } from '@/components/publish/MediaUploader';
@@ -67,6 +69,7 @@ function PublishPageInner() {
     telegramChannels,
     linkedinAccounts,
     youtubeChannels,
+    tiktokAccounts,
     loading,
   } = useConnectedAccounts();
 
@@ -125,6 +128,9 @@ function PublishPageInner() {
   const [selectedLinkedInAccounts, setSelectedLinkedInAccounts] = useState<string[]>([]);
   const [selectedYouTubeChannels, setSelectedYouTubeChannels] = useState<string[]>([]);
   const [youtubeTitle, setYoutubeTitle] = useState('');
+  const [selectedTikTokAccounts, setSelectedTikTokAccounts] = useState<string[]>([]);
+  const [tiktokSettings, setTiktokSettings] = useState<TikTokPostSettings>(EMPTY_TIKTOK_SETTINGS);
+  const [isTiktokReady, setIsTiktokReady] = useState(false);
   // What to send to platforms that cannot take the whole post
   const [contentSelection, setContentSelection] = useState<ContentSelection>({});
 
@@ -184,6 +190,12 @@ function PublishPageInner() {
       setSelectedYouTubeChannels(youtubeChannels.map((c) => c.id));
     }
   }, [youtubeChannels]);
+
+  useEffect(() => {
+    if (tiktokAccounts.length > 0) {
+      setSelectedTikTokAccounts(tiktokAccounts.map((a) => a.id));
+    }
+  }, [tiktokAccounts]);
 
   // Draft loading state
   const [draftTargets, setDraftTargets] = useState<Platform[] | null>(null);
@@ -258,6 +270,7 @@ function PublishPageInner() {
     );
     setSelectedLinkedInAccounts(draftTargets.includes('linkedin') ? linkedinAccounts.map((a) => a.id) : []);
     setSelectedYouTubeChannels(draftTargets.includes('youtube') ? youtubeChannels.map((c) => c.id) : []);
+    setSelectedTikTokAccounts(draftTargets.includes('tiktok') ? tiktokAccounts.map((a) => a.id) : []);
     const instagram: Record<string, InstagramSelection> = {};
     instagramAccounts.forEach((a) => {
       instagram[a.id] = {
@@ -266,7 +279,7 @@ function PublishPageInner() {
       };
     });
     setSelectedInstagramAccounts(instagram);
-  }, [draftTargets, loading, facebookPages, xAccounts, telegramChannels, linkedinAccounts, youtubeChannels, instagramAccounts, uploadedMedia.length]);
+  }, [draftTargets, loading, facebookPages, xAccounts, telegramChannels, linkedinAccounts, youtubeChannels, tiktokAccounts, instagramAccounts, uploadedMedia.length]);
 
   // A published or queued draft is consumed: delete it and drop the ?draft param
   const consumeDraft = useCallback(async () => {
@@ -336,6 +349,14 @@ function PublishPageInner() {
     );
   }, []);
 
+  const handleTikTokChange = useCallback((openId: string) => {
+    setSelectedTikTokAccounts((prev) =>
+      prev.includes(openId)
+        ? prev.filter((id) => id !== openId)
+        : [...prev, openId]
+    );
+  }, []);
+
   const handleContentSelect = useCallback((platform: Platform, kinds: ContentKind[]) => {
     setContentSelection((prev) => ({ ...prev, [platform]: kinds }));
   }, []);
@@ -345,17 +366,19 @@ function PublishPageInner() {
     setUploadedMedia([]);
     setContentSelection({});
     setYoutubeTitle('');
+    setTiktokSettings(EMPTY_TIKTOK_SETTINGS);
     setSelectedFacebookPages(facebookPages.map((p) => p.page_id));
     setSelectedXAccounts(xAccounts.map((a) => a.id));
     setSelectedTelegramChannels(telegramChannels.map((c) => c.channel_id));
     setSelectedLinkedInAccounts(linkedinAccounts.map((a) => a.id));
     setSelectedYouTubeChannels(youtubeChannels.map((c) => c.id));
+    setSelectedTikTokAccounts(tiktokAccounts.map((a) => a.id));
     const resetInstagram: Record<string, InstagramSelection> = {};
     instagramAccounts.forEach((a) => {
       resetInstagram[a.id] = { publish: false, story: false };
     });
     setSelectedInstagramAccounts(resetInstagram);
-  }, [facebookPages, xAccounts, instagramAccounts, telegramChannels, linkedinAccounts, youtubeChannels]);
+  }, [facebookPages, xAccounts, instagramAccounts, telegramChannels, linkedinAccounts, youtubeChannels, tiktokAccounts]);
 
   const handleHidePublishing = useCallback(() => {
     setPublishingHidden(true);
@@ -377,6 +400,8 @@ function PublishPageInner() {
       selectedLinkedInAccounts,
       selectedYouTubeChannels,
       youtubeTitle,
+      selectedTikTokAccounts,
+      tiktokSettings,
       contentSelection,
     });
 
@@ -405,6 +430,7 @@ function PublishPageInner() {
       selectedTelegramChannels.length > 0 ? 'telegram' : null,
       selectedLinkedInAccounts.length > 0 ? 'linkedin' : null,
       selectedYouTubeChannels.length > 0 ? 'youtube' : null,
+      selectedTikTokAccounts.length > 0 ? 'tiktok' : null,
     ].filter(Boolean);
 
     try {
@@ -451,7 +477,7 @@ function PublishPageInner() {
   const charCount = postText.length;
   const showTwitterWarning = charCount > TWITTER_CHAR_LIMIT && selectedXAccounts.length > 0;
   const hasAnyAccount =
-    facebookPages.length > 0 || xAccounts.length > 0 || instagramAccounts.length > 0 || telegramChannels.length > 0 || linkedinAccounts.length > 0 || youtubeChannels.length > 0;
+    facebookPages.length > 0 || xAccounts.length > 0 || instagramAccounts.length > 0 || telegramChannels.length > 0 || linkedinAccounts.length > 0 || youtubeChannels.length > 0 || tiktokAccounts.length > 0;
   const kinds = contentKinds(postText, uploadedMedia);
   const selectedPerPlatform: Record<Platform, number> = {
     facebook: selectedFacebookPages.length,
@@ -460,9 +486,11 @@ function PublishPageInner() {
     telegram: selectedTelegramChannels.length,
     linkedin: selectedLinkedInAccounts.length,
     youtube: selectedYouTubeChannels.length,
+    tiktok: selectedTikTokAccounts.length,
   };
   const platforms = Object.keys(selectedPerPlatform) as Platform[];
   const showYouTubeTitle = selectedYouTubeChannels.length > 0 && fitContent('youtube', kinds).status !== 'unsupported';
+  const showTikTokSettings = selectedTikTokAccounts.length > 0 && resolveContent('tiktok', kinds, contentSelection.tiktok) !== null;
   // Selected destinations whose platform can take the post (or has a choice made)
   const selectedCount = platforms.reduce(
     (count, platform) =>
@@ -480,7 +508,8 @@ function PublishPageInner() {
     (postText.trim() !== '' || uploadedMedia.length > 0);
   const canPublish =
     !isPublishing && !isMediaUploading && !isSavingDraft && selectedCount > 0 && undecided.length === 0 &&
-    !(showYouTubeTitle && youtubeTitleError(youtubeTitle.trim()));
+    !(showYouTubeTitle && youtubeTitleError(youtubeTitle.trim())) &&
+    !(showTikTokSettings && !isTiktokReady);
 
   if (loading) {
     return (
@@ -672,7 +701,7 @@ function PublishPageInner() {
                 No accounts connected
               </Typography>
               <Typography variant="body1" color="text.secondary">
-                Head to the Dashboard to connect your Facebook, Instagram, X, Telegram, LinkedIn, and YouTube accounts.
+                Head to the Dashboard to connect your Facebook, Instagram, X, Telegram, LinkedIn, YouTube, and TikTok accounts.
               </Typography>
             </Paper>
           </Fade>
@@ -727,18 +756,21 @@ function PublishPageInner() {
                   telegramChannels={telegramChannels}
                   linkedinAccounts={linkedinAccounts}
                   youtubeChannels={youtubeChannels}
+                  tiktokAccounts={tiktokAccounts}
                   selectedFacebookPages={selectedFacebookPages}
                   selectedXAccounts={selectedXAccounts}
                   selectedInstagramAccounts={selectedInstagramAccounts}
                   selectedTelegramChannels={selectedTelegramChannels}
                   selectedLinkedInAccounts={selectedLinkedInAccounts}
                   selectedYouTubeChannels={selectedYouTubeChannels}
+                  selectedTikTokAccounts={selectedTikTokAccounts}
                   onFacebookChange={handleFacebookChange}
                   onXChange={handleXChange}
                   onInstagramChange={handleInstagramChange}
                   onTelegramChange={handleTelegramChange}
                   onLinkedInChange={handleLinkedInChange}
                   onYouTubeChange={handleYouTubeChange}
+                  onTikTokChange={handleTikTokChange}
                   contentKinds={kinds}
                   contentSelection={contentSelection}
                   onContentSelect={handleContentSelect}
@@ -746,6 +778,17 @@ function PublishPageInner() {
                 {showYouTubeTitle && (
                   <Box sx={{ mt: 2 }}>
                     <YouTubeTitleField value={youtubeTitle} onChange={setYoutubeTitle} />
+                  </Box>
+                )}
+                {showTikTokSettings && (
+                  <Box sx={{ mt: 2 }}>
+                    <TikTokSettingsField
+                      accountIds={selectedTikTokAccounts}
+                      videoUrl={uploadedMedia.find((m) => m.resourceType === 'video')?.previewUrl}
+                      value={tiktokSettings}
+                      onChange={setTiktokSettings}
+                      onReadyChange={setIsTiktokReady}
+                    />
                   </Box>
                 )}
               </Paper>

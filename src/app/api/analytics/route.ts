@@ -3,8 +3,12 @@ import pool from '@/lib/db';
 import type { TimeRange, AnalyticsResponse, PlatformVolume, PlatformReliability } from '@/types/analytics';
 import { getAuthUserId } from '@/lib/api-auth';
 import { createLogger } from '@/lib/logger';
+import { PLATFORMS, type Platform } from '@/types/accounts';
 
 const logger = createLogger('Analytics');
+
+const zeroPerPlatform = (): Record<Platform, number> =>
+  Object.fromEntries(PLATFORMS.map((platform) => [platform, 0])) as Record<Platform, number>;
 
 function getDateFilter(range: TimeRange): string {
   switch (range) {
@@ -68,18 +72,17 @@ export async function GET(req: NextRequest) {
              jsonb_array_elements(publish_destinations) as d
         WHERE user_id = $1 AND ${dateFilter} AND publish_destinations IS NOT NULL
       )
-      SELECT
-        COALESCE(SUM(CASE WHEN platform = 'facebook' THEN 1 ELSE 0 END), 0)::int as facebook,
-        COALESCE(SUM(CASE WHEN platform = 'twitter' THEN 1 ELSE 0 END), 0)::int as twitter,
-        COALESCE(SUM(CASE WHEN platform = 'instagram' THEN 1 ELSE 0 END), 0)::int as instagram,
-        COALESCE(SUM(CASE WHEN platform = 'telegram' THEN 1 ELSE 0 END), 0)::int as telegram,
-        COALESCE(SUM(CASE WHEN platform = 'linkedin' THEN 1 ELSE 0 END), 0)::int as linkedin,
-        COALESCE(SUM(CASE WHEN platform = 'youtube' THEN 1 ELSE 0 END), 0)::int as youtube
-      FROM platform_posts`,
-      [userId]
+      SELECT platform, COUNT(*)::int as count
+      FROM platform_posts
+      WHERE platform = ANY($2)
+      GROUP BY platform`,
+      [userId, PLATFORMS]
     );
 
-    const platformCounts: PlatformVolume = platformResult.rows[0] || { facebook: 0, twitter: 0, instagram: 0, telegram: 0, linkedin: 0, youtube: 0 };
+    const platformCounts: PlatformVolume = zeroPerPlatform();
+    for (const row of platformResult.rows as { platform: Platform; count: number }[]) {
+      platformCounts[row.platform] = row.count;
+    }
 
     const mostUsedPlatform = Object.entries(platformCounts)
       .sort(([, a], [, b]) => b - a)[0];
@@ -142,19 +145,17 @@ export async function GET(req: NextRequest) {
         COUNT(*) as total,
         COUNT(*) FILTER (WHERE success = true) as success_count
       FROM destination_stats
-      WHERE platform IN ('facebook', 'twitter', 'instagram', 'telegram', 'linkedin', 'youtube')
+      WHERE platform = ANY($2)
       GROUP BY platform`,
-      [userId]
+      [userId, PLATFORMS]
     );
 
-    const platformReliability: PlatformReliability = { facebook: 0, twitter: 0, instagram: 0, telegram: 0, linkedin: 0, youtube: 0 };
+    const platformReliability: PlatformReliability = zeroPerPlatform();
     for (const row of reliabilityResult.rows) {
-      const platform = row.platform as keyof PlatformReliability;
-      if (platform in platformReliability) {
-        platformReliability[platform] = row.total > 0
-          ? (parseInt(row.success_count) / parseInt(row.total)) * 100
-          : 0;
-      }
+      const platform = row.platform as Platform;
+      platformReliability[platform] = row.total > 0
+        ? (parseInt(row.success_count) / parseInt(row.total)) * 100
+        : 0;
     }
 
     const response: AnalyticsResponse = {

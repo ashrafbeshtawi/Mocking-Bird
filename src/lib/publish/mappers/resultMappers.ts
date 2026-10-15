@@ -12,6 +12,7 @@ import {
 } from '@/types/interfaces';
 import type { LinkedInPublishResult, LinkedInPublishError } from '@/lib/publishers/linkedin';
 import type { YouTubePublishResult, YouTubePublishError } from '@/lib/publishers/youtube';
+import type { TikTokPublishResult, TikTokPublishError } from '@/lib/publishers/tiktok';
 
 /**
  * Maps Facebook failed items to standardized FailedPublishResult
@@ -176,6 +177,28 @@ export function mapYouTubeFailed(failed: YouTubePublishError[]): FailedPublishRe
  * Maps YouTube successful items to standardized SuccessfulPublishResult
  */
 export function mapYouTubeSuccess(successful: YouTubePublishResult[]): SuccessfulPublishResult[] {
+  return successful.map(item => ({
+    platform: item.platform,
+    account_id: item.account_id,
+    post_id: item.post_id
+  }));
+}
+
+/**
+ * Maps TikTok failed items to standardized FailedPublishResult
+ */
+export function mapTikTokFailed(failed: TikTokPublishError[]): FailedPublishResult[] {
+  return failed.map(item => ({
+    platform: item.platform,
+    account_id: item.account_id,
+    error: { message: item.error.message, code: item.error.code }
+  }));
+}
+
+/**
+ * Maps TikTok successful items to standardized SuccessfulPublishResult
+ */
+export function mapTikTokSuccess(successful: TikTokPublishResult[]): SuccessfulPublishResult[] {
   return successful.map(item => ({
     platform: item.platform,
     account_id: item.account_id,

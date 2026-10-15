@@ -16,6 +16,7 @@ const PLATFORM_COLORS: Record<string, string> = {
   telegram: '#0088cc',
   linkedin: '#0a66c2',
   youtube: '#ff0000',
+  tiktok: '#ff0050',
 };
 
 export function PlatformVolumeChart({ data, loading }: PlatformVolumeChartProps) {

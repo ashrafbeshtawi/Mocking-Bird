@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import pool from '@/lib/db';
 import { createLogger } from '@/lib/logger';
-import { validateTextContent, validateAccountArrays, parsePublishRequest } from '@/lib/publish/validators/requestValidator';
+import { validateTextContent, validateAccountArrays, parsePublishRequest, hasAnyDestination } from '@/lib/publish/validators/requestValidator';
 import { processCloudinaryMedia } from '@/lib/publish/validators/mediaValidator';
 import { fetchAllTokens, validateMissingAccounts, formatMissingAccounts, hasMissingAccounts } from '@/lib/publish/services/tokenService';
 import { createReportLogger, buildAndSaveResponse, buildErrorResponse } from '@/lib/publish/services/reportService';
@@ -34,12 +34,11 @@ export async function POST(req: Request) {
       return buildErrorResponse(reportLogger.getReport(), 400, parseResult.error || 'Failed to parse request');
     }
 
-    const { text, facebookPages, xAccounts, instagramPublishAccounts, instagramStoryAccounts, telegramChannels, linkedinAccounts, youtubeChannels, youtubeTitle, cloudinaryMedia, contentSelection } = parseResult.data;
+    const { text, facebookPages, xAccounts, instagramPublishAccounts, instagramStoryAccounts, telegramChannels, linkedinAccounts, youtubeChannels, youtubeTitle, tiktokAccounts, tiktokSettings, cloudinaryMedia, contentSelection } = parseResult.data;
     reportLogger.add(`Request payload parsed. Text length: ${text?.length || 0}, Facebook pages: ${facebookPages?.length || 0}, X accounts: ${xAccounts?.length || 0}, Instagram feed: ${instagramPublishAccounts?.length || 0}, Instagram stories: ${instagramStoryAccounts?.length || 0}, Telegram channels: ${telegramChannels?.length || 0}, LinkedIn accounts: ${linkedinAccounts?.length || 0}, YouTube channels: ${youtubeChannels?.length || 0}, Cloudinary media: ${cloudinaryMedia?.length || 0}`);
 
     // 3. Validate text content
-    const hasAnyAccount = facebookPages.length > 0 || xAccounts.length > 0 || instagramPublishAccounts.length > 0 || instagramStoryAccounts.length > 0 || telegramChannels.length > 0 || linkedinAccounts.length > 0 || youtubeChannels.length > 0;
-    const textValidation = validateTextContent(text, cloudinaryMedia.length > 0, hasAnyAccount);
+    const textValidation = validateTextContent(text, cloudinaryMedia.length > 0, hasAnyDestination(parseResult.data));
     if (!textValidation.success) {
       reportLogger.add(`WARN: Invalid text input and no media files. Text: ${text?.substring(0, 100)}`);
       return await buildAndSaveResponse({
@@ -60,7 +59,7 @@ export async function POST(req: Request) {
     }
 
     // 4. Validate account arrays
-    const accountValidation = validateAccountArrays(facebookPages, xAccounts, instagramPublishAccounts, instagramStoryAccounts, telegramChannels, linkedinAccounts, youtubeChannels);
+    const accountValidation = validateAccountArrays(facebookPages, xAccounts, instagramPublishAccounts, instagramStoryAccounts, telegramChannels, linkedinAccounts, youtubeChannels, tiktokAccounts);
     if (!accountValidation.success) {
       reportLogger.add(`WARN: ${accountValidation.error}`);
       return await buildAndSaveResponse({
@@ -103,7 +102,7 @@ export async function POST(req: Request) {
     }
 
     // 6. Fetch tokens
-    const { facebookTokens, twitterTokens, instagramFeedTokens, instagramStoryTokens, telegramTokens, linkedinTokens, youtubeTokens } = await fetchAllTokens(
+    const { facebookTokens, twitterTokens, instagramFeedTokens, instagramStoryTokens, telegramTokens, linkedinTokens, youtubeTokens, tiktokTokens } = await fetchAllTokens(
       pool,
       userId,
       facebookPages,
@@ -113,6 +112,7 @@ export async function POST(req: Request) {
       telegramChannels,
       linkedinAccounts,
       youtubeChannels,
+      tiktokAccounts,
       reportLogger
     );
 
@@ -121,7 +121,7 @@ export async function POST(req: Request) {
     const allInstagramTokens = [...instagramFeedTokens, ...instagramStoryTokens].filter(
       (token, index, self) => index === self.findIndex(t => t.instagram_account_id === token.instagram_account_id)
     );
-    const missing = validateMissingAccounts(facebookPages, xAccounts, allInstagramAccountIds, telegramChannels, facebookTokens, twitterTokens, allInstagramTokens, telegramTokens, linkedinAccounts, linkedinTokens, youtubeChannels, youtubeTokens);
+    const missing = validateMissingAccounts(facebookPages, xAccounts, allInstagramAccountIds, telegramChannels, facebookTokens, twitterTokens, allInstagramTokens, telegramTokens, linkedinAccounts, linkedinTokens, youtubeChannels, youtubeTokens, tiktokAccounts, tiktokTokens);
     if (hasMissingAccounts(missing)) {
       const missingAccounts = formatMissingAccounts(missing);
       reportLogger.add(`ERROR: Missing accounts detected. Details: ${missingAccounts.join(', ')}`);
@@ -151,8 +151,10 @@ export async function POST(req: Request) {
       telegramTokens,
       linkedinTokens,
       youtubeTokens,
+      tiktokTokens,
       reportLogger,
       youtubeTitle,
+      tiktokSettings,
       contentSelection
     });
 

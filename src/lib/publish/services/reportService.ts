@@ -9,6 +9,8 @@ import {
 } from '@/types/interfaces';
 import { PublishStatus, ReportLogger, type CloudinaryMediaInfo } from '../types';
 import { createLogger } from '@/lib/logger';
+import type { TikTokPostSettings } from '@/lib/tiktok';
+import { PLATFORMS, type Platform } from '@/types/accounts';
 
 const logger = createLogger('ReportService');
 
@@ -16,7 +18,7 @@ const logger = createLogger('ReportService');
  * Represents a publish destination for storage
  */
 export interface PublishDestination {
-  platform: 'facebook' | 'twitter' | 'instagram' | 'telegram' | 'linkedin' | 'youtube';
+  platform: Platform;
   account_id: string;
   account_name?: string;
   post_type?: 'feed' | 'story';
@@ -28,13 +30,13 @@ export interface PublishDestination {
 /**
  * Normalizes platform name to standard format
  */
-function normalizePlatform(platform: string): PublishDestination['platform'] {
+function normalizePlatform(platform: string): Platform {
   const normalized = platform.toLowerCase();
-  if (normalized === 'x' || normalized === 'twitter') {
+  if (normalized === 'x') {
     return 'twitter';
   }
-  if (normalized === 'facebook' || normalized === 'instagram' || normalized === 'telegram' || normalized === 'linkedin' || normalized === 'youtube') {
-    return normalized as PublishDestination['platform'];
+  if ((PLATFORMS as readonly string[]).includes(normalized)) {
+    return normalized as Platform;
   }
   // Default fallback - log unknown platforms
   logger.warn(`Unknown platform: ${platform}`);
@@ -160,16 +162,18 @@ export async function savePublishReport(
   status: PublishStatus,
   destinations: PublishDestination[] = [],
   /** The post as published; stored so failed destinations can be retried. */
-  post?: { text: string; media: CloudinaryMediaInfo[]; youtubeTitle: string }
+  post?: { text: string; media: CloudinaryMediaInfo[]; youtubeTitle: string; tiktokSettings: TikTokPostSettings | null }
 ): Promise<void> {
   const client = await pool.connect();
   try {
     report.push(`Saving publish result to database with ${destinations.length} destinations`);
     logger.info(`Saving publish report: userId=${userId}, status=${status}, destinations=${JSON.stringify(destinations)}`);
 
-    await client.query(
+    await client.query('BEGIN');
+    const { rows } = await client.query(
       `INSERT INTO publish_history (user_id, content, publish_report, publish_status, publish_destinations, post_text, media, youtube_title)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING id`,
       [
         parseInt(userId),
         content,
@@ -181,9 +185,20 @@ export async function savePublishReport(
         post?.youtubeTitle ?? null,
       ]
     );
+    const tiktok = post?.tiktokSettings;
+    if (tiktok) {
+      await client.query(
+        `INSERT INTO publish_history_tiktok
+           (history_id, privacy_level, allow_comment, allow_duet, allow_stitch, is_your_brand, is_branded_content)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [rows[0].id, tiktok.privacyLevel, tiktok.allowComment, tiktok.allowDuet, tiktok.allowStitch, tiktok.isYourBrand, tiktok.isBrandedContent]
+      );
+    }
+    await client.query('COMMIT');
 
     report.push(`Publish result saved to database successfully`);
   } catch (dbError) {
+    await client.query('ROLLBACK').catch(() => {});
     const errorMessage = dbError instanceof Error ? dbError.message : String(dbError);
     report.push(`ERROR: Failed to save publish result to database. Error: ${errorMessage}`);
     logger.error(`Failed to save publish result to database.`, dbError);

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { YOUTUBE_TERMS_URL } from "@/lib/youtube";
+import { TIKTOK_TERMS_URL } from "@/lib/tiktok";
 
 export const metadata = { title: "Terms of Service – Mockingbird" };
 
@@ -37,6 +38,10 @@ export default function TermsPage() {
         also apply, and users are responsible for complying with them. Connecting a YouTube channel means agreeing to the{" "}
         <a href={YOUTUBE_TERMS_URL} target="_blank" rel="noopener noreferrer">
           YouTube Terms of Service
+        </a>
+        , and connecting a TikTok account means agreeing to the{" "}
+        <a href={TIKTOK_TERMS_URL} target="_blank" rel="noopener noreferrer">
+          TikTok Terms of Service
         </a>
         . Connections can be removed at any time on the dashboard.
       </p>

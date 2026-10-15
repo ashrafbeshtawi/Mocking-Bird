@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import pool from '@/lib/db';
 import { getAuthUserId } from '@/lib/api-auth';
 import { createLogger } from '@/lib/logger';
+import { PLATFORMS } from '@/types/accounts';
 
 const logger = createLogger('PublishHistory');
 
@@ -153,8 +154,7 @@ export async function GET(req: NextRequest) {
         const statusFilter = status && validStatuses.includes(status) ? status : null;
 
         // Validate platform if provided
-        const validPlatforms = ['facebook', 'twitter', 'instagram', 'telegram', 'linkedin', 'youtube'];
-        const platformFilter = platform && validPlatforms.includes(platform) ? platform : null;
+        const platformFilter = platform && (PLATFORMS as readonly string[]).includes(platform) ? platform : null;
 
         // Cursor-based pagination (preferred for large datasets)
         const cursor = searchParams.get('cursor');

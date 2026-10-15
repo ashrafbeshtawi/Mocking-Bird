@@ -3,10 +3,9 @@ import pool from '@/lib/db';
 import { getAuthUserId } from '@/lib/api-auth';
 import { createLogger } from '@/lib/logger';
 import { retryFailedDestinations, type DestinationKey } from '@/lib/publish/services/retryService';
+import { PLATFORMS } from '@/types/accounts';
 
 const logger = createLogger('PublishRetryAPI');
-
-const PLATFORMS = ['facebook', 'twitter', 'instagram', 'telegram', 'linkedin', 'youtube'];
 
 const isDestinationKey = (value: unknown): value is DestinationKey => {
   const d = value as DestinationKey;

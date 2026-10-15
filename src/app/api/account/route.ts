@@ -4,6 +4,7 @@ import { getAuthUserId } from '@/lib/api-auth';
 import { cleanupCloudinaryMedia } from '@/lib/services/cloudinaryService';
 import { createLogger } from '@/lib/logger';
 import { revokeYouTubeTokens } from '@/lib/publishers/youtube';
+import { revokeTikTokTokens } from '@/lib/publishers/tiktok';
 
 const logger = createLogger('AccountAPI');
 
@@ -23,8 +24,9 @@ const USER_MEDIA_SQL = `
 /**
  * DELETE /api/account — deletes the signed-in user's account.
  * Every user-scoped table cascades from users(id), so one DELETE removes
- * connections, tokens, drafts and publish history. YouTube access is revoked at
- * Google first, since a stored refresh token would otherwise stay valid there.
+ * connections, tokens, drafts and publish history. YouTube and TikTok access is
+ * revoked at Google and TikTok first, since a stored refresh token would otherwise
+ * stay valid there.
  */
 export async function DELETE() {
   const userId = await getAuthUserId();
@@ -49,6 +51,12 @@ export async function DELETE() {
       [userId]
     );
     await revokeYouTubeTokens(channels.map((channel) => channel.refresh_token));
+
+    const { rows: tiktokAccounts } = await pool.query<{ access_token: string; refresh_token: string; expires_at: Date }>(
+      'SELECT access_token, refresh_token, expires_at FROM connected_tiktok_accounts WHERE user_id = $1',
+      [userId]
+    );
+    await revokeTikTokTokens(tiktokAccounts);
 
     await pool.query('DELETE FROM users WHERE id = $1', [userId]);
     logger.info('Account deleted', { userId, mediaRemoved: media.length });

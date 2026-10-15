@@ -42,6 +42,7 @@ import WarningIcon from '@mui/icons-material/Warning';
 import DownloadIcon from '@mui/icons-material/Download';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { PageHeader } from '@/components/PageHeader';
+import type { Platform } from '@/types/accounts';
 import ArticleIcon from '@mui/icons-material/Article';
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
@@ -53,11 +54,12 @@ import InstagramIcon from '@mui/icons-material/Instagram';
 import TelegramIcon from '@mui/icons-material/Telegram';
 import LinkedInIcon from '@mui/icons-material/LinkedIn';
 import YouTubeIcon from '@mui/icons-material/YouTube';
+import { TikTokIcon } from '@/components/icons/TikTokIcon';
 import ReplayIcon from '@mui/icons-material/Replay';
 import { useConnectedAccounts } from '@/hooks/useConnectedAccounts';
 
 interface PublishDestination {
-  platform: 'facebook' | 'twitter' | 'instagram' | 'telegram' | 'linkedin' | 'youtube';
+  platform: Platform;
   account_id: string;
   account_name?: string;
   post_type?: 'feed' | 'story';
@@ -83,6 +85,7 @@ const platformConfig = {
   telegram: { icon: TelegramIcon, color: '#0088cc', label: 'Telegram' },
   linkedin: { icon: LinkedInIcon, color: '#0a66c2', label: 'LinkedIn' },
   youtube: { icon: YouTubeIcon, color: '#ff0000', label: 'YouTube' },
+  tiktok: { icon: TikTokIcon, color: '#ff0050', label: 'TikTok' },
 };
 
 interface PaginatedResponse {
@@ -827,6 +830,7 @@ export default function PublishHistoryPage() {
                   <MenuItem value="telegram">Telegram</MenuItem>
                   <MenuItem value="linkedin">LinkedIn</MenuItem>
                   <MenuItem value="youtube">YouTube</MenuItem>
+                  <MenuItem value="tiktok">TikTok</MenuItem>
                 </Select>
               </FormControl>
               <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 130 } }}>

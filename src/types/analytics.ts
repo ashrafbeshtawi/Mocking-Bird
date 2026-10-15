@@ -1,3 +1,5 @@
+import type { Platform } from './accounts';
+
 export type TimeRange = '7d' | '30d' | '90d' | 'all';
 
 export interface AnalyticsSummary {
@@ -14,23 +16,9 @@ export interface ActivityChartData {
   failed: number[];
 }
 
-export interface PlatformVolume {
-  facebook: number;
-  twitter: number;
-  instagram: number;
-  telegram: number;
-  linkedin: number;
-  youtube: number;
-}
+export type PlatformVolume = Record<Platform, number>;
 
-export interface PlatformReliability {
-  facebook: number;
-  twitter: number;
-  instagram: number;
-  telegram: number;
-  linkedin: number;
-  youtube: number;
-}
+export type PlatformReliability = Record<Platform, number>;
 
 export interface AnalyticsResponse {
   summary: AnalyticsSummary;

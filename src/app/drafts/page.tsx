@@ -45,6 +45,8 @@ import { contentKinds, fitContent, needsChoice, resolveContent, type ContentSele
 import { MediaPreviewDialog, type PreviewMedia } from '@/components/publish/MediaPreviewDialog';
 import { YouTubeTitleField } from '@/components/publish/YouTubeTitleField';
 import { youtubeTitleError } from '@/lib/youtube';
+import { TikTokSettingsField } from '@/components/publish/TikTokSettingsField';
+import { EMPTY_TIKTOK_SETTINGS, type TikTokPostSettings } from '@/lib/tiktok';
 import { useDrafts, mapDraftMediaToUploaded, type Draft } from '@/hooks/useDrafts';
 import { useConnectedAccounts } from '@/hooks/useConnectedAccounts';
 import { usePublish } from '@/hooks/usePublish';
@@ -63,7 +65,7 @@ export default function DraftsPage() {
   const platform: Platform | 'all' = platformParam && PLATFORMS.includes(platformParam) ? platformParam : 'all';
 
   const { drafts, total, totalPages, loading, error, refetch, deleteDrafts } = useDrafts({ page, query, platform });
-  const { facebookPages, xAccounts, instagramAccounts, telegramChannels, linkedinAccounts, youtubeChannels } = useConnectedAccounts();
+  const { facebookPages, xAccounts, instagramAccounts, telegramChannels, linkedinAccounts, youtubeChannels, tiktokAccounts } = useConnectedAccounts();
   const { publish, isPublishing, statusMessage, error: publishError, success: publishSuccess, results: publishResults, clearStatus } =
     usePublish();
 
@@ -71,6 +73,8 @@ export default function DraftsPage() {
   // What to send to platforms that cannot take the whole previewed draft
   const [previewSelection, setPreviewSelection] = useState<ContentSelection>({});
   const [previewYoutubeTitle, setPreviewYoutubeTitle] = useState('');
+  const [previewTiktokSettings, setPreviewTiktokSettings] = useState<TikTokPostSettings>(EMPTY_TIKTOK_SETTINGS);
+  const [isPreviewTiktokReady, setIsPreviewTiktokReady] = useState(false);
   const [previewMedia, setPreviewMedia] = useState<PreviewMedia | null>(null);
   // Drafts awaiting delete confirmation: one from a row button, or the selection.
   const [deleting, setDeleting] = useState<Draft[] | null>(null);
@@ -147,6 +151,8 @@ export default function DraftsPage() {
         return linkedinAccounts.map((a) => a.name);
       case 'youtube':
         return youtubeChannels.map((c) => c.name);
+      case 'tiktok':
+        return tiktokAccounts.map((a) => a.name);
     }
   };
 
@@ -157,6 +163,9 @@ export default function DraftsPage() {
   const previewNeedsChoice = (platform: Platform) =>
     accountNamesFor(platform).length > 0 && needsChoice(platform, previewKinds, previewSelection[platform]);
   const isPreviewUndecided = previewDraft?.target_platforms.some(previewNeedsChoice) ?? false;
+
+  const isPreviewTikTok = (previewDraft?.target_platforms.includes('tiktok') ?? false) && tiktokAccounts.length > 0 &&
+    isPreviewSendable('tiktok');
 
   /** Accounts the confirm button would actually publish to. */
   const previewDestinationCount = previewDraft
@@ -169,6 +178,7 @@ export default function DraftsPage() {
   const openPreview = (draft: Draft) => {
     setPreviewSelection({});
     setPreviewYoutubeTitle('');
+    setPreviewTiktokSettings(EMPTY_TIKTOK_SETTINGS);
     setPreviewDraft(draft);
   };
 
@@ -194,6 +204,8 @@ export default function DraftsPage() {
       selectedLinkedInAccounts: targets.includes('linkedin') ? linkedinAccounts.map((a) => a.id) : [],
       selectedYouTubeChannels: targets.includes('youtube') ? youtubeChannels.map((c) => c.id) : [],
       youtubeTitle: previewYoutubeTitle,
+      selectedTikTokAccounts: targets.includes('tiktok') ? tiktokAccounts.map((a) => a.id) : [],
+      tiktokSettings: previewTiktokSettings,
       contentSelection: previewSelection,
     });
 
@@ -618,6 +630,18 @@ export default function DraftsPage() {
               </Box>
             )}
 
+          {isPreviewTikTok && (
+            <Box sx={{ mt: 2 }}>
+              <TikTokSettingsField
+                accountIds={tiktokAccounts.map((a) => a.id)}
+                videoUrl={previewDraft?.media?.find((m) => m.resourceType === 'video')?.publicUrl}
+                value={previewTiktokSettings}
+                onChange={setPreviewTiktokSettings}
+                onReadyChange={setIsPreviewTiktokReady}
+              />
+            </Box>
+          )}
+
           {isPublishing && (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mt: 2 }}>
               <CircularProgress size={18} />
@@ -639,7 +663,7 @@ export default function DraftsPage() {
           <Button
             onClick={handleConfirmPublish}
             variant="contained"
-            disabled={isPublishing || previewDestinationCount === 0 || isPreviewUndecided || youtubeTitleError(previewYoutubeTitle.trim()) !== null}
+            disabled={isPublishing || previewDestinationCount === 0 || isPreviewUndecided || youtubeTitleError(previewYoutubeTitle.trim()) !== null || (isPreviewTikTok && !isPreviewTiktokReady)}
             endIcon={isPublishing ? <CircularProgress size={16} color="inherit" /> : <SendIcon />}
             sx={{ borderRadius: 2 }}
           >

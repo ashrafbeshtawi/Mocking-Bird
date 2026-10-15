@@ -8,6 +8,7 @@ import {
   type PublishDestination,
 } from '@/lib/publish/services/reportService';
 import type { CloudinaryMediaInfo, PublishStatus } from '@/lib/publish/types';
+import { parseTikTokSettings } from '@/lib/tiktok';
 
 /** Identifies one destination of a history entry. */
 export interface DestinationKey {
@@ -61,8 +62,11 @@ export async function retryFailedDestinations(
     }
 
     const { rows } = await client.query(
-      `SELECT post_text, media, youtube_title, publish_destinations
-       FROM publish_history WHERE id = $1 AND user_id = $2`,
+      `SELECT h.post_text, h.media, h.youtube_title, h.publish_destinations,
+              t.privacy_level, t.allow_comment, t.allow_duet, t.allow_stitch, t.is_your_brand, t.is_branded_content
+       FROM publish_history h
+       LEFT JOIN publish_history_tiktok t ON t.history_id = h.id
+       WHERE h.id = $1 AND h.user_id = $2`,
       [historyId, parseInt(userId, 10)]
     );
     if (rows.length === 0) {
@@ -72,6 +76,12 @@ export async function retryFailedDestinations(
       post_text: string | null;
       media: CloudinaryMediaInfo[] | null;
       youtube_title: string | null;
+      privacy_level: string | null;
+      allow_comment: boolean | null;
+      allow_duet: boolean | null;
+      allow_stitch: boolean | null;
+      is_your_brand: boolean | null;
+      is_branded_content: boolean | null;
       publish_destinations: PublishDestination[] | null;
     };
     if (entry.post_text === null) {
@@ -101,6 +111,7 @@ export async function retryFailedDestinations(
     const telegramChannels = accountsOf('telegram');
     const linkedinAccounts = accountsOf('linkedin');
     const youtubeChannels = accountsOf('youtube');
+    const tiktokAccounts = accountsOf('tiktok');
 
     // Facebook and X upload the files themselves; the other platforms take the URLs.
     const needsDownload = facebookPages.length > 0 || xAccounts.length > 0;
@@ -109,7 +120,7 @@ export async function retryFailedDestinations(
       : { files: [] };
 
     const tokens = await fetchAllTokens(
-      pool, userId, facebookPages, xAccounts, instagramFeed, instagramStory, telegramChannels, linkedinAccounts, youtubeChannels, reportLogger
+      pool, userId, facebookPages, xAccounts, instagramFeed, instagramStory, telegramChannels, linkedinAccounts, youtubeChannels, tiktokAccounts, reportLogger
     );
     const { successful, failed } = await executePublish({
       pool,
@@ -117,6 +128,14 @@ export async function retryFailedDestinations(
       mediaFiles: mediaResult.files,
       cloudinaryMedia: media,
       youtubeTitle: entry.youtube_title ?? '',
+      tiktokSettings: parseTikTokSettings({
+        privacyLevel: entry.privacy_level,
+        allowComment: entry.allow_comment,
+        allowDuet: entry.allow_duet,
+        allowStitch: entry.allow_stitch,
+        isYourBrand: entry.is_your_brand,
+        isBrandedContent: entry.is_branded_content,
+      }),
       ...tokens,
       reportLogger,
     });

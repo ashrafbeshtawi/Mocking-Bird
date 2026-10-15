@@ -42,6 +42,7 @@ describe('usePublish destination filtering', () => {
         selectedTelegramChannels: [],
         selectedLinkedInAccounts: [],
         selectedYouTubeChannels: [],
+        selectedTikTokAccounts: [],
         contentSelection: { twitter: ['text', 'video'], instagram: ['text', 'image'] },
       })
     );
@@ -66,6 +67,7 @@ describe('usePublish destination filtering', () => {
         selectedTelegramChannels: [],
         selectedLinkedInAccounts: [],
         selectedYouTubeChannels: [],
+        selectedTikTokAccounts: [],
       })
     );
 
@@ -89,6 +91,7 @@ describe('usePublish destination filtering', () => {
         selectedTelegramChannels: [],
         selectedLinkedInAccounts: [],
         selectedYouTubeChannels: [],
+        selectedTikTokAccounts: [],
       });
     });
 
@@ -110,6 +113,7 @@ describe('usePublish destination filtering', () => {
         selectedTelegramChannels: [],
         selectedLinkedInAccounts: [],
         selectedYouTubeChannels: [],
+        selectedTikTokAccounts: [],
       })
     );
 
@@ -130,6 +134,7 @@ describe('usePublish destination filtering', () => {
         selectedTelegramChannels: [],
         selectedLinkedInAccounts: [],
         selectedYouTubeChannels: [],
+        selectedTikTokAccounts: [],
       });
     });
 
@@ -149,6 +154,7 @@ describe('usePublish YouTube title', () => {
     selectedTelegramChannels: [],
     selectedLinkedInAccounts: [],
     selectedYouTubeChannels: ['UC1'],
+    selectedTikTokAccounts: [],
     youtubeTitle,
   });
 
@@ -171,5 +177,49 @@ describe('usePublish YouTube title', () => {
 
     expect(global.fetch).not.toHaveBeenCalled();
     expect(result.current.error?.message).toBe('YouTube titles cannot contain < or >.');
+  });
+});
+
+describe('usePublish TikTok settings', () => {
+  const chosen = {
+    privacyLevel: 'PUBLIC_TO_EVERYONE' as const,
+    allowComment: true,
+    allowDuet: false,
+    allowStitch: false,
+    isYourBrand: false,
+    isBrandedContent: false,
+  };
+  const tiktokPost = (privacyLevel: typeof chosen.privacyLevel | '') => ({
+    postText: 'Watch this',
+    uploadedMedia: [video],
+    selectedFacebookPages: [],
+    selectedXAccounts: [],
+    selectedInstagramAccounts: {},
+    selectedTelegramChannels: [],
+    selectedLinkedInAccounts: [],
+    selectedYouTubeChannels: [],
+    selectedTikTokAccounts: ['oid-1'],
+    tiktokSettings: { ...chosen, privacyLevel },
+  });
+
+  beforeEach(() => {
+    global.fetch = jest.fn().mockResolvedValue(emptyStream());
+  });
+
+  it('sends the chosen settings with the TikTok accounts', async () => {
+    const { result } = renderHook(() => usePublish());
+
+    await act(() => result.current.publish(tiktokPost('PUBLIC_TO_EVERYONE')));
+
+    expect(sentBody()).toMatchObject({ tiktokAccounts: ['oid-1'], tiktokSettings: chosen });
+  });
+
+  it('blocks a TikTok post without a chosen visibility', async () => {
+    const { result } = renderHook(() => usePublish());
+
+    await act(() => result.current.publish(tiktokPost('')));
+
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(result.current.error?.message).toBe('Choose who can view the TikTok post.');
   });
 });

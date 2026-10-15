@@ -1,6 +1,7 @@
 import { PublishRequest, CloudinaryMediaInfo } from '../types';
 import { parseContentSelection } from '../contentRules';
 import { youtubeTitleError } from '@/lib/youtube';
+import { parseTikTokSettings, tiktokSettingsError } from '@/lib/tiktok';
 
 export interface ValidationResult<T> {
   success: boolean;
@@ -34,6 +35,20 @@ export function validateTextContent(
   return { success: true, data: text || '' };
 }
 
+/** Whether the request selects at least one destination on any platform. */
+export function hasAnyDestination(request: PublishRequest): boolean {
+  return [
+    request.facebookPages,
+    request.xAccounts,
+    request.instagramPublishAccounts,
+    request.instagramStoryAccounts,
+    request.telegramChannels,
+    request.linkedinAccounts,
+    request.youtubeChannels,
+    request.tiktokAccounts,
+  ].some((ids) => ids.length > 0);
+}
+
 /**
  * Validates that account arrays are valid
  */
@@ -44,7 +59,8 @@ export function validateAccountArrays(
   instagramStoryAccounts: string[] = [],
   telegramChannels: string[] = [],
   linkedinAccounts: string[] = [],
-  youtubeChannels: string[] = []
+  youtubeChannels: string[] = [],
+  tiktokAccounts: string[] = []
 ): ValidationResult<void> {
   if (!Array.isArray(facebookPages) || !Array.isArray(xAccounts)) {
     return {
@@ -81,6 +97,13 @@ export function validateAccountArrays(
     };
   }
 
+  if (!Array.isArray(tiktokAccounts)) {
+    return {
+      success: false,
+      error: 'tiktokAccounts must be an array'
+    };
+  }
+
   const hasAnyAccount =
     facebookPages.length > 0 ||
     xAccounts.length > 0 ||
@@ -88,7 +111,8 @@ export function validateAccountArrays(
     instagramStoryAccounts.length > 0 ||
     telegramChannels.length > 0 ||
     linkedinAccounts.length > 0 ||
-    youtubeChannels.length > 0;
+    youtubeChannels.length > 0 ||
+    tiktokAccounts.length > 0;
 
   if (!hasAnyAccount) {
     return {
@@ -182,6 +206,16 @@ export async function parsePublishRequest(
     return { success: false, error: titleError };
   }
 
+  const tiktokAccounts = Array.isArray(data.tiktokAccounts)
+    ? data.tiktokAccounts.filter((id): id is string => typeof id === 'string')
+    : [];
+
+  const tiktokSettings = parseTikTokSettings(data.tiktokSettings);
+  const settingsError = tiktokAccounts.length > 0 ? tiktokSettingsError(tiktokSettings) : null;
+  if (settingsError) {
+    return { success: false, error: settingsError };
+  }
+
   const mediaValidation = validateCloudinaryMedia(
     Array.isArray(data.cloudinaryMedia) ? data.cloudinaryMedia : []
   );
@@ -202,6 +236,8 @@ export async function parsePublishRequest(
       linkedinAccounts,
       youtubeChannels,
       youtubeTitle,
+      tiktokAccounts,
+      tiktokSettings,
       cloudinaryMedia: mediaValidation.data || [],
       contentSelection: parseContentSelection(data.contentSelection),
     },
