@@ -9,3 +9,6 @@ export type { TelegramChannelToken, TelegramPublishResult, TelegramPublishError,
 
 export { LinkedInPublisher } from './linkedin';
 export type { LinkedInAccountToken, LinkedInPublishResult, LinkedInPublishError, LinkedInPublishOptions } from './linkedin';
+
+export { YouTubePublisher } from './youtube';
+export type { YouTubeChannelToken, YouTubePublishResult, YouTubePublishError, YouTubePublishOptions } from './youtube';

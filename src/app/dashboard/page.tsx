@@ -188,6 +188,7 @@ export default function DashboardPage() {
       ...normalizedAccounts.twitter,
       ...normalizedAccounts.telegram,
       ...normalizedAccounts.linkedin,
+      ...normalizedAccounts.youtube,
     ],
     [normalizedAccounts]
   );

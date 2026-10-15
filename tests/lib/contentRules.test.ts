@@ -50,6 +50,14 @@ describe('fitContent', () => {
     expect(fitContent('instagram', ['video'])).toEqual({ status: 'ok' });
   });
 
+  it('takes only a video on YouTube, with text as its title and description', () => {
+    expect(fitContent('youtube', ['video'])).toEqual({ status: 'ok' });
+    expect(fitContent('youtube', ['text', 'video'])).toEqual({ status: 'ok' });
+    expect(fitContent('youtube', ['text'])).toEqual({ status: 'unsupported' });
+    expect(fitContent('youtube', ['text', 'image'])).toEqual({ status: 'unsupported' });
+    expect(fitContent('youtube', ['text', 'image', 'video'])).toEqual({ status: 'partial', options: [['text', 'video']] });
+  });
+
   it('treats an empty post as unsupported everywhere', () => {
     expect(fitContent('facebook', [])).toEqual({ status: 'unsupported' });
   });

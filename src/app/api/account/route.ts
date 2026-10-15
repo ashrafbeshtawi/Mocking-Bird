@@ -3,6 +3,7 @@ import pool from '@/lib/db';
 import { getAuthUserId } from '@/lib/api-auth';
 import { cleanupCloudinaryMedia } from '@/lib/services/cloudinaryService';
 import { createLogger } from '@/lib/logger';
+import { revokeYouTubeTokens } from '@/lib/publishers/youtube';
 
 const logger = createLogger('AccountAPI');
 
@@ -22,7 +23,8 @@ const USER_MEDIA_SQL = `
 /**
  * DELETE /api/account — deletes the signed-in user's account.
  * Every user-scoped table cascades from users(id), so one DELETE removes
- * connections, tokens, drafts and publish history.
+ * connections, tokens, drafts and publish history. YouTube access is revoked at
+ * Google first, since a stored refresh token would otherwise stay valid there.
  */
 export async function DELETE() {
   const userId = await getAuthUserId();
@@ -41,6 +43,12 @@ export async function DELETE() {
       );
     // Best effort: individual Cloudinary failures are logged inside and never block the deletion.
     await cleanupCloudinaryMedia(media);
+
+    const { rows: channels } = await pool.query<{ refresh_token: string }>(
+      'SELECT refresh_token FROM connected_youtube_channels WHERE user_id = $1',
+      [userId]
+    );
+    await revokeYouTubeTokens(channels.map((channel) => channel.refresh_token));
 
     await pool.query('DELETE FROM users WHERE id = $1', [userId]);
     logger.info('Account deleted', { userId, mediaRemoved: media.length });

@@ -32,13 +32,15 @@ import { useConnectedAccounts } from '@/hooks/useConnectedAccounts';
 import { usePublish } from '@/hooks/usePublish';
 import { PostComposer } from '@/components/publish/PostComposer';
 import { AccountSelector } from '@/components/publish/AccountSelector';
+import { YouTubeTitleField } from '@/components/publish/YouTubeTitleField';
+import { youtubeTitleError } from '@/lib/youtube';
 import { PublishResults } from '@/components/publish/PublishResults';
 import { PageHeader } from '@/components/PageHeader';
 import type { UploadedMedia } from '@/components/publish/MediaUploader';
 import { mapDraftMediaToUploaded } from '@/hooks/useDrafts';
 import type { InstagramSelection, Platform } from '@/types/accounts';
 import { TWITTER_CHAR_LIMIT } from '@/types/accounts';
-import { contentKinds, needsChoice, resolveContent, type ContentKind, type ContentSelection } from '@/lib/publish/contentRules';
+import { contentKinds, fitContent, needsChoice, resolveContent, type ContentKind, type ContentSelection } from '@/lib/publish/contentRules';
 import { PLATFORM_CONFIG } from '@/lib/platformConfig';
 
 export default function PublishPage() {
@@ -64,6 +66,7 @@ function PublishPageInner() {
     instagramAccounts,
     telegramChannels,
     linkedinAccounts,
+    youtubeChannels,
     loading,
   } = useConnectedAccounts();
 
@@ -120,6 +123,8 @@ function PublishPageInner() {
   >({});
   const [selectedTelegramChannels, setSelectedTelegramChannels] = useState<string[]>([]);
   const [selectedLinkedInAccounts, setSelectedLinkedInAccounts] = useState<string[]>([]);
+  const [selectedYouTubeChannels, setSelectedYouTubeChannels] = useState<string[]>([]);
+  const [youtubeTitle, setYoutubeTitle] = useState('');
   // What to send to platforms that cannot take the whole post
   const [contentSelection, setContentSelection] = useState<ContentSelection>({});
 
@@ -173,6 +178,12 @@ function PublishPageInner() {
       setSelectedLinkedInAccounts(linkedinAccounts.map((a) => a.id));
     }
   }, [linkedinAccounts]);
+
+  useEffect(() => {
+    if (youtubeChannels.length > 0) {
+      setSelectedYouTubeChannels(youtubeChannels.map((c) => c.id));
+    }
+  }, [youtubeChannels]);
 
   // Draft loading state
   const [draftTargets, setDraftTargets] = useState<Platform[] | null>(null);
@@ -246,6 +257,7 @@ function PublishPageInner() {
       draftTargets.includes('telegram') ? telegramChannels.map((c) => c.channel_id) : []
     );
     setSelectedLinkedInAccounts(draftTargets.includes('linkedin') ? linkedinAccounts.map((a) => a.id) : []);
+    setSelectedYouTubeChannels(draftTargets.includes('youtube') ? youtubeChannels.map((c) => c.id) : []);
     const instagram: Record<string, InstagramSelection> = {};
     instagramAccounts.forEach((a) => {
       instagram[a.id] = {
@@ -254,7 +266,7 @@ function PublishPageInner() {
       };
     });
     setSelectedInstagramAccounts(instagram);
-  }, [draftTargets, loading, facebookPages, xAccounts, telegramChannels, linkedinAccounts, instagramAccounts, uploadedMedia.length]);
+  }, [draftTargets, loading, facebookPages, xAccounts, telegramChannels, linkedinAccounts, youtubeChannels, instagramAccounts, uploadedMedia.length]);
 
   // A published or queued draft is consumed: delete it and drop the ?draft param
   const consumeDraft = useCallback(async () => {
@@ -316,6 +328,14 @@ function PublishPageInner() {
     );
   }, []);
 
+  const handleYouTubeChange = useCallback((channelId: string) => {
+    setSelectedYouTubeChannels((prev) =>
+      prev.includes(channelId)
+        ? prev.filter((id) => id !== channelId)
+        : [...prev, channelId]
+    );
+  }, []);
+
   const handleContentSelect = useCallback((platform: Platform, kinds: ContentKind[]) => {
     setContentSelection((prev) => ({ ...prev, [platform]: kinds }));
   }, []);
@@ -324,16 +344,18 @@ function PublishPageInner() {
     setPostText('');
     setUploadedMedia([]);
     setContentSelection({});
+    setYoutubeTitle('');
     setSelectedFacebookPages(facebookPages.map((p) => p.page_id));
     setSelectedXAccounts(xAccounts.map((a) => a.id));
     setSelectedTelegramChannels(telegramChannels.map((c) => c.channel_id));
     setSelectedLinkedInAccounts(linkedinAccounts.map((a) => a.id));
+    setSelectedYouTubeChannels(youtubeChannels.map((c) => c.id));
     const resetInstagram: Record<string, InstagramSelection> = {};
     instagramAccounts.forEach((a) => {
       resetInstagram[a.id] = { publish: false, story: false };
     });
     setSelectedInstagramAccounts(resetInstagram);
-  }, [facebookPages, xAccounts, instagramAccounts, telegramChannels, linkedinAccounts]);
+  }, [facebookPages, xAccounts, instagramAccounts, telegramChannels, linkedinAccounts, youtubeChannels]);
 
   const handleHidePublishing = useCallback(() => {
     setPublishingHidden(true);
@@ -353,6 +375,8 @@ function PublishPageInner() {
       selectedInstagramAccounts,
       selectedTelegramChannels,
       selectedLinkedInAccounts,
+      selectedYouTubeChannels,
+      youtubeTitle,
       contentSelection,
     });
 
@@ -380,6 +404,7 @@ function PublishPageInner() {
       Object.values(selectedInstagramAccounts).some((s) => s.publish || s.story) ? 'instagram' : null,
       selectedTelegramChannels.length > 0 ? 'telegram' : null,
       selectedLinkedInAccounts.length > 0 ? 'linkedin' : null,
+      selectedYouTubeChannels.length > 0 ? 'youtube' : null,
     ].filter(Boolean);
 
     try {
@@ -426,7 +451,7 @@ function PublishPageInner() {
   const charCount = postText.length;
   const showTwitterWarning = charCount > TWITTER_CHAR_LIMIT && selectedXAccounts.length > 0;
   const hasAnyAccount =
-    facebookPages.length > 0 || xAccounts.length > 0 || instagramAccounts.length > 0 || telegramChannels.length > 0 || linkedinAccounts.length > 0;
+    facebookPages.length > 0 || xAccounts.length > 0 || instagramAccounts.length > 0 || telegramChannels.length > 0 || linkedinAccounts.length > 0 || youtubeChannels.length > 0;
   const kinds = contentKinds(postText, uploadedMedia);
   const selectedPerPlatform: Record<Platform, number> = {
     facebook: selectedFacebookPages.length,
@@ -434,8 +459,10 @@ function PublishPageInner() {
     instagram: Object.values(selectedInstagramAccounts).filter((s) => s.publish || s.story).length,
     telegram: selectedTelegramChannels.length,
     linkedin: selectedLinkedInAccounts.length,
+    youtube: selectedYouTubeChannels.length,
   };
   const platforms = Object.keys(selectedPerPlatform) as Platform[];
+  const showYouTubeTitle = selectedYouTubeChannels.length > 0 && fitContent('youtube', kinds).status !== 'unsupported';
   // Selected destinations whose platform can take the post (or has a choice made)
   const selectedCount = platforms.reduce(
     (count, platform) =>
@@ -452,7 +479,8 @@ function PublishPageInner() {
     !isSavingDraft &&
     (postText.trim() !== '' || uploadedMedia.length > 0);
   const canPublish =
-    !isPublishing && !isMediaUploading && !isSavingDraft && selectedCount > 0 && undecided.length === 0;
+    !isPublishing && !isMediaUploading && !isSavingDraft && selectedCount > 0 && undecided.length === 0 &&
+    !(showYouTubeTitle && youtubeTitleError(youtubeTitle.trim()));
 
   if (loading) {
     return (
@@ -644,7 +672,7 @@ function PublishPageInner() {
                 No accounts connected
               </Typography>
               <Typography variant="body1" color="text.secondary">
-                Head to the Dashboard to connect your Facebook, Instagram, X, Telegram, and LinkedIn accounts.
+                Head to the Dashboard to connect your Facebook, Instagram, X, Telegram, LinkedIn, and YouTube accounts.
               </Typography>
             </Paper>
           </Fade>
@@ -698,20 +726,28 @@ function PublishPageInner() {
                   instagramAccounts={instagramAccounts}
                   telegramChannels={telegramChannels}
                   linkedinAccounts={linkedinAccounts}
+                  youtubeChannels={youtubeChannels}
                   selectedFacebookPages={selectedFacebookPages}
                   selectedXAccounts={selectedXAccounts}
                   selectedInstagramAccounts={selectedInstagramAccounts}
                   selectedTelegramChannels={selectedTelegramChannels}
                   selectedLinkedInAccounts={selectedLinkedInAccounts}
+                  selectedYouTubeChannels={selectedYouTubeChannels}
                   onFacebookChange={handleFacebookChange}
                   onXChange={handleXChange}
                   onInstagramChange={handleInstagramChange}
                   onTelegramChange={handleTelegramChange}
                   onLinkedInChange={handleLinkedInChange}
+                  onYouTubeChange={handleYouTubeChange}
                   contentKinds={kinds}
                   contentSelection={contentSelection}
                   onContentSelect={handleContentSelect}
                 />
+                {showYouTubeTitle && (
+                  <Box sx={{ mt: 2 }}>
+                    <YouTubeTitleField value={youtubeTitle} onChange={setYoutubeTitle} />
+                  </Box>
+                )}
               </Paper>
 
               {/* Publish Buttons */}

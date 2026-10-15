@@ -5,6 +5,7 @@ import { TwitterPublisherV1, TwitterAccountTokenV1 } from '@/lib/publishers/twit
 import { InstagramPublisher, InstagramAccountToken } from '@/lib/publishers/instagram';
 import { TelegramPublisher, TelegramChannelToken } from '@/lib/publishers/telegram';
 import { LinkedInPublisher, LinkedInAccountToken } from '@/lib/publishers/linkedin';
+import { YouTubePublisher, YouTubeChannelToken } from '@/lib/publishers/youtube';
 import { ReportLogger, CloudinaryMediaInfo } from './types';
 import type { ContentSelection } from './contentRules';
 import type { Platform } from '@/types/accounts';
@@ -19,6 +20,8 @@ import {
   mapTelegramFailed,
   mapLinkedInSuccess,
   mapLinkedInFailed,
+  mapYouTubeSuccess,
+  mapYouTubeFailed,
   formatFailedDetails
 } from './mappers/resultMappers';
 
@@ -53,6 +56,9 @@ export interface ExecutePublishOptions {
   instagramStoryTokens: InstagramAccountToken[];
   telegramTokens: TelegramChannelToken[];
   linkedinTokens: LinkedInAccountToken[];
+  youtubeTokens: YouTubeChannelToken[];
+  /** Title for YouTube uploads; blank uses the video's file name. */
+  youtubeTitle?: string;
   reportLogger: ReportLogger;
   contentSelection?: ContentSelection;
   onProgress?: ProgressCallback;
@@ -92,13 +98,14 @@ export async function executePublish(
     instagramStoryTokens,
     telegramTokens,
     linkedinTokens,
+    youtubeTokens,
     reportLogger
   } = options;
 
   reportLogger.add(
     `Starting publishing process to ${facebookTokens.length} Facebook pages, ` +
     `${twitterTokens.length} X accounts, ${instagramFeedTokens.length} Instagram feed accounts, ` +
-    `${instagramStoryTokens.length} Instagram story accounts, ${telegramTokens.length} Telegram channels, ${linkedinTokens.length} LinkedIn accounts`
+    `${instagramStoryTokens.length} Instagram story accounts, ${telegramTokens.length} Telegram channels, ${linkedinTokens.length} LinkedIn accounts, ${youtubeTokens.length} YouTube channels`
   );
 
   const facebookPublisher = new FacebookPublisher(pool);
@@ -115,6 +122,7 @@ export async function executePublish(
   const instagram = contentFor('instagram', options);
   const telegram = contentFor('telegram', options);
   const linkedin = contentFor('linkedin', options);
+  const youtube = contentFor('youtube', options);
 
   // Facebook and Twitter use downloaded media files (buffers)
   const facebookOptions = {
@@ -322,7 +330,17 @@ export async function executePublish(
       : Promise.resolve({ successful: [], failed: [] })
   );
 
-  const [fbResults, xResults, igFeedResults, igStoryResults, telegramResults, linkedinResults] = await Promise.all(publishPromises);
+  // YouTube publishing (uploads the Cloudinary video itself)
+  publishPromises.push(
+    youtubeTokens.length > 0
+      ? new YouTubePublisher(pool).publishToAccounts({ title: options.youtubeTitle ?? '', text: youtube.text.trim(), cloudinaryMedia: youtube.cloudinaryMedia }, youtubeTokens).then(res => ({
+          successful: mapYouTubeSuccess(res.successful),
+          failed: mapYouTubeFailed(res.failed)
+        }))
+      : Promise.resolve({ successful: [], failed: [] })
+  );
+
+  const [fbResults, xResults, igFeedResults, igStoryResults, telegramResults, linkedinResults, youtubeResults] = await Promise.all(publishPromises);
 
   const allSuccessful = [
     ...fbResults.successful,
@@ -330,7 +348,8 @@ export async function executePublish(
     ...igFeedResults.successful,
     ...igStoryResults.successful,
     ...telegramResults.successful,
-    ...linkedinResults.successful
+    ...linkedinResults.successful,
+    ...youtubeResults.successful
   ];
   const allFailed = [
     ...fbResults.failed,
@@ -338,7 +357,8 @@ export async function executePublish(
     ...igFeedResults.failed,
     ...igStoryResults.failed,
     ...telegramResults.failed,
-    ...linkedinResults.failed
+    ...linkedinResults.failed,
+    ...youtubeResults.failed
   ];
 
   reportLogger.add(`Publishing complete. Successful posts: ${allSuccessful.length}, Failed posts: ${allFailed.length}`);
@@ -364,13 +384,14 @@ export async function executePublishWithProgress(
     instagramStoryTokens,
     telegramTokens,
     linkedinTokens,
+    youtubeTokens,
     reportLogger,
     onProgress,
     onAccountProgress
   } = options;
 
   const totalAccounts = facebookTokens.length + twitterTokens.length +
-    instagramFeedTokens.length + instagramStoryTokens.length + telegramTokens.length + linkedinTokens.length;
+    instagramFeedTokens.length + instagramStoryTokens.length + telegramTokens.length + linkedinTokens.length + youtubeTokens.length;
 
   const allSuccessful: SuccessfulPublishResult[] = [];
   const allFailed: FailedPublishResult[] = [];
@@ -432,6 +453,15 @@ export async function executePublishWithProgress(
     });
   });
 
+  youtubeTokens.forEach(token => {
+    accountsProgress.push({
+      accountId: token.channel_id,
+      accountName: token.title,
+      platform: 'YouTube',
+      status: 'pending'
+    });
+  });
+
   // Track completed count for progress updates
   let completedCount = 0;
 
@@ -482,6 +512,7 @@ export async function executePublishWithProgress(
   const instagram = contentFor('instagram', options);
   const telegram = contentFor('telegram', options);
   const linkedin = contentFor('linkedin', options);
+  const youtube = contentFor('youtube', options);
 
   const facebookOptions = {
     text: facebook.text.trim() || undefined,
@@ -762,6 +793,29 @@ export async function executePublishWithProgress(
       } catch (err) {
         reportLogger.add(`Error publishing to LinkedIn ${token.name}: ${(err as Error).message}`);
         await updateAccountStatus(token.linkedin_user_id, 'failed', (err as Error).message);
+      }
+    })());
+  }
+
+  // YouTube publishing (parallel)
+  const youtubePublisher = new YouTubePublisher(pool);
+  for (const token of youtubeTokens) {
+    publishPromises.push((async () => {
+      await updateAccountStatus(token.channel_id, 'publishing');
+
+      try {
+        const result = await youtubePublisher.publishToAccounts({ title: options.youtubeTitle ?? '', text: youtube.text.trim(), cloudinaryMedia: youtube.cloudinaryMedia }, [token]);
+        if (result.successful.length > 0) {
+          allSuccessful.push(...mapYouTubeSuccess(result.successful));
+          await updateAccountStatus(token.channel_id, 'completed');
+        }
+        if (result.failed.length > 0) {
+          allFailed.push(...mapYouTubeFailed(result.failed));
+          await updateAccountStatus(token.channel_id, 'failed', result.failed[0].error.message);
+        }
+      } catch (err) {
+        reportLogger.add(`Error publishing to YouTube ${token.title}: ${(err as Error).message}`);
+        await updateAccountStatus(token.channel_id, 'failed', (err as Error).message);
       }
     })());
   }

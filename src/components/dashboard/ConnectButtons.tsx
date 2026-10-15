@@ -1,13 +1,15 @@
 'use client';
 
 import React from 'react';
-import { Box, Button, CircularProgress } from '@mui/material';
+import { Box, Button, CircularProgress, Link, Typography } from '@mui/material';
+import { GOOGLE_PRIVACY_URL, YOUTUBE_TERMS_URL } from '@/lib/youtube';
 import {
   Facebook as FacebookIcon,
   Instagram as InstagramIcon,
   Twitter as TwitterIcon,
   Telegram as TelegramIcon,
   LinkedIn as LinkedInIcon,
+  YouTube as YouTubeIcon,
 } from '@mui/icons-material';
 
 interface ConnectButtonsProps {
@@ -113,6 +115,34 @@ export function ConnectButtons({
       >
         Add LinkedIn Account
       </Button>
+
+      <Button
+        variant="contained"
+        href="/api/youtube/auth"
+        fullWidth
+        startIcon={<YouTubeIcon />}
+        sx={{
+          bgcolor: '#ff0000',
+          '&:hover': { bgcolor: '#cc0000' },
+          color: '#fff',
+          maxWidth: { sm: 'fit-content' },
+        }}
+      >
+        Add YouTube Channel
+      </Button>
+
+      <Typography variant="caption" color="text.secondary" sx={{ flexBasis: '100%' }}>
+        MockingBird uploads to YouTube through the YouTube API Services. By connecting a YouTube channel you agree to
+        the{' '}
+        <Link href={YOUTUBE_TERMS_URL} target="_blank" rel="noopener noreferrer">
+          YouTube Terms of Service
+        </Link>
+        ; Google processes your data under the{' '}
+        <Link href={GOOGLE_PRIVACY_URL} target="_blank" rel="noopener noreferrer">
+          Google Privacy Policy
+        </Link>
+        .
+      </Typography>
     </Box>
   );
 }

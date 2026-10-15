@@ -41,6 +41,7 @@ describe('usePublish destination filtering', () => {
         selectedInstagramAccounts: { ig1: { publish: true, story: false } },
         selectedTelegramChannels: [],
         selectedLinkedInAccounts: [],
+        selectedYouTubeChannels: [],
         contentSelection: { twitter: ['text', 'video'], instagram: ['text', 'image'] },
       })
     );
@@ -64,6 +65,7 @@ describe('usePublish destination filtering', () => {
         selectedInstagramAccounts: { ig1: { publish: true, story: false } },
         selectedTelegramChannels: [],
         selectedLinkedInAccounts: [],
+        selectedYouTubeChannels: [],
       })
     );
 
@@ -86,6 +88,7 @@ describe('usePublish destination filtering', () => {
         selectedInstagramAccounts: {},
         selectedTelegramChannels: [],
         selectedLinkedInAccounts: [],
+        selectedYouTubeChannels: [],
       });
     });
 
@@ -106,6 +109,7 @@ describe('usePublish destination filtering', () => {
         selectedInstagramAccounts: {},
         selectedTelegramChannels: [],
         selectedLinkedInAccounts: [],
+        selectedYouTubeChannels: [],
       })
     );
 
@@ -125,11 +129,47 @@ describe('usePublish destination filtering', () => {
         selectedInstagramAccounts: { ig1: { publish: true, story: false } },
         selectedTelegramChannels: [],
         selectedLinkedInAccounts: [],
+        selectedYouTubeChannels: [],
       });
     });
 
     expect(ok).toBe(false);
     expect(global.fetch).not.toHaveBeenCalled();
     expect(result.current.error?.message).toMatch(/select at least one/i);
+  });
+});
+
+describe('usePublish YouTube title', () => {
+  const youtubePost = (youtubeTitle: string) => ({
+    postText: 'We shipped it.',
+    uploadedMedia: [video],
+    selectedFacebookPages: [],
+    selectedXAccounts: [],
+    selectedInstagramAccounts: {},
+    selectedTelegramChannels: [],
+    selectedLinkedInAccounts: [],
+    selectedYouTubeChannels: ['UC1'],
+    youtubeTitle,
+  });
+
+  beforeEach(() => {
+    global.fetch = jest.fn().mockResolvedValue(emptyStream());
+  });
+
+  it('sends the trimmed title with the YouTube channels', async () => {
+    const { result } = renderHook(() => usePublish());
+
+    await act(() => result.current.publish(youtubePost('  Launch day  ')));
+
+    expect(sentBody()).toMatchObject({ youtubeChannels: ['UC1'], youtubeTitle: 'Launch day' });
+  });
+
+  it('blocks a title YouTube would reject', async () => {
+    const { result } = renderHook(() => usePublish());
+
+    await act(() => result.current.publish(youtubePost('a <b>')));
+
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(result.current.error?.message).toBe('YouTube titles cannot contain < or >.');
   });
 });

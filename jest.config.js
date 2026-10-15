@@ -7,7 +7,8 @@ module.exports = {
   testEnvironment: 'node',
   testMatch: ['**/tests/**/*.test.ts?(x)'],
   // Functional tests need a running app + Postgres: `npm run test:functional`.
-  testPathIgnorePatterns: ['/node_modules/', '/tests/functional/'],
+  // .claude/ holds Claude Code worktrees, whose copies of the tests must not run here.
+  testPathIgnorePatterns: ['/node_modules/', '/tests/functional/', '/.claude/'],
   setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',

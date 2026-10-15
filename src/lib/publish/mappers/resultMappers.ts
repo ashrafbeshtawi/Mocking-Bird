@@ -11,6 +11,7 @@ import {
   TelegramSuccessItem
 } from '@/types/interfaces';
 import type { LinkedInPublishResult, LinkedInPublishError } from '@/lib/publishers/linkedin';
+import type { YouTubePublishResult, YouTubePublishError } from '@/lib/publishers/youtube';
 
 /**
  * Maps Facebook failed items to standardized FailedPublishResult
@@ -153,6 +154,28 @@ export function mapLinkedInFailed(failed: LinkedInPublishError[]): FailedPublish
  * Maps LinkedIn successful items to standardized SuccessfulPublishResult
  */
 export function mapLinkedInSuccess(successful: LinkedInPublishResult[]): SuccessfulPublishResult[] {
+  return successful.map(item => ({
+    platform: item.platform,
+    account_id: item.account_id,
+    post_id: item.post_id
+  }));
+}
+
+/**
+ * Maps YouTube failed items to standardized FailedPublishResult
+ */
+export function mapYouTubeFailed(failed: YouTubePublishError[]): FailedPublishResult[] {
+  return failed.map(item => ({
+    platform: item.platform,
+    account_id: item.account_id,
+    error: { message: item.error.message, code: item.error.code }
+  }));
+}
+
+/**
+ * Maps YouTube successful items to standardized SuccessfulPublishResult
+ */
+export function mapYouTubeSuccess(successful: YouTubePublishResult[]): SuccessfulPublishResult[] {
   return successful.map(item => ({
     platform: item.platform,
     account_id: item.account_id,

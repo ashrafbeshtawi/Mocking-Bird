@@ -3,6 +3,7 @@ import InstagramIcon from '@mui/icons-material/Instagram';
 import XIcon from '@mui/icons-material/X';
 import TelegramIcon from '@mui/icons-material/Telegram';
 import LinkedInIcon from '@mui/icons-material/LinkedIn';
+import YouTubeIcon from '@mui/icons-material/YouTube';
 import type { SvgIconComponent } from '@mui/icons-material';
 import type { Platform } from '@/types/accounts';
 
@@ -39,6 +40,11 @@ export const PLATFORM_CONFIG: Record<Platform, PlatformConfig> = {
     label: 'LinkedIn',
     icon: LinkedInIcon,
     color: '#0a66c2',
+  },
+  youtube: {
+    label: 'YouTube',
+    icon: YouTubeIcon,
+    color: '#ff0000',
   },
 };
 

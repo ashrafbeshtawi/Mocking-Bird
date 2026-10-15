@@ -61,7 +61,7 @@ export async function retryFailedDestinations(
     }
 
     const { rows } = await client.query(
-      `SELECT post_text, media, publish_destinations
+      `SELECT post_text, media, youtube_title, publish_destinations
        FROM publish_history WHERE id = $1 AND user_id = $2`,
       [historyId, parseInt(userId, 10)]
     );
@@ -71,6 +71,7 @@ export async function retryFailedDestinations(
     const entry = rows[0] as {
       post_text: string | null;
       media: CloudinaryMediaInfo[] | null;
+      youtube_title: string | null;
       publish_destinations: PublishDestination[] | null;
     };
     if (entry.post_text === null) {
@@ -99,6 +100,7 @@ export async function retryFailedDestinations(
     const instagramStory = accountsOf('instagram', 'story');
     const telegramChannels = accountsOf('telegram');
     const linkedinAccounts = accountsOf('linkedin');
+    const youtubeChannels = accountsOf('youtube');
 
     // Facebook and X upload the files themselves; the other platforms take the URLs.
     const needsDownload = facebookPages.length > 0 || xAccounts.length > 0;
@@ -107,13 +109,14 @@ export async function retryFailedDestinations(
       : { files: [] };
 
     const tokens = await fetchAllTokens(
-      pool, userId, facebookPages, xAccounts, instagramFeed, instagramStory, telegramChannels, linkedinAccounts, reportLogger
+      pool, userId, facebookPages, xAccounts, instagramFeed, instagramStory, telegramChannels, linkedinAccounts, youtubeChannels, reportLogger
     );
     const { successful, failed } = await executePublish({
       pool,
       text: entry.post_text,
       mediaFiles: mediaResult.files,
       cloudinaryMedia: media,
+      youtubeTitle: entry.youtube_title ?? '',
       ...tokens,
       reportLogger,
     });

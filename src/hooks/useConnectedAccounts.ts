@@ -8,6 +8,7 @@ import type {
   InstagramAccount,
   TelegramChannel,
   LinkedInAccount,
+  YouTubeChannel,
   AccountData,
 } from '@/types/accounts';
 
@@ -18,6 +19,7 @@ interface UseConnectedAccountsReturn {
   instagramAccounts: InstagramAccount[];
   telegramChannels: TelegramChannel[];
   linkedinAccounts: LinkedInAccount[];
+  youtubeChannels: YouTubeChannel[];
   // Normalized data for dashboard
   normalizedAccounts: {
     facebook: AccountData[];
@@ -25,6 +27,7 @@ interface UseConnectedAccountsReturn {
     twitter: AccountData[];
     telegram: AccountData[];
     linkedin: AccountData[];
+    youtube: AccountData[];
   };
   // State
   loading: boolean;
@@ -39,6 +42,7 @@ export function useConnectedAccounts(): UseConnectedAccountsReturn {
   const [instagramAccounts, setInstagramAccounts] = useState<InstagramAccount[]>([]);
   const [telegramChannels, setTelegramChannels] = useState<TelegramChannel[]>([]);
   const [linkedinAccounts, setLinkedinAccounts] = useState<LinkedInAccount[]>([]);
+  const [youtubeChannels, setYoutubeChannels] = useState<YouTubeChannel[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -47,12 +51,13 @@ export function useConnectedAccounts(): UseConnectedAccountsReturn {
     setError(null);
 
     try {
-      const [fbRes, instaRes, twitterRes, telegramRes, linkedinRes] = await Promise.allSettled([
+      const [fbRes, instaRes, twitterRes, telegramRes, linkedinRes, youtubeRes] = await Promise.allSettled([
         fetchWithAuth('/api/facebook/get-pages'),
         fetchWithAuth('/api/instagram'),
         fetchWithAuth('/api/twitter-v1.1/get-accounts'),
         fetchWithAuth('/api/telegram/get-channels'),
         fetchWithAuth('/api/linkedin/get-accounts'),
+        fetchWithAuth('/api/youtube/get-channels'),
       ]);
 
       // Process Facebook pages
@@ -93,6 +98,14 @@ export function useConnectedAccounts(): UseConnectedAccountsReturn {
         setLinkedinAccounts(data.accounts || []);
       } else {
         setLinkedinAccounts([]);
+      }
+
+      // Process YouTube channels
+      if (youtubeRes.status === 'fulfilled' && youtubeRes.value.ok) {
+        const data = await youtubeRes.value.json();
+        setYoutubeChannels(data.channels || []);
+      } else {
+        setYoutubeChannels([]);
       }
     } catch (err) {
       console.error('Error fetching accounts:', err);
@@ -135,7 +148,12 @@ export function useConnectedAccounts(): UseConnectedAccountsReturn {
       details: new Date(a.expiresAt) <= new Date() ? 'Expired, reconnect' : undefined,
       platform: 'linkedin' as const,
     })),
-  }), [facebookPages, instagramAccounts, xAccounts, telegramChannels, linkedinAccounts]);
+    youtube: youtubeChannels.map((c) => ({
+      id: c.id,
+      name: c.name,
+      platform: 'youtube' as const,
+    })),
+  }), [facebookPages, instagramAccounts, xAccounts, telegramChannels, linkedinAccounts, youtubeChannels]);
 
   return {
     facebookPages,
@@ -143,6 +161,7 @@ export function useConnectedAccounts(): UseConnectedAccountsReturn {
     instagramAccounts,
     telegramChannels,
     linkedinAccounts,
+    youtubeChannels,
     normalizedAccounts,
     loading,
     error,

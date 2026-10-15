@@ -16,7 +16,7 @@ const logger = createLogger('ReportService');
  * Represents a publish destination for storage
  */
 export interface PublishDestination {
-  platform: 'facebook' | 'twitter' | 'instagram' | 'telegram' | 'linkedin';
+  platform: 'facebook' | 'twitter' | 'instagram' | 'telegram' | 'linkedin' | 'youtube';
   account_id: string;
   account_name?: string;
   post_type?: 'feed' | 'story';
@@ -33,7 +33,7 @@ function normalizePlatform(platform: string): PublishDestination['platform'] {
   if (normalized === 'x' || normalized === 'twitter') {
     return 'twitter';
   }
-  if (normalized === 'facebook' || normalized === 'instagram' || normalized === 'telegram' || normalized === 'linkedin') {
+  if (normalized === 'facebook' || normalized === 'instagram' || normalized === 'telegram' || normalized === 'linkedin' || normalized === 'youtube') {
     return normalized as PublishDestination['platform'];
   }
   // Default fallback - log unknown platforms
@@ -160,7 +160,7 @@ export async function savePublishReport(
   status: PublishStatus,
   destinations: PublishDestination[] = [],
   /** The post as published; stored so failed destinations can be retried. */
-  post?: { text: string; media: CloudinaryMediaInfo[] }
+  post?: { text: string; media: CloudinaryMediaInfo[]; youtubeTitle: string }
 ): Promise<void> {
   const client = await pool.connect();
   try {
@@ -168,8 +168,8 @@ export async function savePublishReport(
     logger.info(`Saving publish report: userId=${userId}, status=${status}, destinations=${JSON.stringify(destinations)}`);
 
     await client.query(
-      `INSERT INTO publish_history (user_id, content, publish_report, publish_status, publish_destinations, post_text, media)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      `INSERT INTO publish_history (user_id, content, publish_report, publish_status, publish_destinations, post_text, media, youtube_title)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [
         parseInt(userId),
         content,
@@ -178,6 +178,7 @@ export async function savePublishReport(
         JSON.stringify(destinations),
         post?.text ?? null,
         post ? JSON.stringify(post.media) : null,
+        post?.youtubeTitle ?? null,
       ]
     );
 

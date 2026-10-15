@@ -3,6 +3,6 @@
 module.exports = {
   ...require('./jest.config'),
   testMatch: ['**/tests/functional/**/*.test.ts'],
-  testPathIgnorePatterns: ['/node_modules/'],
+  testPathIgnorePatterns: ['/node_modules/', '/.claude/'],
   testTimeout: 60000,
 };

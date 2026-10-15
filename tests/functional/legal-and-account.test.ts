@@ -4,10 +4,10 @@ afterAll(() => db.end());
 
 describe('legal pages', () => {
   it.each([
-    ['/impressum', 'Impressum'],
-    ['/privacy', 'Datenschutzerklärung'],
-    ['/terms', 'Nutzungsbedingungen'],
-    ['/delete-account', 'Account löschen'],
+    ['/impressum', 'Legal Notice (Impressum)'],
+    ['/privacy', 'Privacy Policy'],
+    ['/terms', 'Terms of Service'],
+    ['/delete-account', 'Delete Account'],
   ])('%s is public and renders', async (pathname, heading) => {
     const response = await fetchPage(pathname);
 

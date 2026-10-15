@@ -22,6 +22,7 @@ export const PLATFORM_CONTENT_RULES: Record<Platform, PlatformContentRules> = {
   twitter: { supported: ['text', 'image', 'video'], mixes: [['text', 'image'], ['text', 'video']] },
   instagram: { supported: ['image', 'video'], mixes: [['text', 'image'], ['text', 'video']] },
   linkedin: { supported: ['text', 'image', 'video'], mixes: [['text', 'image'], ['text', 'video']] },
+  youtube: { supported: ['video'], mixes: [['text', 'video']] },
 };
 
 /** How a post fits a platform's rules. `partial` lists the largest sendable subsets. */

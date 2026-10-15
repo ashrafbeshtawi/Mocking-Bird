@@ -49,11 +49,11 @@ export default function RootLayout({
             <Navbar />
             {children}
             <footer className="py-6 text-center text-sm opacity-70">
-              <Link href="/impressum">Impressum</Link>
+              <Link href="/impressum">Legal Notice</Link>
               {" · "}
-              <Link href="/privacy">Datenschutz</Link>
+              <Link href="/privacy">Privacy Policy</Link>
               {" · "}
-              <Link href="/terms">Nutzungsbedingungen</Link>
+              <Link href="/terms">Terms of Service</Link>
             </footer>
           </MuiThemeProvider>
         </AuthProvider>
