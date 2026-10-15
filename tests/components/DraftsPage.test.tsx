@@ -13,6 +13,7 @@ jest.mock('@/hooks/useConnectedAccounts', () => ({
     xAccounts: [],
     instagramAccounts: [],
     telegramChannels: [],
+    normalizedAccounts: { facebook: [{ id: 'p1', name: 'My Page', platform: 'facebook' }] },
   }),
 }));
 let mockPublishState: Record<string, unknown> = {};
@@ -147,6 +148,7 @@ describe('Drafts page', () => {
     await screen.findByText('first draft');
 
     const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText('My Page')).toBeInTheDocument();
     expect(within(dialog).getByText(/Token expired/)).toBeInTheDocument();
     expect(within(dialog).getByText(/Code: 190/)).toBeInTheDocument();
   });

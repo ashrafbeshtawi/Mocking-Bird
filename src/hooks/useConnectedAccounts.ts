@@ -13,7 +13,7 @@ import type {
   AccountData,
 } from '@/types/accounts';
 
-interface UseConnectedAccountsReturn {
+export interface UseConnectedAccountsReturn {
   // Raw data from APIs
   facebookPages: ConnectedPage[];
   xAccounts: ConnectedXAccount[];
