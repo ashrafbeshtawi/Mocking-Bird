@@ -1,14 +1,15 @@
 import Link from "next/link";
+import { GOOGLE_PERMISSIONS_URL, GOOGLE_PRIVACY_URL, YOUTUBE_TERMS_URL } from "@/lib/youtube";
 
-export const metadata = { title: "Datenschutzerklärung – Mockingbird" };
+export const metadata = { title: "Privacy Policy – Mockingbird" };
 
 export default function PrivacyPage() {
   return (
-    <main className="legal" lang="de">
-      <h1>Datenschutzerklärung</h1>
+    <main className="legal" lang="en">
+      <h1>Privacy Policy</h1>
 
-      <h2>1. Verantwortlicher</h2>
-      <p>Verantwortlicher für die Verarbeitung personenbezogener Daten im Zusammenhang mit MockingBird ist:</p>
+      <h2>1. Controller</h2>
+      <p>The controller responsible for processing personal data in connection with MockingBird is:</p>
       <address>
         <strong>Ashraf Beshtawi</strong>
         <br />
@@ -16,256 +17,281 @@ export default function PrivacyPage() {
         <br />
         12685 Berlin
         <br />
-        Deutschland
+        Germany
       </address>
       <p>
-        E-Mail: <a href="mailto:beshtawi.ashraf@gmail.com">beshtawi.ashraf@gmail.com</a>
+        Email: <a href="mailto:beshtawi.ashraf@gmail.com">beshtawi.ashraf@gmail.com</a>
       </p>
 
-      <h2>2. Über MockingBird</h2>
+      <h2>2. About MockingBird</h2>
       <p>
-        MockingBird ist eine Anwendung, mit der Nutzer Beiträge zentral erstellen, verwalten und auf ihren eigenen
-        Social-Media-Konten veröffentlichen können.
+        MockingBird is an application that lets users create and manage posts in one place and publish them on their own
+        social media accounts.
       </p>
       <p>
-        Hierzu können Nutzer ihre Social-Media-Konten über die von den jeweiligen Plattformen bereitgestellten
-        offiziellen Schnittstellen (APIs) mit MockingBird verbinden.
+        To do so, users can connect their social media accounts to MockingBird through the official interfaces (APIs)
+        provided by each platform.
       </p>
-      <p>
-        MockingBird greift dabei nur auf Daten und Funktionen zu, für die der Nutzer der jeweiligen Plattform eine
-        entsprechende Berechtigung erteilt hat.
-      </p>
+      <p>MockingBird only accesses data and functions that the user has authorized on the respective platform.</p>
 
-      <h2>3. Welche personenbezogenen Daten werden verarbeitet?</h2>
-      <p>Je nach Nutzung von MockingBird können insbesondere folgende Daten verarbeitet werden:</p>
+      <h2>3. Which personal data is processed?</h2>
+      <p>Depending on how MockingBird is used, the following data in particular may be processed:</p>
       <ul>
-        <li>Name bzw. Benutzername</li>
-        <li>E-Mail-Adresse</li>
-        <li>Benutzerkonto und interne Benutzer-ID</li>
-        <li>Informationen über verbundene Social-Media-Konten</li>
-        <li>Social-Media-Konto-IDs</li>
-        <li>OAuth-Zugriffsdaten bzw. Zugriffstokens</li>
-        <li>von Nutzern erstellte Beiträge</li>
-        <li>Bilder, Videos und sonstige hochgeladene Inhalte</li>
-        <li>technische Protokoll- und Nutzungsdaten</li>
-        <li>IP-Adresse</li>
-        <li>Browser- und Geräteinformationen</li>
-        <li>Datum und Uhrzeit von Zugriffen und Aktionen</li>
+        <li>name or username</li>
+        <li>email address</li>
+        <li>user account and internal user ID</li>
+        <li>information about connected social media accounts</li>
+        <li>social media account IDs</li>
+        <li>OAuth credentials, access tokens and refresh tokens</li>
+        <li>posts created by users</li>
+        <li>images, videos and other uploaded content</li>
+        <li>technical log and usage data</li>
+        <li>IP address</li>
+        <li>browser and device information</li>
+        <li>date and time of access and actions</li>
       </ul>
       <p>
-        Welche Daten tatsächlich verarbeitet werden, hängt von den vom Nutzer verwendeten Funktionen und den jeweiligen
-        APIs der verbundenen Plattformen ab.
+        Which data is actually processed depends on the features the user uses and on the APIs of the connected
+        platforms.
       </p>
 
-      <h2>4. Verbindung mit Social-Media-Plattformen</h2>
-      <p>MockingBird ermöglicht die Verbindung mit folgenden Social-Media-Plattformen:</p>
+      <h2>4. Connecting social media platforms</h2>
+      <p>MockingBird can connect to the following social media platforms:</p>
       <ul>
         <li>Facebook / Meta</li>
         <li>Instagram</li>
         <li>X</li>
         <li>Telegram</li>
+        <li>LinkedIn</li>
+        <li>YouTube</li>
       </ul>
+      <p>Connections use the authentication and API procedures provided by each platform.</p>
+      <p>MockingBird only receives the permissions the user has granted on the respective platform.</p>
       <p>
-        Die Verbindung erfolgt über die von den jeweiligen Plattformen bereitgestellten Authentifizierungs- und
-        API-Verfahren.
-      </p>
-      <p>MockingBird erhält dabei nur die Berechtigungen, denen der Nutzer gegenüber der jeweiligen Plattform zugestimmt hat.</p>
-      <p>
-        Die jeweiligen Plattformbetreiber verarbeiten Daten zusätzlich in eigener Verantwortung. Für deren
-        Datenverarbeitung gelten die Datenschutzbestimmungen der jeweiligen Plattform.
+        The platform operators also process data under their own responsibility. Their processing is governed by the
+        privacy policy of the respective platform.
       </p>
 
-      <h2>5. Zweck der Verarbeitung</h2>
-      <p>Personenbezogene Daten werden insbesondere verarbeitet, um:</p>
+      <h2>5. YouTube</h2>
+      <p>
+        MockingBird uses the <strong>YouTube API Services</strong> to upload videos to YouTube channels that users
+        connect. By connecting a YouTube channel, users agree to the{" "}
+        <a href={YOUTUBE_TERMS_URL} target="_blank" rel="noopener noreferrer">
+          YouTube Terms of Service
+        </a>
+        . Google processes data under the{" "}
+        <a href={GOOGLE_PRIVACY_URL} target="_blank" rel="noopener noreferrer">
+          Google Privacy Policy
+        </a>
+        .
+      </p>
+      <p>When a user connects a YouTube channel, MockingBird requests permission to:</p>
       <ul>
-        <li>Nutzer bei der Anmeldung zu authentifizieren,</li>
-        <li>das MockingBird-Konto bereitzustellen,</li>
-        <li>Social-Media-Konten zu verbinden,</li>
-        <li>Beiträge zu erstellen und zu verwalten,</li>
-        <li>Beiträge auf den vom Nutzer ausgewählten Plattformen zu veröffentlichen,</li>
-        <li>die Sicherheit und Stabilität der Anwendung zu gewährleisten,</li>
-        <li>Fehler zu erkennen und zu beheben,</li>
-        <li>die technische Funktionalität von MockingBird sicherzustellen.</li>
+        <li>read the channel&apos;s ID and title, to show which channel is connected;</li>
+        <li>upload videos to that channel, only when the user publishes a post to it.</li>
       </ul>
-
-      <h2>6. Rechtsgrundlagen</h2>
       <p>
-        Die Verarbeitung personenbezogener Daten erfolgt abhängig vom jeweiligen Verarbeitungsvorgang insbesondere auf
-        Grundlage von:
+        MockingBird stores the channel ID, the channel title and the OAuth access and refresh tokens Google issues. For
+        each upload it sends the video, the title the user entered and the post text (as the video description) to
+        YouTube. MockingBird does not read, store or analyze any other YouTube data, and does not share YouTube data with
+        anyone other than YouTube itself.
       </p>
+      <p>
+        The stored data is kept until the user disconnects the channel or deletes their MockingBird account. In both
+        cases MockingBird deletes it and revokes its access at Google. Users can also revoke MockingBird&apos;s access at
+        any time on the{" "}
+        <a href={GOOGLE_PERMISSIONS_URL} target="_blank" rel="noopener noreferrer">
+          Google security settings page
+        </a>
+        ; after that, publishing to the channel fails until it is connected again.
+      </p>
+      <p>
+        MockingBird&apos;s use and transfer of information received from Google APIs adheres to the Google API Services
+        User Data Policy, including the Limited Use requirements.
+      </p>
+
+      <h2>6. Purposes of processing</h2>
+      <p>Personal data is processed in particular to:</p>
       <ul>
-        <li>
-          Art. 6 Abs. 1 lit. b DSGVO, soweit die Verarbeitung zur Bereitstellung der vom Nutzer gewünschten Funktionen
-          erforderlich ist;
-        </li>
-        <li>Art. 6 Abs. 1 lit. f DSGVO, soweit die Verarbeitung zur Wahrung berechtigter Interessen erforderlich ist;</li>
-        <li>Art. 6 Abs. 1 lit. a DSGVO, soweit eine Einwilligung erforderlich ist und vom Nutzer erteilt wurde.</li>
+        <li>authenticate users when they sign in,</li>
+        <li>provide the MockingBird account,</li>
+        <li>connect social media accounts,</li>
+        <li>create and manage posts,</li>
+        <li>publish posts on the platforms the user selects,</li>
+        <li>keep the application secure and stable,</li>
+        <li>detect and fix errors,</li>
+        <li>ensure that MockingBird works technically.</li>
       </ul>
 
-      <h2>7. OAuth und Zugriffstokens</h2>
-      <p>
-        Die Anmeldung bei MockingBird erfolgt per OAuth über Google, GitHub oder Discord. MockingBird erhält dabei vom
-        gewählten Anbieter Name, E-Mail-Adresse und Konto-ID; ein Passwort wird bei MockingBird nicht gespeichert.
-      </p>
-      <p>
-        Wenn ein Nutzer ein Social-Media-Konto mit MockingBird verbindet, werden Authentifizierungsdaten bzw.
-        Zugriffstokens verarbeitet, soweit dies für die Nutzung der jeweiligen API erforderlich ist.
-      </p>
-      <p>
-        Diese Daten werden verwendet, um die vom Nutzer autorisierten Aktionen – beispielsweise die Veröffentlichung eines
-        Beitrags – gegenüber der jeweiligen Plattform durchführen zu können.
-      </p>
-
-      <h2>8. Veröffentlichung von Beiträgen</h2>
-      <p>
-        Wenn ein Nutzer einen Beitrag über MockingBird veröffentlicht, werden die dafür erforderlichen Inhalte und
-        technischen Informationen an die vom Nutzer ausgewählte Social-Media-Plattform übertragen.
-      </p>
-      <p>Die Übertragung erfolgt, damit der Beitrag auf dem vom Nutzer autorisierten Konto veröffentlicht werden kann.</p>
-      <p>
-        Die Verarbeitung der Daten durch die jeweilige Social-Media-Plattform erfolgt zusätzlich nach deren eigenen
-        Datenschutzbestimmungen.
-      </p>
-
-      <h2>9. Hosting und technische Dienstleister</h2>
-      <p>Für den Betrieb von MockingBird können externe technische Dienstleister eingesetzt werden.</p>
-      <p>Hierzu können insbesondere gehören:</p>
+      <h2>7. Legal bases</h2>
+      <p>Depending on the processing operation, personal data is processed in particular on the basis of:</p>
       <ul>
-        <li>Hosting-Provider</li>
-        <li>Datenbankanbieter</li>
-        <li>Cloud-Infrastruktur</li>
-        <li>Storage-Anbieter</li>
-        <li>E-Mail-Dienstleister</li>
-        <li>Monitoring- und Logging-Dienste</li>
-        <li>Fehleranalyse- und Sicherheitsdienste</li>
+        <li>Art. 6(1)(b) GDPR, where processing is necessary to provide the features the user requested;</li>
+        <li>Art. 6(1)(f) GDPR, where processing is necessary for legitimate interests;</li>
+        <li>Art. 6(1)(a) GDPR, where consent is required and the user has given it.</li>
+      </ul>
+
+      <h2>8. OAuth and access tokens</h2>
+      <p>
+        Users sign in to MockingBird via OAuth with Google, GitHub or Discord. MockingBird receives the user&apos;s name,
+        email address and account ID from the chosen provider; MockingBird does not store a password.
+      </p>
+      <p>
+        When a user connects a social media account to MockingBird, authentication data or access tokens are processed
+        as far as the respective API requires.
+      </p>
+      <p>
+        This data is used to carry out the actions the user has authorized on the respective platform, for example
+        publishing a post.
+      </p>
+
+      <h2>9. Publishing posts</h2>
+      <p>
+        When a user publishes a post through MockingBird, the required content and technical information are sent to the
+        social media platform the user selected.
+      </p>
+      <p>This transfer takes place so that the post can be published on the account the user has authorized.</p>
+      <p>The social media platform additionally processes the data under its own privacy policy.</p>
+
+      <h2>10. Hosting and technical service providers</h2>
+      <p>External technical service providers may be used to operate MockingBird.</p>
+      <p>These may include in particular:</p>
+      <ul>
+        <li>hosting providers</li>
+        <li>database providers</li>
+        <li>cloud infrastructure</li>
+        <li>storage providers</li>
+        <li>email service providers</li>
+        <li>monitoring and logging services</li>
+        <li>error analysis and security services</li>
       </ul>
       <p>
-        <strong>Aktuell eingesetzte Anbieter:</strong>
+        <strong>Providers currently in use:</strong>
       </p>
-      <ul>
-        <li>
-          <strong>Hosting:</strong> Contabo GmbH, München (Deutschland) – virtueller Server, auf dem die Anwendung und
-          die Datenbank betrieben werden.
-        </li>
-        <li>
-          <strong>Datenbank:</strong> PostgreSQL, selbst betrieben auf demselben Server; kein externer Datenbankanbieter.
-        </li>
-        <li>
-          <strong>Medienverarbeitung:</strong> Cloudinary Ltd. – hochgeladene Bilder und Videos werden zur Verarbeitung
-          und Speicherung an Cloudinary übertragen.
-        </li>
-        <li>
-          <strong>Anmeldung (OAuth):</strong> Google, GitHub, Discord.
-        </li>
-        <li>
-          <strong>Monitoring / Fehleranalyse:</strong> keine externen Dienste; Server- und Fehlerprotokolle verbleiben auf
-          dem eigenen Server.
-        </li>
-      </ul>
-
-      <h2>10. Server- und Logdaten</h2>
-      <p>Beim Aufruf und bei der Nutzung von MockingBird können technisch erforderliche Informationen verarbeitet werden.</p>
-      <p>Hierzu können insbesondere gehören:</p>
-      <ul>
-        <li>IP-Adresse</li>
-        <li>Datum und Uhrzeit des Zugriffs</li>
-        <li>aufgerufene URL</li>
-        <li>verwendeter Browser</li>
-        <li>Betriebssystem</li>
-        <li>Referrer</li>
-        <li>technische Statusinformationen</li>
-      </ul>
-      <p>Die Verarbeitung dient insbesondere der technischen Bereitstellung, Stabilität und Sicherheit der Anwendung.</p>
-      <p>Die konkrete Speicherdauer richtet sich nach der eingesetzten Infrastruktur.</p>
-
-      <h2>11. Cookies und ähnliche Technologien</h2>
-      <p>MockingBird verwendet ausschließlich technisch erforderliche Cookies und Browser-Speicher:</p>
       <ul>
         <li>
-          <code>authjs.session-token</code> (bzw. <code>__Secure-authjs.session-token</code>): Login-Sitzung, HttpOnly,
-          Gültigkeit bis zu 30 Tage.
+          <strong>Hosting:</strong> Contabo GmbH, Munich (Germany) – virtual server running the application and the
+          database.
         </li>
         <li>
-          <code>authjs.csrf-token</code>, <code>authjs.callback-url</code>: Schutz vor Cross-Site-Request-Forgery und
-          Rücksprung nach dem Login; nur für die Dauer der Sitzung.
+          <strong>Database:</strong> PostgreSQL, self-hosted on the same server; no external database provider.
         </li>
         <li>
-          <code>twitter_oauth_secret</code>, <code>temp_jwt</code>: nur während der Verbindung eines X-Kontos, Gültigkeit
-          5 Minuten.
+          <strong>Media processing:</strong> Cloudinary Ltd. – uploaded images and videos are sent to Cloudinary for
+          processing and storage.
         </li>
         <li>
-          Browser-Speicher (localStorage) <code>colorMode</code> (Hell-/Dunkelmodus) und <code>emojiHistory</code>{" "}
-          (zuletzt verwendete Emojis): verbleiben im Browser und werden nicht an den Server übertragen.
+          <strong>Sign-in (OAuth):</strong> Google, GitHub, Discord.
+        </li>
+        <li>
+          <strong>Monitoring / error analysis:</strong> no external services; server and error logs stay on our own
+          server.
         </li>
       </ul>
-      <p>
-        Beim Verbinden von Facebook-Seiten bzw. Instagram-Konten wird das JavaScript-SDK von Meta (connect.facebook.net)
-        geladen; dabei kann Meta eigene Cookies setzen. Hierfür gelten die Datenschutzbestimmungen von Meta.
-      </p>
-      <p>Tracking- oder Analyse-Cookies werden nicht eingesetzt.</p>
-      <p>
-        Technisch erforderliche Cookies oder vergleichbare Technologien können eingesetzt werden, soweit sie für die
-        Bereitstellung der vom Nutzer gewünschten Funktionen erforderlich sind.
-      </p>
-      <p>Für darüber hinausgehende Speicherungen oder Zugriffe auf das Endgerät kann eine Einwilligung erforderlich sein.</p>
 
-      <h2>12. Speicherdauer</h2>
-      <p>
-        Personenbezogene Daten werden nur so lange gespeichert, wie dies für die jeweiligen Zwecke erforderlich ist oder
-        gesetzliche Aufbewahrungspflichten bestehen.
-      </p>
-      <p>
-        Nutzer können die Löschung ihres MockingBird-Kontos beantragen (siehe{" "}
-        <Link href="/delete-account">Account löschen</Link>).
-      </p>
-      <p>
-        Bei der Löschung werden die mit dem Konto verbundenen personenbezogenen Daten grundsätzlich gelöscht, soweit keine
-        gesetzlichen Aufbewahrungspflichten oder andere rechtlich zulässige Gründe für eine weitere Speicherung bestehen.
-      </p>
-
-      <h2>13. Löschung und Trennung von Social-Media-Konten</h2>
-      <p>Nutzer können die Verbindung zwischen MockingBird und ihren Social-Media-Konten entfernen.</p>
-      <p>
-        Dabei werden die bei MockingBird gespeicherten Zugangsdaten bzw. Zugriffstokens für die jeweilige Verbindung
-        gelöscht, soweit keine weitere rechtliche Grundlage für deren Speicherung besteht.
-      </p>
-      <p>
-        Die Aufhebung der Verbindung in MockingBird beendet nicht automatisch die Verarbeitung von Daten durch die
-        jeweilige Social-Media-Plattform.
-      </p>
-
-      <h2>14. Rechte betroffener Personen</h2>
-      <p>Nutzer haben nach Maßgabe der gesetzlichen Voraussetzungen insbesondere folgende Rechte:</p>
+      <h2>11. Server and log data</h2>
+      <p>When MockingBird is accessed and used, technically necessary information may be processed.</p>
+      <p>This may include in particular:</p>
       <ul>
-        <li>Recht auf Auskunft</li>
-        <li>Recht auf Berichtigung</li>
-        <li>Recht auf Löschung</li>
-        <li>Recht auf Einschränkung der Verarbeitung</li>
-        <li>Recht auf Datenübertragbarkeit</li>
-        <li>Recht auf Widerspruch</li>
-        <li>Recht auf Widerruf einer erteilten Einwilligung</li>
+        <li>IP address</li>
+        <li>date and time of access</li>
+        <li>requested URL</li>
+        <li>browser used</li>
+        <li>operating system</li>
+        <li>referrer</li>
+        <li>technical status information</li>
       </ul>
-      <p>Zur Ausübung dieser Rechte kann eine Anfrage an folgende E-Mail-Adresse gesendet werden:</p>
+      <p>The processing serves in particular the technical provision, stability and security of the application.</p>
+      <p>The specific retention period depends on the infrastructure used.</p>
+
+      <h2>12. Cookies and similar technologies</h2>
+      <p>MockingBird only uses technically necessary cookies and browser storage:</p>
+      <ul>
+        <li>
+          <code>authjs.session-token</code> (or <code>__Secure-authjs.session-token</code>): sign-in session, HttpOnly,
+          valid for up to 30 days.
+        </li>
+        <li>
+          <code>authjs.csrf-token</code>, <code>authjs.callback-url</code>: protection against cross-site request forgery
+          and returning to the right page after sign-in; only for the duration of the session.
+        </li>
+        <li>
+          <code>twitter_oauth_secret</code>, <code>temp_jwt</code>: only while connecting an X account, valid for 5
+          minutes.
+        </li>
+        <li>
+          <code>linkedin_oauth_state</code>, <code>youtube_oauth_state</code>: only while connecting a LinkedIn account
+          or YouTube channel, valid for 10 minutes.
+        </li>
+        <li>
+          Browser storage (localStorage) <code>colorMode</code> (light/dark mode) and <code>emojiHistory</code> (recently
+          used emojis): stays in the browser and is not sent to the server.
+        </li>
+      </ul>
+      <p>
+        When connecting Facebook pages or Instagram accounts, Meta&apos;s JavaScript SDK (connect.facebook.net) is loaded;
+        Meta may set its own cookies. Meta&apos;s privacy policy applies to these.
+      </p>
+      <p>No tracking or analytics cookies are used.</p>
+      <p>
+        Technically necessary cookies or comparable technologies may be used where they are required to provide the
+        features the user requested.
+      </p>
+      <p>Any storage on or access to the user&apos;s device beyond that may require consent.</p>
+
+      <h2>13. Retention period</h2>
+      <p>
+        Personal data is only stored for as long as necessary for the respective purposes or as required by statutory
+        retention obligations.
+      </p>
+      <p>
+        Users can delete their MockingBird account (see <Link href="/delete-account">delete your account</Link>).
+      </p>
+      <p>
+        On deletion, the personal data associated with the account is deleted, unless statutory retention obligations or
+        other legally permitted reasons require further storage.
+      </p>
+
+      <h2>14. Disconnecting social media accounts</h2>
+      <p>Users can remove the connection between MockingBird and their social media accounts.</p>
+      <p>
+        The credentials or access tokens stored at MockingBird for that connection are then deleted, unless there is
+        another legal basis for storing them.
+      </p>
+      <p>Removing a connection in MockingBird does not by itself end the processing of data by the respective platform.</p>
+
+      <h2>15. Rights of data subjects</h2>
+      <p>Subject to the statutory requirements, users have in particular the following rights:</p>
+      <ul>
+        <li>right of access</li>
+        <li>right to rectification</li>
+        <li>right to erasure</li>
+        <li>right to restriction of processing</li>
+        <li>right to data portability</li>
+        <li>right to object</li>
+        <li>right to withdraw consent</li>
+      </ul>
+      <p>To exercise these rights, send a request to the following email address:</p>
       <p>
         <strong>
           <a href="mailto:beshtawi.ashraf@gmail.com">beshtawi.ashraf@gmail.com</a>
         </strong>
       </p>
 
-      <h2>15. Beschwerderecht</h2>
+      <h2>16. Right to lodge a complaint</h2>
       <p>
-        Betroffene Personen haben das Recht, sich bei einer Datenschutzaufsichtsbehörde über die Verarbeitung ihrer
-        personenbezogenen Daten zu beschweren.
+        Data subjects have the right to lodge a complaint with a data protection supervisory authority about the
+        processing of their personal data.
       </p>
 
-      <h2>16. Änderungen dieser Datenschutzerklärung</h2>
+      <h2>17. Changes to this privacy policy</h2>
       <p>
-        Diese Datenschutzerklärung kann angepasst werden, wenn sich die Funktionen von MockingBird, die eingesetzten
-        technischen Dienste oder die rechtlichen Anforderungen ändern.
+        This privacy policy may be updated when MockingBird&apos;s features, the technical services used or the legal
+        requirements change.
       </p>
-      <p>Die jeweils aktuelle Version wird auf dieser Website veröffentlicht.</p>
+      <p>The current version is published on this website.</p>
 
-      <p>Stand: September 2026</p>
+      <p>Last updated: October 2026</p>
     </main>
   );
 }

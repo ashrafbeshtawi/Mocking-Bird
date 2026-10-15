@@ -1,12 +1,12 @@
-export const metadata = { title: "Impressum – Mockingbird" };
+export const metadata = { title: "Legal Notice – Mockingbird" };
 
 export default function ImpressumPage() {
   return (
-    <main className="legal" lang="de">
-      <h1>Impressum</h1>
+    <main className="legal" lang="en">
+      <h1>Legal Notice (Impressum)</h1>
 
-      <h2>Angaben gemäß § 5 DDG</h2>
-      <h3>Diensteanbieter</h3>
+      <h2>Information pursuant to § 5 DDG</h2>
+      <h3>Service provider</h3>
       <address>
         Ashraf Beshtawi
         <br />
@@ -14,39 +14,32 @@ export default function ImpressumPage() {
         <br />
         12685 Berlin
         <br />
-        Deutschland
+        Germany
       </address>
-      <h3>Kontakt</h3>
+      <h3>Contact</h3>
       <p>
-        E-Mail: <a href="mailto:beshtawi.ashraf@gmail.com">beshtawi.ashraf@gmail.com</a>
+        Email: <a href="mailto:beshtawi.ashraf@gmail.com">beshtawi.ashraf@gmail.com</a>
       </p>
 
-      <h2>Über MockingBird</h2>
+      <h2>About MockingBird</h2>
+      <p>MockingBird is a software application for managing and publishing posts on several social media platforms from one place.</p>
       <p>
-        MockingBird ist eine Softwareanwendung zur zentralen Verwaltung und Veröffentlichung von Beiträgen auf
-        verschiedenen Social-Media-Plattformen.
+        With MockingBird, users connect their own social media accounts through the official interfaces (APIs) provided by
+        each platform and publish content from a single interface.
       </p>
-      <p>
-        Über MockingBird können Nutzer ihre eigenen Social-Media-Konten über die von den jeweiligen Plattformen
-        bereitgestellten offiziellen Schnittstellen (APIs) verbinden und Inhalte von einer zentralen Oberfläche aus
-        veröffentlichen.
-      </p>
-      <p>MockingBird ist kein eigenes soziales Netzwerk und verkauft keine Social-Media-Daten.</p>
+      <p>MockingBird is not a social network of its own and does not sell social media data.</p>
 
-      <h2>Verantwortlichkeit für Inhalte</h2>
+      <h2>Responsibility for content</h2>
       <p>
-        Die über MockingBird veröffentlichten Inhalte werden von den jeweiligen Nutzern erstellt und über deren
-        autorisierte Social-Media-Konten veröffentlicht.
+        Content published through MockingBird is created by the respective users and published through their authorized
+        social media accounts.
       </p>
-      <p>Die Verantwortung für diese Inhalte liegt beim jeweiligen Nutzer.</p>
+      <p>Responsibility for this content lies with the respective user.</p>
 
-      <h2>Verbraucherstreitbeilegung</h2>
-      <p>
-        Wir sind nicht bereit oder verpflichtet, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle
-        teilzunehmen.
-      </p>
+      <h2>Consumer dispute resolution</h2>
+      <p>We are neither willing nor obliged to take part in dispute resolution proceedings before a consumer arbitration board.</p>
 
-      <p>Stand: September 2026</p>
+      <p>Last updated: October 2026</p>
     </main>
   );
 }

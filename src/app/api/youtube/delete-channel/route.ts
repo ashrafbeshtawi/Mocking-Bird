@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import pool from '@/lib/db';
 import { getAuthUserId } from '@/lib/api-auth';
 import { createLogger } from '@/lib/logger';
+import { revokeYouTubeTokens } from '@/lib/publishers/youtube';
 
 const logger = createLogger('YouTubeDeleteChannel');
 
@@ -19,12 +20,13 @@ export async function DELETE(req: Request) {
 
   try {
     const result = await pool.query(
-      'DELETE FROM connected_youtube_channels WHERE channel_id = $1 AND user_id = $2 RETURNING id',
+      'DELETE FROM connected_youtube_channels WHERE channel_id = $1 AND user_id = $2 RETURNING refresh_token',
       [channel_id, userId]
     );
     if (result.rows.length === 0) {
       return NextResponse.json({ error: 'YouTube channel not found' }, { status: 404 });
     }
+    await revokeYouTubeTokens(result.rows.map((row) => row.refresh_token));
     return NextResponse.json({ success: true, message: 'YouTube channel disconnected successfully' });
   } catch (error) {
     logger.error('Failed to delete YouTube channel', error);

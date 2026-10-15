@@ -1,5 +1,5 @@
 import type { Pool } from 'pg';
-import { YouTubePublisher, videoMetadata, type YouTubeChannelToken } from '@/lib/publishers/youtube';
+import { YouTubePublisher, revokeYouTubeTokens, videoMetadata, type YouTubeChannelToken } from '@/lib/publishers/youtube';
 import type { CloudinaryMediaInfo } from '@/lib/publish/types';
 
 const channel = (expiresInMs: number): YouTubeChannelToken => ({
@@ -102,5 +102,29 @@ describe('YouTubePublisher', () => {
 
     expect(failed[0].error.message).toBe('YouTube uploads take exactly one video.');
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('revokeYouTubeTokens', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  it('revokes each refresh token at Google', async () => {
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue(new Response(null, { status: 200 }));
+
+    await revokeYouTubeTokens(['r1', 'r2']);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('https://oauth2.googleapis.com/revoke');
+    expect(String(init?.body)).toBe('token=r1');
+  });
+
+  it('resolves when Google rejects or is unreachable', async () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    jest.spyOn(global, 'fetch')
+      .mockResolvedValueOnce(new Response(null, { status: 400 }))
+      .mockRejectedValueOnce(new Error('offline'));
+
+    await expect(revokeYouTubeTokens(['r1', 'r2'])).resolves.toBeUndefined();
   });
 });

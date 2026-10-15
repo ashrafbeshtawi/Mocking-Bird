@@ -1,107 +1,104 @@
 import Link from "next/link";
+import { YOUTUBE_TERMS_URL } from "@/lib/youtube";
 
-export const metadata = { title: "Nutzungsbedingungen – Mockingbird" };
+export const metadata = { title: "Terms of Service – Mockingbird" };
 
 export default function TermsPage() {
   return (
-    <main className="legal" lang="de">
-      <h1>Nutzungsbedingungen</h1>
+    <main className="legal" lang="en">
+      <h1>Terms of Service</h1>
 
-      <h2>1. Geltungsbereich</h2>
+      <h2>1. Scope</h2>
       <p>
-        Diese Nutzungsbedingungen gelten für die Nutzung von MockingBird (nachfolgend „Dienst“), angeboten von Ashraf
-        Beshtawi, Pritzhagener Weg 3, 12685 Berlin (nachfolgend „Anbieter“). Mit der Anmeldung akzeptiert der Nutzer
-        diese Bedingungen.
-      </p>
-
-      <h2>2. Leistungsbeschreibung</h2>
-      <p>
-        MockingBird ermöglicht es, Beiträge zentral zu erstellen, zu planen und über die offiziellen Schnittstellen (APIs)
-        auf den eigenen Social-Media-Konten des Nutzers zu veröffentlichen. Der Dienst wird derzeit unentgeltlich
-        angeboten.
-      </p>
-      <p>
-        MockingBird ist kein eigenes soziales Netzwerk. Der Anbieter hat keinen Einfluss auf die verbundenen Plattformen,
-        deren Verfügbarkeit, Regeln oder Entscheidungen.
+        These terms of service apply to the use of MockingBird (the &ldquo;Service&rdquo;), provided by Ashraf Beshtawi,
+        Pritzhagener Weg 3, 12685 Berlin, Germany (the &ldquo;Provider&rdquo;). By signing in, the user accepts these
+        terms.
       </p>
 
-      <h2>3. Konto und Anmeldung</h2>
+      <h2>2. Description of the Service</h2>
       <p>
-        Die Anmeldung erfolgt über ein bestehendes Konto bei Google, GitHub oder Discord. Der Nutzer muss volljährig sein.
-        Der Nutzer ist für die Sicherheit seiner Zugangsdaten und für alle Aktivitäten verantwortlich, die über sein Konto
-        erfolgen.
+        MockingBird lets users create and schedule posts in one place and publish them on their own social media accounts
+        through the official interfaces (APIs). The Service is currently provided free of charge.
+      </p>
+      <p>
+        MockingBird is not a social network of its own. The Provider has no influence on the connected platforms, their
+        availability, rules or decisions.
       </p>
 
-      <h2>4. Verbindung von Social-Media-Konten</h2>
+      <h2>3. Account and sign-in</h2>
       <p>
-        Der Nutzer darf nur Konten verbinden, zu deren Nutzung er berechtigt ist. Für die verbundenen Plattformen gelten
-        zusätzlich deren eigene Nutzungsbedingungen und Richtlinien; für deren Einhaltung ist der Nutzer verantwortlich.
-        Verbindungen können jederzeit im Dashboard getrennt werden.
+        Users sign in with an existing Google, GitHub or Discord account. Users must be of legal age. Users are
+        responsible for the security of their credentials and for all activity carried out through their account.
       </p>
 
-      <h2>5. Inhalte und Pflichten des Nutzers</h2>
+      <h2>4. Connecting social media accounts</h2>
       <p>
-        Der Nutzer ist allein verantwortlich für die Inhalte, die er über MockingBird erstellt und veröffentlicht.
-        Unzulässig sind insbesondere:
+        Users may only connect accounts they are authorized to use. The connected platforms&apos; own terms and policies
+        also apply, and users are responsible for complying with them. Connecting a YouTube channel means agreeing to the{" "}
+        <a href={YOUTUBE_TERMS_URL} target="_blank" rel="noopener noreferrer">
+          YouTube Terms of Service
+        </a>
+        . Connections can be removed at any time on the dashboard.
       </p>
+
+      <h2>5. Content and user obligations</h2>
+      <p>Users are solely responsible for the content they create and publish through MockingBird. In particular, the following is not permitted:</p>
       <ul>
-        <li>rechtswidrige Inhalte,</li>
-        <li>Inhalte, die Rechte Dritter verletzen (z. B. Urheber-, Marken- oder Persönlichkeitsrechte),</li>
-        <li>Spam sowie irreführende oder täuschende Inhalte,</li>
+        <li>unlawful content,</li>
+        <li>content that infringes the rights of others (e.g. copyright, trademark or personality rights),</li>
+        <li>spam and misleading or deceptive content,</li>
         <li>
-          jede Nutzung, die den Betrieb des Dienstes oder der verbundenen Plattformen beeinträchtigt oder gegen deren
-          Regeln verstößt (z. B. automatisierte Massenveröffentlichungen).
+          any use that impairs the operation of the Service or of the connected platforms or breaks their rules (e.g.
+          automated mass publishing).
         </li>
       </ul>
       <p>
-        Der Nutzer stellt den Anbieter von Ansprüchen Dritter frei, die auf einer schuldhaften Verletzung dieser Pflichten
-        beruhen.
+        Users indemnify the Provider against third-party claims arising from a culpable breach of these obligations.
       </p>
 
-      <h2>6. Verfügbarkeit und Änderungen des Dienstes</h2>
+      <h2>6. Availability and changes to the Service</h2>
       <p>
-        Der Anbieter bemüht sich um eine hohe Verfügbarkeit, garantiert diese jedoch nicht. Wartungsarbeiten, technische
-        Störungen oder Änderungen an den Schnittstellen der Plattformen können die Nutzung vorübergehend einschränken. Der
-        Anbieter kann Funktionen des Dienstes jederzeit ändern, erweitern oder einstellen.
+        The Provider aims for high availability but does not guarantee it. Maintenance, technical faults or changes to
+        the platforms&apos; interfaces may temporarily limit use. The Provider may change, extend or discontinue features of
+        the Service at any time.
       </p>
 
-      <h2>7. Haftung</h2>
+      <h2>7. Liability</h2>
       <p>
-        Der Anbieter haftet unbeschränkt bei Vorsatz und grober Fahrlässigkeit. Bei leichter Fahrlässigkeit haftet der
-        Anbieter nur bei Verletzung des Lebens, des Körpers oder der Gesundheit sowie bei Verletzung wesentlicher
-        Vertragspflichten, in diesem Fall begrenzt auf den vertragstypischen, vorhersehbaren Schaden.
+        The Provider is liable without limitation for intent and gross negligence. For slight negligence, the Provider is
+        only liable for injury to life, body or health and for breach of essential contractual obligations, in the latter
+        case limited to the typical, foreseeable damage.
       </p>
       <p>
-        Für Inhalte der Nutzer sowie für Handlungen, Entscheidungen oder Ausfälle der verbundenen Plattformen (z. B.
-        Sperrung von Konten, Ablehnung von Beiträgen) übernimmt der Anbieter keine Verantwortung.
-      </p>
-
-      <h2>8. Laufzeit, Löschung und Sperrung</h2>
-      <p>
-        Der Nutzer kann sein Konto jederzeit im Dashboard löschen (siehe{" "}
-        <Link href="/delete-account">Account löschen</Link>). Der Anbieter kann Konten bei Verstößen gegen diese
-        Bedingungen sperren oder löschen und den Dienst mit angemessener Frist einstellen.
+        The Provider accepts no responsibility for users&apos; content or for actions, decisions or outages of the connected
+        platforms (e.g. account suspensions, rejected posts).
       </p>
 
-      <h2>9. Datenschutz</h2>
+      <h2>8. Term, deletion and suspension</h2>
       <p>
-        Informationen zur Verarbeitung personenbezogener Daten enthält die{" "}
-        <Link href="/privacy">Datenschutzerklärung</Link>.
+        Users can delete their account at any time on the dashboard (see{" "}
+        <Link href="/delete-account">delete your account</Link>). The Provider may suspend or delete accounts that breach
+        these terms and may discontinue the Service with reasonable notice.
       </p>
 
-      <h2>10. Änderungen dieser Bedingungen</h2>
+      <h2>9. Privacy</h2>
       <p>
-        Der Anbieter kann diese Nutzungsbedingungen anpassen, wenn sich der Funktionsumfang, die eingesetzten Dienste
-        oder die rechtlichen Anforderungen ändern. Die jeweils aktuelle Fassung wird auf dieser Website veröffentlicht.
+        Information on the processing of personal data is provided in the <Link href="/privacy">Privacy Policy</Link>.
       </p>
 
-      <h2>11. Anwendbares Recht</h2>
+      <h2>10. Changes to these terms</h2>
       <p>
-        Es gilt das Recht der Bundesrepublik Deutschland. Gegenüber Verbrauchern gilt dies nur, soweit ihnen dadurch
-        nicht der Schutz zwingender Vorschriften des Staates ihres gewöhnlichen Aufenthalts entzogen wird.
+        The Provider may update these terms of service when the features, the services used or the legal requirements
+        change. The current version is published on this website.
       </p>
 
-      <p>Stand: September 2026</p>
+      <h2>11. Governing law</h2>
+      <p>
+        The law of the Federal Republic of Germany applies. For consumers, this applies only insofar as it does not
+        deprive them of the protection of mandatory provisions of the country of their habitual residence.
+      </p>
+
+      <p>Last updated: October 2026</p>
     </main>
   );
 }

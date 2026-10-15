@@ -1,6 +1,10 @@
 export const YOUTUBE_STATE_COOKIE = 'youtube_oauth_state';
 export const YOUTUBE_CALLBACK_PATH = '/api/youtube/auth/callback';
 export const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
+export const GOOGLE_REVOKE_URL = 'https://oauth2.googleapis.com/revoke';
+export const YOUTUBE_TERMS_URL = 'https://www.youtube.com/t/terms';
+export const GOOGLE_PRIVACY_URL = 'https://policies.google.com/privacy';
+export const GOOGLE_PERMISSIONS_URL = 'https://myaccount.google.com/permissions';
 
 export const YOUTUBE_TITLE_MAX = 100;
 

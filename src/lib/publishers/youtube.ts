@@ -1,7 +1,7 @@
 import { Pool } from 'pg';
 import { createLogger } from '@/lib/logger';
 import { CloudinaryMediaInfo } from '@/lib/publish/types';
-import { GOOGLE_TOKEN_URL, YOUTUBE_TITLE_MAX } from '@/lib/youtube';
+import { GOOGLE_REVOKE_URL, GOOGLE_TOKEN_URL, YOUTUBE_TITLE_MAX } from '@/lib/youtube';
 
 const logger = createLogger('YouTubePublisher');
 
@@ -57,6 +57,27 @@ export function videoMetadata(title: string, text: string, fileName: string): { 
     title: truncate(sanitize(videoTitle), YOUTUBE_TITLE_MAX),
     description: truncate(sanitize(text.trim()), DESCRIPTION_MAX),
   };
+}
+
+/**
+ * Revokes MockingBird's Google access for each refresh token (which also ends its
+ * access tokens). Best effort: a failed revocation is logged and never thrown.
+ */
+export async function revokeYouTubeTokens(refreshTokens: string[]): Promise<void> {
+  await Promise.all(
+    refreshTokens.map(async (token) => {
+      try {
+        const response = await fetch(GOOGLE_REVOKE_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ token }),
+        });
+        if (!response.ok) logger.warn('YouTube token revocation failed', { status: response.status });
+      } catch (error) {
+        logger.warn('YouTube token revocation failed', { error: error instanceof Error ? error.message : String(error) });
+      }
+    })
+  );
 }
 
 export class YouTubePublisher {
