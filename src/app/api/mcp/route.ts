@@ -15,6 +15,7 @@ import {
   type DraftMedia,
 } from '@/lib/drafts';
 import { PLATFORMS, type Platform } from '@/types/accounts';
+import { TIKTOK_PRIVACY_LEVELS } from '@/lib/tiktok';
 
 const logger = createLogger('McpAPI');
 
@@ -23,6 +24,22 @@ const mediaUrls = z
   .array(z.string())
   .optional()
   .describe('Optional list of media URLs to attach to the draft');
+
+const youtubeTitle = z
+  .string()
+  .describe('Title for the YouTube upload (max 100 characters, no < or >). Empty uses the video file name.');
+const tiktokSettings = z
+  .object({
+    privacyLevel: z.enum(TIKTOK_PRIVACY_LEVELS).describe('Who can view the TikTok video'),
+    allowComment: z.boolean(),
+    allowDuet: z.boolean(),
+    allowStitch: z.boolean(),
+    isYourBrand: z.boolean().describe('Commercial content promoting the creator or their own business'),
+    isBrandedContent: z.boolean().describe('Paid partnership promoting a third party; cannot be SELF_ONLY'),
+  })
+  .describe(
+    'Suggested TikTok post settings. The user still confirms them when publishing: TikTok requires every choice to be made by the user.'
+  );
 
 // External URLs can expire, so drafts must not reference them directly.
 // Ingest them into Cloudinary (same store the UI uploads to) at write time.
@@ -125,15 +142,19 @@ const handler = createMcpHandler(
             .optional()
             .describe('Platforms this draft is intended for'),
           media: mediaUrls,
+          youtube_title: youtubeTitle.optional(),
+          tiktok_settings: tiktokSettings.optional(),
         }),
       },
-      async ({ text, target_platforms, media }, extra) => {
+      async ({ text, target_platforms, media, youtube_title, tiktok_settings }, extra) => {
         const userId = userIdFrom(extra);
         // Validate before ingesting so bad input doesn't trigger uploads
         const validationError = validateDraftInput({
           text,
           target_platforms,
           media: media?.map((publicUrl) => ({ publicUrl })) ?? null,
+          youtube_title,
+          tiktok_settings,
         });
         if (validationError) return fail(validationError);
 
@@ -144,7 +165,7 @@ const handler = createMcpHandler(
           return fail((error as Error).message);
         }
 
-        const draft = await createDraft(userId, { text, target_platforms, media: storedMedia });
+        const draft = await createDraft(userId, { text, target_platforms, media: storedMedia, youtube_title, tiktok_settings });
         return json({ draft });
       }
     );
@@ -159,9 +180,11 @@ const handler = createMcpHandler(
           text: z.string().optional(),
           target_platforms: z.array(platformEnum).optional(),
           media: mediaUrls,
+          youtube_title: youtubeTitle.optional(),
+          tiktok_settings: tiktokSettings.nullable().optional().describe('Suggested TikTok post settings; null removes them'),
         }),
       },
-      async ({ id, text, target_platforms, media }, extra) => {
+      async ({ id, text, target_platforms, media, youtube_title, tiktok_settings }, extra) => {
         const userId = userIdFrom(extra);
         const existing = await getDraft(userId, id);
         if (!existing) return fail(`Draft ${id} not found.`);
@@ -172,6 +195,8 @@ const handler = createMcpHandler(
           target_platforms: target_platforms ?? existing.target_platforms,
           media:
             media !== undefined ? media.map((publicUrl) => ({ publicUrl })) : existing.media,
+          youtube_title: youtube_title ?? existing.youtube_title,
+          tiktok_settings,
         });
         if (validationError) return fail(validationError);
 
@@ -186,6 +211,8 @@ const handler = createMcpHandler(
           text: text ?? existing.text,
           target_platforms: target_platforms ?? existing.target_platforms,
           media: storedMedia,
+          youtube_title: youtube_title ?? existing.youtube_title,
+          tiktok_settings,
         });
         return json({ draft });
       }
