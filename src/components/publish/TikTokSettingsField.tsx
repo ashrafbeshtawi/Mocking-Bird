@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import {
   Alert,
   Box,
+  Button,
   Checkbox,
   CircularProgress,
   FormControl,
@@ -38,7 +39,25 @@ interface TikTokSettingsFieldProps {
   onChange: (value: TikTokPostSettings) => void;
   /** Called with whether the post can go to TikTok as configured. */
   onReadyChange: (isReady: boolean) => void;
+  /** Settings suggested for this post (e.g. saved on a draft by an AI assistant); offered, never preset. */
+  suggestion?: TikTokPostSettings | null;
 }
+
+const onOff = (label: string, isOn: boolean) => `${label} ${isOn ? 'on' : 'off'}`;
+
+/** One line describing the settings, e.g. "Only me · Comments on · Duet off · Stitch off". */
+function describeSettings(settings: TikTokPostSettings): string {
+  return [
+    settings.privacyLevel ? TIKTOK_PRIVACY_LABELS[settings.privacyLevel] : 'No visibility',
+    onOff('Comments', settings.allowComment),
+    onOff('Duet', settings.allowDuet),
+    onOff('Stitch', settings.allowStitch),
+    ...(settings.isYourBrand ? ['Your brand'] : []),
+    ...(settings.isBrandedContent ? ['Branded content'] : []),
+  ].join(' · ');
+}
+
+const TIKTOK_SETTING_KEYS = ['privacyLevel', 'allowComment', 'allowDuet', 'allowStitch', 'isYourBrand', 'isBrandedContent'] as const;
 
 type CreatorState = { creator: TikTokCreatorInfo } | { error: string };
 
@@ -47,7 +66,7 @@ type CreatorState = { creator: TikTokCreatorInfo } | { error: string };
  * the target accounts, a visibility with no preset, interaction toggles that
  * start off, the commercial content disclosure and the consent notice.
  */
-export function TikTokSettingsField({ accountIds, videoUrl, value, onChange, onReadyChange }: TikTokSettingsFieldProps) {
+export function TikTokSettingsField({ accountIds, videoUrl, value, onChange, onReadyChange, suggestion }: TikTokSettingsFieldProps) {
   const [creators, setCreators] = useState<Record<string, CreatorState>>({});
   const [isCommercial, setIsCommercial] = useState(value.isYourBrand || value.isBrandedContent);
   const [videoDurationSec, setVideoDurationSec] = useState<number | null>(null);
@@ -102,6 +121,12 @@ export function TikTokSettingsField({ accountIds, videoUrl, value, onChange, onR
     if (!isOn) update({ isYourBrand: false, isBrandedContent: false });
   };
 
+  const applySuggestion = (settings: TikTokPostSettings) => {
+    onChange(settings);
+    setIsCommercial(settings.isYourBrand || settings.isBrandedContent);
+  };
+  const isSuggestionApplied = suggestion != null && TIKTOK_SETTING_KEYS.every((key) => suggestion[key] === value[key]);
+
   if (isLoading) {
     return (
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -120,6 +145,15 @@ export function TikTokSettingsField({ accountIds, videoUrl, value, onChange, onR
       <Typography variant="subtitle2">
         Posting to TikTok as {infos.map((c) => c.nickname).join(', ')}
       </Typography>
+
+      {suggestion && !isSuggestionApplied && (
+        <Alert
+          severity="info"
+          action={<Button color="inherit" size="small" onClick={() => applySuggestion(suggestion)}>Apply</Button>}
+        >
+          Suggested by your assistant: {describeSettings(suggestion)}
+        </Alert>
+      )}
 
       <FormControl size="small" fullWidth required error={!value.privacyLevel}>
         <InputLabel id="tiktok-privacy-label">Who can view this video</InputLabel>

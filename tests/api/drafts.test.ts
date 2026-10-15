@@ -2,10 +2,10 @@ jest.mock('@/lib/api-auth', () => ({
   getAuthUserId: jest.fn(),
 }));
 
-jest.mock('@/lib/db', () => ({
-  __esModule: true,
-  default: { query: jest.fn() },
-}));
+jest.mock('@/lib/db', () => {
+  const query = jest.fn();
+  return { __esModule: true, default: { query, connect: jest.fn(async () => ({ query, release: jest.fn() })) } };
+});
 
 import { GET, POST, PUT, DELETE } from '@/app/api/drafts/route';
 import { getAuthUserId } from '@/lib/api-auth';
@@ -19,9 +19,23 @@ const draftRow = {
   text: 'hello',
   target_platforms: ['facebook'],
   media: null,
+  youtube_title: '',
+  tiktok_settings: null,
   created_at: '2026-09-11T00:00:00Z',
   updated_at: '2026-09-11T00:00:00Z',
 };
+
+const tiktokSettings = {
+  privacyLevel: 'SELF_ONLY',
+  allowComment: true,
+  allowDuet: false,
+  allowStitch: false,
+  isYourBrand: true,
+  isBrandedContent: false,
+};
+
+const sqlCalls = (): string[] => mockQuery.mock.calls.map(([sql]) => (sql as string).trim());
+const callTo = (prefix: string) => mockQuery.mock.calls.find(([sql]) => (sql as string).trim().startsWith(prefix))!;
 
 const request = (method: string, body: unknown) =>
   new Request('http://localhost/api/drafts', { method, body: JSON.stringify(body) });
@@ -107,7 +121,54 @@ describe('Drafts API', () => {
 
     expect(response.status).toBe(201);
     expect(data.draft).toEqual(draftRow);
-    expect(mockQuery.mock.calls[0][1]).toEqual([42, 'hello', ['facebook'], null]);
+    expect(callTo('INSERT INTO drafts ')[1]).toEqual(['hello', ['facebook'], null, '', 42]);
+    expect(sqlCalls()).toEqual(expect.arrayContaining(['BEGIN', 'COMMIT']));
+    expect(sqlCalls().some((sql) => sql.includes('drafts_tiktok WHERE'))).toBe(false);
+  });
+
+  it('stores the YouTube title and the suggested TikTok settings with the draft', async () => {
+    mockQuery.mockResolvedValue({ rows: [draftRow] });
+
+    const response = await POST(request('POST', { text: 'hello', youtube_title: ' Launch ', tiktok_settings: tiktokSettings }));
+
+    expect(response.status).toBe(201);
+    expect(callTo('INSERT INTO drafts ')[1][3]).toBe('Launch');
+    expect(callTo('INSERT INTO drafts_tiktok')[1]).toEqual([1, 'SELF_ONLY', true, false, false, true, false]);
+  });
+
+  it.each([
+    ['without a visibility', { ...tiktokSettings, privacyLevel: '' }],
+    ['with a missing toggle', { privacyLevel: 'SELF_ONLY' }],
+    ['as private branded content', { ...tiktokSettings, isBrandedContent: true }],
+  ])('rejects TikTok settings %s', async (_case, settings) => {
+    const response = await POST(request('POST', { text: 'hello', tiktok_settings: settings }));
+
+    expect(response.status).toBe(400);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it('rejects a YouTube title YouTube would refuse', async () => {
+    const response = await POST(request('POST', { text: 'hello', youtube_title: 'a <b>' }));
+
+    expect(response.status).toBe(400);
+  });
+
+  it('keeps the TikTok suggestion when an update leaves it out', async () => {
+    mockQuery.mockResolvedValue({ rows: [draftRow] });
+
+    const response = await PUT(request('PUT', { id: 1, text: 'hello' }));
+
+    expect(response.status).toBe(200);
+    expect(sqlCalls().some((sql) => sql.includes('drafts_tiktok WHERE'))).toBe(false);
+  });
+
+  it('removes the TikTok suggestion when an update sets it to null', async () => {
+    mockQuery.mockResolvedValue({ rows: [draftRow] });
+
+    await PUT(request('PUT', { id: 1, text: 'hello', tiktok_settings: null }));
+
+    expect(callTo('DELETE FROM drafts_tiktok')[1]).toEqual([1]);
+    expect(sqlCalls().some((sql) => sql.includes('INSERT INTO drafts_tiktok'))).toBe(false);
   });
 
   it('returns 404 when updating a draft that is not owned', async () => {
@@ -153,7 +214,7 @@ describe('Drafts API', () => {
     await GET(getRequest('?platform=facebook'));
 
     expect(mockQuery.mock.calls[0][1]).toEqual([42, null, 'facebook', null]);
-    expect(mockQuery.mock.calls[1][0]).toContain('= ANY(target_platforms)');
+    expect(mockQuery.mock.calls[1][0]).toContain('= ANY(d.target_platforms)');
   });
 
   it('ignores an unknown platform filter', async () => {
