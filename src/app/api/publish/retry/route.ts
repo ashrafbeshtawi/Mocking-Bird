@@ -6,7 +6,7 @@ import { retryFailedDestinations, type DestinationKey } from '@/lib/publish/serv
 
 const logger = createLogger('PublishRetryAPI');
 
-const PLATFORMS = ['facebook', 'twitter', 'instagram', 'telegram', 'linkedin', 'youtube'];
+const PLATFORMS = ['facebook', 'twitter', 'instagram', 'telegram', 'linkedin', 'youtube', 'tiktok'];
 
 const isDestinationKey = (value: unknown): value is DestinationKey => {
   const d = value as DestinationKey;

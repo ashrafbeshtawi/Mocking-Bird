@@ -6,6 +6,8 @@ import { InstagramPublisher, InstagramAccountToken } from '@/lib/publishers/inst
 import { TelegramPublisher, TelegramChannelToken } from '@/lib/publishers/telegram';
 import { LinkedInPublisher, LinkedInAccountToken } from '@/lib/publishers/linkedin';
 import { YouTubePublisher, YouTubeChannelToken } from '@/lib/publishers/youtube';
+import { TikTokPublisher, TikTokAccountToken } from '@/lib/publishers/tiktok';
+import { EMPTY_TIKTOK_SETTINGS, type TikTokPostSettings } from '@/lib/tiktok';
 import { ReportLogger, CloudinaryMediaInfo } from './types';
 import type { ContentSelection } from './contentRules';
 import type { Platform } from '@/types/accounts';
@@ -22,6 +24,8 @@ import {
   mapLinkedInFailed,
   mapYouTubeSuccess,
   mapYouTubeFailed,
+  mapTikTokSuccess,
+  mapTikTokFailed,
   formatFailedDetails
 } from './mappers/resultMappers';
 
@@ -59,6 +63,9 @@ export interface ExecutePublishOptions {
   youtubeTokens: YouTubeChannelToken[];
   /** Title for YouTube uploads; blank uses the video's file name. */
   youtubeTitle?: string;
+  tiktokTokens: TikTokAccountToken[];
+  /** The user's choices for TikTok posts. */
+  tiktokSettings?: TikTokPostSettings;
   reportLogger: ReportLogger;
   contentSelection?: ContentSelection;
   onProgress?: ProgressCallback;
@@ -99,13 +106,14 @@ export async function executePublish(
     telegramTokens,
     linkedinTokens,
     youtubeTokens,
+    tiktokTokens,
     reportLogger
   } = options;
 
   reportLogger.add(
     `Starting publishing process to ${facebookTokens.length} Facebook pages, ` +
     `${twitterTokens.length} X accounts, ${instagramFeedTokens.length} Instagram feed accounts, ` +
-    `${instagramStoryTokens.length} Instagram story accounts, ${telegramTokens.length} Telegram channels, ${linkedinTokens.length} LinkedIn accounts, ${youtubeTokens.length} YouTube channels`
+    `${instagramStoryTokens.length} Instagram story accounts, ${telegramTokens.length} Telegram channels, ${linkedinTokens.length} LinkedIn accounts, ${youtubeTokens.length} YouTube channels, ${tiktokTokens.length} TikTok accounts`
   );
 
   const facebookPublisher = new FacebookPublisher(pool);
@@ -123,6 +131,8 @@ export async function executePublish(
   const telegram = contentFor('telegram', options);
   const linkedin = contentFor('linkedin', options);
   const youtube = contentFor('youtube', options);
+  const tiktok = contentFor('tiktok', options);
+  const tiktokOptions = { text: tiktok.text.trim(), settings: options.tiktokSettings ?? EMPTY_TIKTOK_SETTINGS, cloudinaryMedia: tiktok.cloudinaryMedia };
 
   // Facebook and Twitter use downloaded media files (buffers)
   const facebookOptions = {
@@ -340,7 +350,17 @@ export async function executePublish(
       : Promise.resolve({ successful: [], failed: [] })
   );
 
-  const [fbResults, xResults, igFeedResults, igStoryResults, telegramResults, linkedinResults, youtubeResults] = await Promise.all(publishPromises);
+  // TikTok publishing (uploads the Cloudinary video itself)
+  publishPromises.push(
+    tiktokTokens.length > 0
+      ? new TikTokPublisher(pool).publishToAccounts(tiktokOptions, tiktokTokens).then(res => ({
+          successful: mapTikTokSuccess(res.successful),
+          failed: mapTikTokFailed(res.failed)
+        }))
+      : Promise.resolve({ successful: [], failed: [] })
+  );
+
+  const [fbResults, xResults, igFeedResults, igStoryResults, telegramResults, linkedinResults, youtubeResults, tiktokResults] = await Promise.all(publishPromises);
 
   const allSuccessful = [
     ...fbResults.successful,
@@ -349,7 +369,8 @@ export async function executePublish(
     ...igStoryResults.successful,
     ...telegramResults.successful,
     ...linkedinResults.successful,
-    ...youtubeResults.successful
+    ...youtubeResults.successful,
+    ...tiktokResults.successful
   ];
   const allFailed = [
     ...fbResults.failed,
@@ -358,7 +379,8 @@ export async function executePublish(
     ...igStoryResults.failed,
     ...telegramResults.failed,
     ...linkedinResults.failed,
-    ...youtubeResults.failed
+    ...youtubeResults.failed,
+    ...tiktokResults.failed
   ];
 
   reportLogger.add(`Publishing complete. Successful posts: ${allSuccessful.length}, Failed posts: ${allFailed.length}`);
@@ -385,13 +407,14 @@ export async function executePublishWithProgress(
     telegramTokens,
     linkedinTokens,
     youtubeTokens,
+    tiktokTokens,
     reportLogger,
     onProgress,
     onAccountProgress
   } = options;
 
   const totalAccounts = facebookTokens.length + twitterTokens.length +
-    instagramFeedTokens.length + instagramStoryTokens.length + telegramTokens.length + linkedinTokens.length + youtubeTokens.length;
+    instagramFeedTokens.length + instagramStoryTokens.length + telegramTokens.length + linkedinTokens.length + youtubeTokens.length + tiktokTokens.length;
 
   const allSuccessful: SuccessfulPublishResult[] = [];
   const allFailed: FailedPublishResult[] = [];
@@ -462,6 +485,15 @@ export async function executePublishWithProgress(
     });
   });
 
+  tiktokTokens.forEach(token => {
+    accountsProgress.push({
+      accountId: token.open_id,
+      accountName: token.display_name,
+      platform: 'TikTok',
+      status: 'pending'
+    });
+  });
+
   // Track completed count for progress updates
   let completedCount = 0;
 
@@ -513,6 +545,8 @@ export async function executePublishWithProgress(
   const telegram = contentFor('telegram', options);
   const linkedin = contentFor('linkedin', options);
   const youtube = contentFor('youtube', options);
+  const tiktok = contentFor('tiktok', options);
+  const tiktokOptions = { text: tiktok.text.trim(), settings: options.tiktokSettings ?? EMPTY_TIKTOK_SETTINGS, cloudinaryMedia: tiktok.cloudinaryMedia };
 
   const facebookOptions = {
     text: facebook.text.trim() || undefined,
@@ -816,6 +850,29 @@ export async function executePublishWithProgress(
       } catch (err) {
         reportLogger.add(`Error publishing to YouTube ${token.title}: ${(err as Error).message}`);
         await updateAccountStatus(token.channel_id, 'failed', (err as Error).message);
+      }
+    })());
+  }
+
+  // TikTok publishing (parallel)
+  const tiktokPublisher = new TikTokPublisher(pool);
+  for (const token of tiktokTokens) {
+    publishPromises.push((async () => {
+      await updateAccountStatus(token.open_id, 'publishing');
+
+      try {
+        const result = await tiktokPublisher.publishToAccounts(tiktokOptions, [token]);
+        if (result.successful.length > 0) {
+          allSuccessful.push(...mapTikTokSuccess(result.successful));
+          await updateAccountStatus(token.open_id, 'completed');
+        }
+        if (result.failed.length > 0) {
+          allFailed.push(...mapTikTokFailed(result.failed));
+          await updateAccountStatus(token.open_id, 'failed', result.failed[0].error.message);
+        }
+      } catch (err) {
+        reportLogger.add(`Error publishing to TikTok ${token.display_name}: ${(err as Error).message}`);
+        await updateAccountStatus(token.open_id, 'failed', (err as Error).message);
       }
     })());
   }

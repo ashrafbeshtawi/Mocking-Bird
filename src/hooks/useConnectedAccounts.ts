@@ -9,6 +9,7 @@ import type {
   TelegramChannel,
   LinkedInAccount,
   YouTubeChannel,
+  TikTokAccount,
   AccountData,
 } from '@/types/accounts';
 
@@ -20,6 +21,7 @@ interface UseConnectedAccountsReturn {
   telegramChannels: TelegramChannel[];
   linkedinAccounts: LinkedInAccount[];
   youtubeChannels: YouTubeChannel[];
+  tiktokAccounts: TikTokAccount[];
   // Normalized data for dashboard
   normalizedAccounts: {
     facebook: AccountData[];
@@ -28,6 +30,7 @@ interface UseConnectedAccountsReturn {
     telegram: AccountData[];
     linkedin: AccountData[];
     youtube: AccountData[];
+    tiktok: AccountData[];
   };
   // State
   loading: boolean;
@@ -43,6 +46,7 @@ export function useConnectedAccounts(): UseConnectedAccountsReturn {
   const [telegramChannels, setTelegramChannels] = useState<TelegramChannel[]>([]);
   const [linkedinAccounts, setLinkedinAccounts] = useState<LinkedInAccount[]>([]);
   const [youtubeChannels, setYoutubeChannels] = useState<YouTubeChannel[]>([]);
+  const [tiktokAccounts, setTiktokAccounts] = useState<TikTokAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -51,13 +55,14 @@ export function useConnectedAccounts(): UseConnectedAccountsReturn {
     setError(null);
 
     try {
-      const [fbRes, instaRes, twitterRes, telegramRes, linkedinRes, youtubeRes] = await Promise.allSettled([
+      const [fbRes, instaRes, twitterRes, telegramRes, linkedinRes, youtubeRes, tiktokRes] = await Promise.allSettled([
         fetchWithAuth('/api/facebook/get-pages'),
         fetchWithAuth('/api/instagram'),
         fetchWithAuth('/api/twitter-v1.1/get-accounts'),
         fetchWithAuth('/api/telegram/get-channels'),
         fetchWithAuth('/api/linkedin/get-accounts'),
         fetchWithAuth('/api/youtube/get-channels'),
+        fetchWithAuth('/api/tiktok/get-accounts'),
       ]);
 
       // Process Facebook pages
@@ -107,6 +112,14 @@ export function useConnectedAccounts(): UseConnectedAccountsReturn {
       } else {
         setYoutubeChannels([]);
       }
+
+      // Process TikTok accounts
+      if (tiktokRes.status === 'fulfilled' && tiktokRes.value.ok) {
+        const data = await tiktokRes.value.json();
+        setTiktokAccounts(data.accounts || []);
+      } else {
+        setTiktokAccounts([]);
+      }
     } catch (err) {
       console.error('Error fetching accounts:', err);
       setError((err as Error)?.message || 'Failed to fetch connected accounts');
@@ -153,7 +166,12 @@ export function useConnectedAccounts(): UseConnectedAccountsReturn {
       name: c.name,
       platform: 'youtube' as const,
     })),
-  }), [facebookPages, instagramAccounts, xAccounts, telegramChannels, linkedinAccounts, youtubeChannels]);
+    tiktok: tiktokAccounts.map((a) => ({
+      id: a.id,
+      name: a.name,
+      platform: 'tiktok' as const,
+    })),
+  }), [facebookPages, instagramAccounts, xAccounts, telegramChannels, linkedinAccounts, youtubeChannels, tiktokAccounts]);
 
   return {
     facebookPages,
@@ -162,6 +180,7 @@ export function useConnectedAccounts(): UseConnectedAccountsReturn {
     telegramChannels,
     linkedinAccounts,
     youtubeChannels,
+    tiktokAccounts,
     normalizedAccounts,
     loading,
     error,

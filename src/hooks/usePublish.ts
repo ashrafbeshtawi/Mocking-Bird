@@ -5,6 +5,7 @@ import type { InstagramSelection, Platform } from '@/types/accounts';
 import type { UploadedMedia } from '@/components/publish/MediaUploader';
 import { contentKinds, needsChoice, resolveContent, type ContentSelection } from '@/lib/publish/contentRules';
 import { youtubeTitleError } from '@/lib/youtube';
+import { tiktokSettingsError, type TikTokPostSettings } from '@/lib/tiktok';
 import { PLATFORM_CONFIG } from '@/lib/platformConfig';
 
 interface PublishResult {
@@ -40,6 +41,9 @@ interface PublishParams {
   selectedYouTubeChannels: string[];
   /** Title for YouTube uploads; blank uses the video's file name. */
   youtubeTitle?: string;
+  selectedTikTokAccounts: string[];
+  /** The user's choices for TikTok posts; required when posting to TikTok. */
+  tiktokSettings?: TikTokPostSettings;
   /** What the user chose to send to platforms that cannot take the whole post. */
   contentSelection?: ContentSelection;
 }
@@ -148,6 +152,7 @@ export function usePublish(): UsePublishReturn {
         telegram: params.selectedTelegramChannels.length > 0,
         linkedin: params.selectedLinkedInAccounts.length > 0,
         youtube: params.selectedYouTubeChannels.length > 0,
+        tiktok: params.selectedTikTokAccounts.length > 0,
       };
       const undecided = (Object.keys(isSelected) as Platform[]).filter(
         (platform) => isSelected[platform] && needsChoice(platform, kinds, params.contentSelection?.[platform])
@@ -173,6 +178,7 @@ export function usePublish(): UsePublishReturn {
       const selectedTelegramChannels = isSendable('telegram') ? params.selectedTelegramChannels : [];
       const selectedLinkedInAccounts = isSendable('linkedin') ? params.selectedLinkedInAccounts : [];
       const selectedYouTubeChannels = isSendable('youtube') ? params.selectedYouTubeChannels : [];
+      const selectedTikTokAccounts = isSendable('tiktok') ? params.selectedTikTokAccounts : [];
 
       // Validation
       const hasInstagramSelection = Object.values(selectedInstagramAccounts).some(
@@ -185,7 +191,8 @@ export function usePublish(): UsePublishReturn {
         !hasInstagramSelection &&
         selectedTelegramChannels.length === 0 &&
         selectedLinkedInAccounts.length === 0 &&
-        selectedYouTubeChannels.length === 0
+        selectedYouTubeChannels.length === 0 &&
+        selectedTikTokAccounts.length === 0
       ) {
         setError({ message: 'Please select at least one page or account to publish to.' });
         setIsPublishing(false);
@@ -197,6 +204,15 @@ export function usePublish(): UsePublishReturn {
       const titleError = youtubeTitleError(youtubeTitle);
       if (titleError) {
         setError({ message: titleError });
+        setIsPublishing(false);
+        setStatusMessage('');
+        return false;
+      }
+
+      const tiktokSettings = selectedTikTokAccounts.length > 0 ? params.tiktokSettings : undefined;
+      const settingsError = tiktokSettings ? tiktokSettingsError(tiktokSettings) : selectedTikTokAccounts.length > 0 ? 'Choose the TikTok post settings.' : null;
+      if (settingsError) {
+        setError({ message: settingsError });
         setIsPublishing(false);
         setStatusMessage('');
         return false;
@@ -233,6 +249,8 @@ export function usePublish(): UsePublishReturn {
         linkedinAccounts: selectedLinkedInAccounts,
         youtubeChannels: selectedYouTubeChannels,
         youtubeTitle,
+        tiktokAccounts: selectedTikTokAccounts,
+        tiktokSettings,
         contentSelection,
         // Send Cloudinary media info instead of raw files
         cloudinaryMedia: uploadedMedia.map((media) => ({

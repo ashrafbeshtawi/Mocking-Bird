@@ -153,7 +153,7 @@ export async function GET(req: NextRequest) {
         const statusFilter = status && validStatuses.includes(status) ? status : null;
 
         // Validate platform if provided
-        const validPlatforms = ['facebook', 'twitter', 'instagram', 'telegram', 'linkedin', 'youtube'];
+        const validPlatforms = ['facebook', 'twitter', 'instagram', 'telegram', 'linkedin', 'youtube', 'tiktok'];
         const platformFilter = platform && validPlatforms.includes(platform) ? platform : null;
 
         // Cursor-based pagination (preferred for large datasets)

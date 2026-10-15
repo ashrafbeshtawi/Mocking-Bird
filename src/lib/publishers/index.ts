@@ -12,3 +12,5 @@ export type { LinkedInAccountToken, LinkedInPublishResult, LinkedInPublishError,
 
 export { YouTubePublisher } from './youtube';
 export type { YouTubeChannelToken, YouTubePublishResult, YouTubePublishError, YouTubePublishOptions } from './youtube';
+export { TikTokPublisher } from './tiktok';
+export type { TikTokAccountToken, TikTokPublishResult, TikTokPublishError, TikTokPublishOptions } from './tiktok';

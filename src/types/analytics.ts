@@ -21,6 +21,7 @@ export interface PlatformVolume {
   telegram: number;
   linkedin: number;
   youtube: number;
+  tiktok: number;
 }
 
 export interface PlatformReliability {
@@ -30,6 +31,7 @@ export interface PlatformReliability {
   telegram: number;
   linkedin: number;
   youtube: number;
+  tiktok: number;
 }
 
 export interface AnalyticsResponse {

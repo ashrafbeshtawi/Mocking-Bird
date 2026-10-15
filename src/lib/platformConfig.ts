@@ -5,6 +5,7 @@ import TelegramIcon from '@mui/icons-material/Telegram';
 import LinkedInIcon from '@mui/icons-material/LinkedIn';
 import YouTubeIcon from '@mui/icons-material/YouTube';
 import type { SvgIconComponent } from '@mui/icons-material';
+import { TikTokIcon } from '@/components/icons/TikTokIcon';
 import type { Platform } from '@/types/accounts';
 
 export type { Platform };
@@ -45,6 +46,11 @@ export const PLATFORM_CONFIG: Record<Platform, PlatformConfig> = {
     label: 'YouTube',
     icon: YouTubeIcon,
     color: '#ff0000',
+  },
+  tiktok: {
+    label: 'TikTok',
+    icon: TikTokIcon,
+    color: '#ff0050',
   },
 };
 

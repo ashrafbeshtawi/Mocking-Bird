@@ -53,7 +53,7 @@ const handler = createMcpHandler(
       'get_connected_social_media_types',
       {
         description:
-          'List the social media platform types the user has connected accounts for (facebook, instagram, twitter, telegram, linkedin, youtube).',
+          'List the social media platform types the user has connected accounts for (facebook, instagram, twitter, telegram, linkedin, youtube, tiktok).',
         inputSchema: z.object({}),
       },
       async (_args, extra) => {

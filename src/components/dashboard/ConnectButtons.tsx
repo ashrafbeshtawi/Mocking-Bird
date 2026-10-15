@@ -3,6 +3,8 @@
 import React from 'react';
 import { Box, Button, CircularProgress, Link, Typography } from '@mui/material';
 import { GOOGLE_PRIVACY_URL, YOUTUBE_TERMS_URL } from '@/lib/youtube';
+import { TIKTOK_PRIVACY_URL, TIKTOK_TERMS_URL } from '@/lib/tiktok';
+import { TikTokIcon } from '@/components/icons/TikTokIcon';
 import {
   Facebook as FacebookIcon,
   Instagram as InstagramIcon,
@@ -131,6 +133,21 @@ export function ConnectButtons({
         Add YouTube Channel
       </Button>
 
+      <Button
+        variant="contained"
+        href="/api/tiktok/auth"
+        fullWidth
+        startIcon={<TikTokIcon />}
+        sx={{
+          bgcolor: '#000000',
+          '&:hover': { bgcolor: '#333333' },
+          color: '#fff',
+          maxWidth: { sm: 'fit-content' },
+        }}
+      >
+        Add TikTok Account
+      </Button>
+
       <Typography variant="caption" color="text.secondary" sx={{ flexBasis: '100%' }}>
         MockingBird uploads to YouTube through the YouTube API Services. By connecting a YouTube channel you agree to
         the{' '}
@@ -140,6 +157,19 @@ export function ConnectButtons({
         ; Google processes your data under the{' '}
         <Link href={GOOGLE_PRIVACY_URL} target="_blank" rel="noopener noreferrer">
           Google Privacy Policy
+        </Link>
+        .
+      </Typography>
+
+      <Typography variant="caption" color="text.secondary" sx={{ flexBasis: '100%' }}>
+        MockingBird posts videos to TikTok through TikTok&apos;s Content Posting API. By connecting a TikTok account you
+        agree to the{' '}
+        <Link href={TIKTOK_TERMS_URL} target="_blank" rel="noopener noreferrer">
+          TikTok Terms of Service
+        </Link>
+        ; TikTok processes your data under the{' '}
+        <Link href={TIKTOK_PRIVACY_URL} target="_blank" rel="noopener noreferrer">
+          TikTok Privacy Policy
         </Link>
         .
       </Typography>

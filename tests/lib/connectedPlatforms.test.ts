@@ -18,7 +18,8 @@ describe('getConnectedPlatformTypes', () => {
           {
             connected:
               sql.includes('connected_x_accounts_v1_1') ||
-              sql.includes('connected_telegram_channels'),
+              sql.includes('connected_telegram_channels') ||
+              sql.includes('connected_tiktok_accounts'),
           },
         ],
       })
@@ -26,8 +27,8 @@ describe('getConnectedPlatformTypes', () => {
 
     const result = await getConnectedPlatformTypes(42);
 
-    expect(result).toEqual(['twitter', 'telegram']);
-    expect(mockQuery).toHaveBeenCalledTimes(6);
+    expect(result).toEqual(['twitter', 'telegram', 'tiktok']);
+    expect(mockQuery).toHaveBeenCalledTimes(7);
     expect(mockQuery.mock.calls[0][1]).toEqual([42]);
   });
 

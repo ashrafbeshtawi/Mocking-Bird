@@ -5,6 +5,7 @@ import { InstagramPublisher, InstagramAccountToken } from '@/lib/publishers/inst
 import { TelegramPublisher, TelegramChannelToken } from '@/lib/publishers/telegram';
 import { LinkedInPublisher, LinkedInAccountToken } from '@/lib/publishers/linkedin';
 import { YouTubePublisher, YouTubeChannelToken } from '@/lib/publishers/youtube';
+import { TikTokPublisher, TikTokAccountToken } from '@/lib/publishers/tiktok';
 import { MissingAccounts, ReportLogger } from '../types';
 
 export interface FetchedTokens {
@@ -15,6 +16,7 @@ export interface FetchedTokens {
   telegramTokens: TelegramChannelToken[];
   linkedinTokens: LinkedInAccountToken[];
   youtubeTokens: YouTubeChannelToken[];
+  tiktokTokens: TikTokAccountToken[];
 }
 
 /**
@@ -30,12 +32,13 @@ export async function fetchAllTokens(
   telegramChannels: string[] = [],
   linkedinAccounts: string[] = [],
   youtubeChannels: string[] = [],
+  tiktokAccounts: string[] = [],
   reportLogger?: ReportLogger
 ): Promise<FetchedTokens> {
   reportLogger?.add(
     `Fetching tokens from database for ${facebookPages.length} Facebook pages, ${xAccounts.length} X accounts, ` +
     `${instagramPublishAccounts.length} Instagram feed accounts, ${instagramStoryAccounts.length} Instagram story accounts, ` +
-    `${telegramChannels.length} Telegram channels, ${linkedinAccounts.length} LinkedIn accounts, ${youtubeChannels.length} YouTube channels`
+    `${telegramChannels.length} Telegram channels, ${linkedinAccounts.length} LinkedIn accounts, ${youtubeChannels.length} YouTube channels, ${tiktokAccounts.length} TikTok accounts`
   );
 
   const facebookPublisher = new FacebookPublisher(pool);
@@ -47,7 +50,7 @@ export async function fetchAllTokens(
     ? new TelegramPublisher(pool)
     : null;
 
-  const [facebookTokens, twitterTokens, instagramFeedTokens, instagramStoryTokens, telegramTokens, linkedinTokens, youtubeTokens] = await Promise.all([
+  const [facebookTokens, twitterTokens, instagramFeedTokens, instagramStoryTokens, telegramTokens, linkedinTokens, youtubeTokens, tiktokTokens] = await Promise.all([
     facebookPublisher.getPageTokens(userId, facebookPages),
     twitterPublisher.getAccountTokens(userId, xAccounts),
     instagramPublisher.getAccountTokens(userId, instagramPublishAccounts),
@@ -56,16 +59,17 @@ export async function fetchAllTokens(
       ? telegramPublisher.getChannelTokens(userId, telegramChannels)
       : Promise.resolve([]),
     new LinkedInPublisher(pool).getAccountTokens(userId, linkedinAccounts),
-    new YouTubePublisher(pool).getAccountTokens(userId, youtubeChannels)
+    new YouTubePublisher(pool).getAccountTokens(userId, youtubeChannels),
+    new TikTokPublisher(pool).getAccountTokens(userId, tiktokAccounts)
   ]);
 
   reportLogger?.add(
     `Tokens retrieved. Facebook: ${facebookTokens.length}, Twitter: ${twitterTokens.length}, ` +
     `Instagram feed: ${instagramFeedTokens.length}, Instagram story: ${instagramStoryTokens.length}, ` +
-    `Telegram: ${telegramTokens.length}, LinkedIn: ${linkedinTokens.length}, YouTube: ${youtubeTokens.length}`
+    `Telegram: ${telegramTokens.length}, LinkedIn: ${linkedinTokens.length}, YouTube: ${youtubeTokens.length}, TikTok: ${tiktokTokens.length}`
   );
 
-  return { facebookTokens, twitterTokens, instagramFeedTokens, instagramStoryTokens, telegramTokens, linkedinTokens, youtubeTokens };
+  return { facebookTokens, twitterTokens, instagramFeedTokens, instagramStoryTokens, telegramTokens, linkedinTokens, youtubeTokens, tiktokTokens };
 }
 
 /**
@@ -83,7 +87,9 @@ export function validateMissingAccounts(
   linkedinAccounts: string[] = [],
   linkedinTokens: LinkedInAccountToken[] = [],
   youtubeChannels: string[] = [],
-  youtubeTokens: YouTubeChannelToken[] = []
+  youtubeTokens: YouTubeChannelToken[] = [],
+  tiktokAccounts: string[] = [],
+  tiktokTokens: TikTokAccountToken[] = []
 ): MissingAccounts {
   const foundFbIds = new Set(facebookTokens.map(t => t.page_id));
   const foundXIds = new Set(twitterTokens.map(t => t.x_user_id));
@@ -91,6 +97,7 @@ export function validateMissingAccounts(
   const foundTgIds = new Set(telegramTokens.map(t => t.channel_id));
   const foundLiIds = new Set(linkedinTokens.map(t => t.linkedin_user_id));
   const foundYtIds = new Set(youtubeTokens.map(t => t.channel_id));
+  const foundTtIds = new Set(tiktokTokens.map(t => t.open_id));
 
   return {
     facebook: facebookPages.filter(id => !foundFbIds.has(id)),
@@ -98,7 +105,8 @@ export function validateMissingAccounts(
     instagram: instagramAccounts.filter(id => !foundIgIds.has(id)),
     telegram: telegramChannels.filter(id => !foundTgIds.has(id)),
     linkedin: linkedinAccounts.filter(id => !foundLiIds.has(id)),
-    youtube: youtubeChannels.filter(id => !foundYtIds.has(id))
+    youtube: youtubeChannels.filter(id => !foundYtIds.has(id)),
+    tiktok: tiktokAccounts.filter(id => !foundTtIds.has(id))
   };
 }
 
@@ -112,7 +120,8 @@ export function formatMissingAccounts(missing: MissingAccounts): string[] {
     ...missing.instagram.map(id => `Instagram Account ID: ${id}`),
     ...missing.telegram.map(id => `Telegram Channel ID: ${id}`),
     ...missing.linkedin.map(id => `LinkedIn Account ID: ${id}`),
-    ...missing.youtube.map(id => `YouTube Channel ID: ${id}`)
+    ...missing.youtube.map(id => `YouTube Channel ID: ${id}`),
+    ...missing.tiktok.map(id => `TikTok Account ID: ${id}`)
   ];
 }
 
@@ -120,5 +129,5 @@ export function formatMissingAccounts(missing: MissingAccounts): string[] {
  * Checks if there are any missing accounts
  */
 export function hasMissingAccounts(missing: MissingAccounts): boolean {
-  return missing.facebook.length > 0 || missing.twitter.length > 0 || missing.instagram.length > 0 || missing.telegram.length > 0 || missing.linkedin.length > 0 || missing.youtube.length > 0;
+  return missing.facebook.length > 0 || missing.twitter.length > 0 || missing.instagram.length > 0 || missing.telegram.length > 0 || missing.linkedin.length > 0 || missing.youtube.length > 0 || missing.tiktok.length > 0;
 }

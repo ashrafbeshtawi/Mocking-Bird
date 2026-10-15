@@ -35,6 +35,19 @@ describe('legal pages', () => {
     );
   });
 
+  it('privacy policy explains the TikTok API use and links to TikTok\'s terms and privacy policy', () => {
+    render(<PrivacyPage />);
+    expect(screen.getByRole('heading', { name: 'TikTok' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'TikTok Terms of Service' })).toHaveAttribute(
+      'href',
+      'https://www.tiktok.com/legal/page/global/terms-of-service/en'
+    );
+    expect(screen.getByRole('link', { name: 'TikTok Privacy Policy' })).toHaveAttribute(
+      'href',
+      'https://www.tiktok.com/legal/page/row/privacy-policy/en'
+    );
+  });
+
   it('terms link to the privacy policy and account deletion', () => {
     render(<TermsPage />);
     expect(heading()).toHaveTextContent('Terms of Service');

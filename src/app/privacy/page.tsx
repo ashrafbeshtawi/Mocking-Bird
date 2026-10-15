@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { GOOGLE_PERMISSIONS_URL, GOOGLE_PRIVACY_URL, YOUTUBE_TERMS_URL } from "@/lib/youtube";
+import { TIKTOK_PRIVACY_URL, TIKTOK_TERMS_URL } from "@/lib/tiktok";
 
 export const metadata = { title: "Privacy Policy – Mockingbird" };
 
@@ -64,6 +65,7 @@ export default function PrivacyPage() {
         <li>Telegram</li>
         <li>LinkedIn</li>
         <li>YouTube</li>
+        <li>TikTok</li>
       </ul>
       <p>Connections use the authentication and API procedures provided by each platform.</p>
       <p>MockingBird only receives the permissions the user has granted on the respective platform.</p>
@@ -72,7 +74,8 @@ export default function PrivacyPage() {
         privacy policy of the respective platform.
       </p>
 
-      <h2>5. YouTube</h2>
+      <h2>5. YouTube and TikTok</h2>
+      <h3>YouTube</h3>
       <p>
         MockingBird uses the <strong>YouTube API Services</strong> to upload videos to YouTube channels that users
         connect. By connecting a YouTube channel, users agree to the{" "}
@@ -108,6 +111,39 @@ export default function PrivacyPage() {
       <p>
         MockingBird&apos;s use and transfer of information received from Google APIs adheres to the Google API Services
         User Data Policy, including the Limited Use requirements.
+      </p>
+
+      <h3>TikTok</h3>
+      <p>
+        MockingBird uses TikTok&apos;s <strong>Login Kit</strong> and <strong>Content Posting API</strong> to post videos
+        to TikTok accounts that users connect. By connecting a TikTok account, users agree to the{" "}
+        <a href={TIKTOK_TERMS_URL} target="_blank" rel="noopener noreferrer">
+          TikTok Terms of Service
+        </a>
+        . TikTok processes data under the{" "}
+        <a href={TIKTOK_PRIVACY_URL} target="_blank" rel="noopener noreferrer">
+          TikTok Privacy Policy
+        </a>
+        .
+      </p>
+      <p>When a user connects a TikTok account, MockingBird requests permission to:</p>
+      <ul>
+        <li>read the account&apos;s ID and display name, to show which account is connected (user.info.basic);</li>
+        <li>post videos to that account, only when the user publishes a post to it (video.publish).</li>
+      </ul>
+      <p>
+        MockingBird stores the account&apos;s ID, its display name and the OAuth access and refresh tokens TikTok issues.
+        Before each post it reads the account&apos;s current posting options from TikTok (nickname, allowed visibility
+        and interaction settings, maximum video length) to show them to the user; these are not stored. For each post it
+        sends the video, the post text (as the caption) and the settings the user chose to TikTok. MockingBird does not
+        read, store or analyze any other TikTok data, and does not share TikTok data with anyone other than TikTok
+        itself.
+      </p>
+      <p>
+        The stored data is kept until the user disconnects the account or deletes their MockingBird account. In both
+        cases MockingBird deletes it and revokes its access at TikTok. Users can also remove MockingBird at any time in
+        the TikTok app under Settings and privacy → Security → Apps and services; after that, publishing to the account
+        fails until it is connected again.
       </p>
 
       <h2>6. Purposes of processing</h2>
@@ -220,8 +256,8 @@ export default function PrivacyPage() {
           minutes.
         </li>
         <li>
-          <code>linkedin_oauth_state</code>, <code>youtube_oauth_state</code>: only while connecting a LinkedIn account
-          or YouTube channel, valid for 10 minutes.
+          <code>linkedin_oauth_state</code>, <code>youtube_oauth_state</code>, <code>tiktok_oauth_state</code>: only
+          while connecting a LinkedIn account, YouTube channel or TikTok account, valid for 10 minutes.
         </li>
         <li>
           Browser storage (localStorage) <code>colorMode</code> (light/dark mode) and <code>emojiHistory</code> (recently

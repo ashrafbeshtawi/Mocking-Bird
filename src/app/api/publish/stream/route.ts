@@ -64,11 +64,11 @@ export async function POST(req: NextRequest) {
         return;
       }
 
-      const { text, facebookPages, xAccounts, instagramPublishAccounts, instagramStoryAccounts, telegramChannels, linkedinAccounts, youtubeChannels, youtubeTitle, cloudinaryMedia, contentSelection } = parseResult.data;
+      const { text, facebookPages, xAccounts, instagramPublishAccounts, instagramStoryAccounts, telegramChannels, linkedinAccounts, youtubeChannels, youtubeTitle, tiktokAccounts, tiktokSettings, cloudinaryMedia, contentSelection } = parseResult.data;
       reportLogger.add(`Request payload parsed`);
 
       // Validate text content
-      const hasAnyAccount = facebookPages.length > 0 || xAccounts.length > 0 || instagramPublishAccounts.length > 0 || instagramStoryAccounts.length > 0 || telegramChannels.length > 0 || linkedinAccounts.length > 0 || youtubeChannels.length > 0;
+      const hasAnyAccount = facebookPages.length > 0 || xAccounts.length > 0 || instagramPublishAccounts.length > 0 || instagramStoryAccounts.length > 0 || telegramChannels.length > 0 || linkedinAccounts.length > 0 || youtubeChannels.length > 0 || tiktokAccounts.length > 0;
       const textValidation = validateTextContent(text, cloudinaryMedia.length > 0, hasAnyAccount);
       if (!textValidation.success) {
         await sendEvent('error', { message: textValidation.error });
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Validate account arrays
-      const accountValidation = validateAccountArrays(facebookPages, xAccounts, instagramPublishAccounts, instagramStoryAccounts, telegramChannels, linkedinAccounts, youtubeChannels);
+      const accountValidation = validateAccountArrays(facebookPages, xAccounts, instagramPublishAccounts, instagramStoryAccounts, telegramChannels, linkedinAccounts, youtubeChannels, tiktokAccounts);
       if (!accountValidation.success) {
         await sendEvent('error', { message: accountValidation.error });
         await writer.close();
@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
       });
 
       // Fetch tokens
-      const { facebookTokens, twitterTokens, instagramFeedTokens, instagramStoryTokens, telegramTokens, linkedinTokens, youtubeTokens } = await fetchAllTokens(
+      const { facebookTokens, twitterTokens, instagramFeedTokens, instagramStoryTokens, telegramTokens, linkedinTokens, youtubeTokens, tiktokTokens } = await fetchAllTokens(
         pool,
         userId,
         facebookPages,
@@ -121,6 +121,7 @@ export async function POST(req: NextRequest) {
         telegramChannels,
         linkedinAccounts,
         youtubeChannels,
+        tiktokAccounts,
         reportLogger
       );
 
@@ -129,7 +130,7 @@ export async function POST(req: NextRequest) {
       const allInstagramTokens = [...instagramFeedTokens, ...instagramStoryTokens].filter(
         (token, index, self) => index === self.findIndex(t => t.instagram_account_id === token.instagram_account_id)
       );
-      const missing = validateMissingAccounts(facebookPages, xAccounts, allInstagramAccountIds, telegramChannels, facebookTokens, twitterTokens, allInstagramTokens, telegramTokens, linkedinAccounts, linkedinTokens, youtubeChannels, youtubeTokens);
+      const missing = validateMissingAccounts(facebookPages, xAccounts, allInstagramAccountIds, telegramChannels, facebookTokens, twitterTokens, allInstagramTokens, telegramTokens, linkedinAccounts, linkedinTokens, youtubeChannels, youtubeTokens, tiktokAccounts, tiktokTokens);
       if (hasMissingAccounts(missing)) {
         const missingAccounts = formatMissingAccounts(missing);
         await sendEvent('error', {
@@ -170,8 +171,10 @@ export async function POST(req: NextRequest) {
         telegramTokens,
         linkedinTokens,
         youtubeTokens,
+        tiktokTokens,
         reportLogger,
         youtubeTitle,
+        tiktokSettings,
         contentSelection,
         onProgress,
         onAccountProgress
@@ -194,6 +197,7 @@ export async function POST(req: NextRequest) {
         text: text.trim(),
         media: cloudinaryMedia,
         youtubeTitle,
+        tiktokSettings: tiktokAccounts.length > 0 ? tiktokSettings : null,
       });
 
       // Send final result
