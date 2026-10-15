@@ -28,7 +28,7 @@ const entry = (overrides: Record<string, unknown> = {}) => ({
 function fakePool(row: object | null, { isLocked = true } = {}) {
   const query = jest.fn((sql: string) => {
     if (sql.includes('pg_try_advisory_lock')) return Promise.resolve({ rows: [{ locked: isLocked }] });
-    if (sql.startsWith('SELECT post_text')) return Promise.resolve({ rows: row ? [row] : [] });
+    if (sql.startsWith('SELECT h.post_text')) return Promise.resolve({ rows: row ? [row] : [] });
     return Promise.resolve({ rows: [], rowCount: 1 });
   });
   const client = { query, release: jest.fn() };
@@ -104,6 +104,27 @@ describe('retryFailedDestinations', () => {
 
     expect(mockMedia).not.toHaveBeenCalled();
     expect(mockExecute).toHaveBeenCalledWith(expect.objectContaining({ mediaFiles: [], cloudinaryMedia: [image] }));
+  });
+
+  it('retries TikTok with the settings stored for the entry', async () => {
+    mockExecute.mockResolvedValue({ successful: [], failed: [] });
+    const { pool } = fakePool(entry({
+      publish_destinations: [{ platform: 'tiktok', account_id: 'oid-1', success: false, error: 'HTTP 500' }],
+      privacy_level: 'SELF_ONLY',
+      allow_comment: true,
+      allow_duet: false,
+      allow_stitch: false,
+      is_your_brand: true,
+      is_branded_content: false,
+    }));
+
+    await retryFailedDestinations(pool, '7', 99);
+
+    expect(mockExecute).toHaveBeenCalledWith(expect.objectContaining({
+      tiktokSettings: {
+        privacyLevel: 'SELF_ONLY', allowComment: true, allowDuet: false, allowStitch: false, isYourBrand: true, isBrandedContent: false,
+      },
+    }));
   });
 
   it.each([

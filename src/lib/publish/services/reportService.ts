@@ -168,9 +168,11 @@ export async function savePublishReport(
     report.push(`Saving publish result to database with ${destinations.length} destinations`);
     logger.info(`Saving publish report: userId=${userId}, status=${status}, destinations=${JSON.stringify(destinations)}`);
 
-    await client.query(
-      `INSERT INTO publish_history (user_id, content, publish_report, publish_status, publish_destinations, post_text, media, youtube_title, tiktok_settings)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+    await client.query('BEGIN');
+    const { rows } = await client.query(
+      `INSERT INTO publish_history (user_id, content, publish_report, publish_status, publish_destinations, post_text, media, youtube_title)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING id`,
       [
         parseInt(userId),
         content,
@@ -180,12 +182,22 @@ export async function savePublishReport(
         post?.text ?? null,
         post ? JSON.stringify(post.media) : null,
         post?.youtubeTitle ?? null,
-        post?.tiktokSettings ? JSON.stringify(post.tiktokSettings) : null,
       ]
     );
+    const tiktok = post?.tiktokSettings;
+    if (tiktok) {
+      await client.query(
+        `INSERT INTO publish_history_tiktok
+           (history_id, privacy_level, allow_comment, allow_duet, allow_stitch, is_your_brand, is_branded_content)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [rows[0].id, tiktok.privacyLevel, tiktok.allowComment, tiktok.allowDuet, tiktok.allowStitch, tiktok.isYourBrand, tiktok.isBrandedContent]
+      );
+    }
+    await client.query('COMMIT');
 
     report.push(`Publish result saved to database successfully`);
   } catch (dbError) {
+    await client.query('ROLLBACK').catch(() => {});
     const errorMessage = dbError instanceof Error ? dbError.message : String(dbError);
     report.push(`ERROR: Failed to save publish result to database. Error: ${errorMessage}`);
     logger.error(`Failed to save publish result to database.`, dbError);

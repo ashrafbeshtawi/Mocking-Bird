@@ -62,8 +62,11 @@ export async function retryFailedDestinations(
     }
 
     const { rows } = await client.query(
-      `SELECT post_text, media, youtube_title, tiktok_settings, publish_destinations
-       FROM publish_history WHERE id = $1 AND user_id = $2`,
+      `SELECT h.post_text, h.media, h.youtube_title, h.publish_destinations,
+              t.privacy_level, t.allow_comment, t.allow_duet, t.allow_stitch, t.is_your_brand, t.is_branded_content
+       FROM publish_history h
+       LEFT JOIN publish_history_tiktok t ON t.history_id = h.id
+       WHERE h.id = $1 AND h.user_id = $2`,
       [historyId, parseInt(userId, 10)]
     );
     if (rows.length === 0) {
@@ -73,7 +76,12 @@ export async function retryFailedDestinations(
       post_text: string | null;
       media: CloudinaryMediaInfo[] | null;
       youtube_title: string | null;
-      tiktok_settings: unknown;
+      privacy_level: string | null;
+      allow_comment: boolean | null;
+      allow_duet: boolean | null;
+      allow_stitch: boolean | null;
+      is_your_brand: boolean | null;
+      is_branded_content: boolean | null;
       publish_destinations: PublishDestination[] | null;
     };
     if (entry.post_text === null) {
@@ -120,7 +128,14 @@ export async function retryFailedDestinations(
       mediaFiles: mediaResult.files,
       cloudinaryMedia: media,
       youtubeTitle: entry.youtube_title ?? '',
-      tiktokSettings: parseTikTokSettings(entry.tiktok_settings),
+      tiktokSettings: parseTikTokSettings({
+        privacyLevel: entry.privacy_level,
+        allowComment: entry.allow_comment,
+        allowDuet: entry.allow_duet,
+        allowStitch: entry.allow_stitch,
+        isYourBrand: entry.is_your_brand,
+        isBrandedContent: entry.is_branded_content,
+      }),
       ...tokens,
       reportLogger,
     });
