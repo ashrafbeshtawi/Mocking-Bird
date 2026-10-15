@@ -14,9 +14,10 @@ import { TimeRangeSelector } from '@/components/analytics/TimeRangeSelector';
 import { ActivityChart } from '@/components/analytics/ActivityChart';
 import { useAnalytics } from '@/hooks/useAnalytics';
 import type { TimeRange } from '@/types/analytics';
+import type { Platform } from '@/types/accounts';
 import type { SvgIconComponent } from '@mui/icons-material';
 
-const platforms: { key: 'instagram' | 'facebook' | 'twitter' | 'telegram' | 'linkedin' | 'youtube' | 'tiktok'; name: string; Icon: SvgIconComponent; color: string }[] = [
+const platforms: { key: Platform; name: string; Icon: SvgIconComponent; color: string }[] = [
   { key: 'instagram', name: 'Instagram', Icon: InstagramIcon, color: '#c13584' },
   { key: 'facebook', name: 'Facebook', Icon: FacebookIcon, color: '#3b5998' },
   { key: 'twitter', name: 'X', Icon: XIcon, color: '#1f1a12' },

@@ -129,5 +129,5 @@ export function formatMissingAccounts(missing: MissingAccounts): string[] {
  * Checks if there are any missing accounts
  */
 export function hasMissingAccounts(missing: MissingAccounts): boolean {
-  return missing.facebook.length > 0 || missing.twitter.length > 0 || missing.instagram.length > 0 || missing.telegram.length > 0 || missing.linkedin.length > 0 || missing.youtube.length > 0 || missing.tiktok.length > 0;
+  return Object.values(missing).some((ids) => ids.length > 0);
 }

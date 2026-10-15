@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import pool from '@/lib/db';
 import { createLogger } from '@/lib/logger';
-import { validateTextContent, validateAccountArrays, parsePublishRequest } from '@/lib/publish/validators/requestValidator';
+import { validateTextContent, validateAccountArrays, parsePublishRequest, hasAnyDestination } from '@/lib/publish/validators/requestValidator';
 import { processCloudinaryMedia } from '@/lib/publish/validators/mediaValidator';
 import { fetchAllTokens, validateMissingAccounts, formatMissingAccounts, hasMissingAccounts } from '@/lib/publish/services/tokenService';
 import { createReportLogger, buildAndSaveResponse, buildErrorResponse } from '@/lib/publish/services/reportService';
@@ -38,8 +38,7 @@ export async function POST(req: Request) {
     reportLogger.add(`Request payload parsed. Text length: ${text?.length || 0}, Facebook pages: ${facebookPages?.length || 0}, X accounts: ${xAccounts?.length || 0}, Instagram feed: ${instagramPublishAccounts?.length || 0}, Instagram stories: ${instagramStoryAccounts?.length || 0}, Telegram channels: ${telegramChannels?.length || 0}, LinkedIn accounts: ${linkedinAccounts?.length || 0}, YouTube channels: ${youtubeChannels?.length || 0}, Cloudinary media: ${cloudinaryMedia?.length || 0}`);
 
     // 3. Validate text content
-    const hasAnyAccount = facebookPages.length > 0 || xAccounts.length > 0 || instagramPublishAccounts.length > 0 || instagramStoryAccounts.length > 0 || telegramChannels.length > 0 || linkedinAccounts.length > 0 || youtubeChannels.length > 0 || tiktokAccounts.length > 0;
-    const textValidation = validateTextContent(text, cloudinaryMedia.length > 0, hasAnyAccount);
+    const textValidation = validateTextContent(text, cloudinaryMedia.length > 0, hasAnyDestination(parseResult.data));
     if (!textValidation.success) {
       reportLogger.add(`WARN: Invalid text input and no media files. Text: ${text?.substring(0, 100)}`);
       return await buildAndSaveResponse({

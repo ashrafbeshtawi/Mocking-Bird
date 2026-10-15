@@ -35,6 +35,20 @@ export function validateTextContent(
   return { success: true, data: text || '' };
 }
 
+/** Whether the request selects at least one destination on any platform. */
+export function hasAnyDestination(request: PublishRequest): boolean {
+  return [
+    request.facebookPages,
+    request.xAccounts,
+    request.instagramPublishAccounts,
+    request.instagramStoryAccounts,
+    request.telegramChannels,
+    request.linkedinAccounts,
+    request.youtubeChannels,
+    request.tiktokAccounts,
+  ].some((ids) => ids.length > 0);
+}
+
 /**
  * Validates that account arrays are valid
  */

@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import pool from '@/lib/db';
 import { createLogger } from '@/lib/logger';
-import { validateUserId, validateTextContent, validateAccountArrays, parsePublishRequest } from '@/lib/publish/validators/requestValidator';
+import { validateUserId, validateTextContent, validateAccountArrays, parsePublishRequest, hasAnyDestination } from '@/lib/publish/validators/requestValidator';
 import { processCloudinaryMedia } from '@/lib/publish/validators/mediaValidator';
 import { fetchAllTokens, validateMissingAccounts, formatMissingAccounts, hasMissingAccounts } from '@/lib/publish/services/tokenService';
 import { createReportLogger, savePublishReport, determinePublishStatus, extractPublishDestinations } from '@/lib/publish/services/reportService';
@@ -68,8 +68,7 @@ export async function POST(req: NextRequest) {
       reportLogger.add(`Request payload parsed`);
 
       // Validate text content
-      const hasAnyAccount = facebookPages.length > 0 || xAccounts.length > 0 || instagramPublishAccounts.length > 0 || instagramStoryAccounts.length > 0 || telegramChannels.length > 0 || linkedinAccounts.length > 0 || youtubeChannels.length > 0 || tiktokAccounts.length > 0;
-      const textValidation = validateTextContent(text, cloudinaryMedia.length > 0, hasAnyAccount);
+      const textValidation = validateTextContent(text, cloudinaryMedia.length > 0, hasAnyDestination(parseResult.data));
       if (!textValidation.success) {
         await sendEvent('error', { message: textValidation.error });
         await writer.close();

@@ -10,6 +10,7 @@ import {
 import { PublishStatus, ReportLogger, type CloudinaryMediaInfo } from '../types';
 import { createLogger } from '@/lib/logger';
 import type { TikTokPostSettings } from '@/lib/tiktok';
+import { PLATFORMS, type Platform } from '@/types/accounts';
 
 const logger = createLogger('ReportService');
 
@@ -17,7 +18,7 @@ const logger = createLogger('ReportService');
  * Represents a publish destination for storage
  */
 export interface PublishDestination {
-  platform: 'facebook' | 'twitter' | 'instagram' | 'telegram' | 'linkedin' | 'youtube' | 'tiktok';
+  platform: Platform;
   account_id: string;
   account_name?: string;
   post_type?: 'feed' | 'story';
@@ -29,13 +30,13 @@ export interface PublishDestination {
 /**
  * Normalizes platform name to standard format
  */
-function normalizePlatform(platform: string): PublishDestination['platform'] {
+function normalizePlatform(platform: string): Platform {
   const normalized = platform.toLowerCase();
-  if (normalized === 'x' || normalized === 'twitter') {
+  if (normalized === 'x') {
     return 'twitter';
   }
-  if (normalized === 'facebook' || normalized === 'instagram' || normalized === 'telegram' || normalized === 'linkedin' || normalized === 'youtube' || normalized === 'tiktok') {
-    return normalized as PublishDestination['platform'];
+  if ((PLATFORMS as readonly string[]).includes(normalized)) {
+    return normalized as Platform;
   }
   // Default fallback - log unknown platforms
   logger.warn(`Unknown platform: ${platform}`);

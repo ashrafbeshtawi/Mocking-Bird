@@ -42,6 +42,7 @@ import WarningIcon from '@mui/icons-material/Warning';
 import DownloadIcon from '@mui/icons-material/Download';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { PageHeader } from '@/components/PageHeader';
+import type { Platform } from '@/types/accounts';
 import ArticleIcon from '@mui/icons-material/Article';
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
@@ -58,7 +59,7 @@ import ReplayIcon from '@mui/icons-material/Replay';
 import { useConnectedAccounts } from '@/hooks/useConnectedAccounts';
 
 interface PublishDestination {
-  platform: 'facebook' | 'twitter' | 'instagram' | 'telegram' | 'linkedin' | 'youtube' | 'tiktok';
+  platform: Platform;
   account_id: string;
   account_name?: string;
   post_type?: 'feed' | 'story';
