@@ -1,43 +1,40 @@
 import Link from "next/link";
 
-export const metadata = { title: "Account löschen – Mockingbird" };
+export const metadata = { title: "Delete Account – Mockingbird" };
 
 export default function DeleteAccountPage() {
   return (
-    <main className="legal" lang="de">
-      <h1>Account löschen</h1>
-      <p>Du kannst dein MockingBird-Konto jederzeit selbst löschen:</p>
+    <main className="legal" lang="en">
+      <h1>Delete Account</h1>
+      <p>You can delete your MockingBird account yourself at any time:</p>
       <ol>
-        <li>Melde dich bei MockingBird an.</li>
+        <li>Sign in to MockingBird.</li>
         <li>
-          Öffne das <Link href="/dashboard">Dashboard</Link>.
+          Open the <Link href="/dashboard">Dashboard</Link>.
         </li>
         <li>
-          Klicke im Abschnitt „Delete account“ auf <strong>Delete account</strong> und bestätige die Löschung.
+          In the &ldquo;Delete account&rdquo; section, click <strong>Delete account</strong> and confirm the deletion.
         </li>
       </ol>
-      <p>Bei der Löschung werden:</p>
+      <p>Deletion removes:</p>
       <ul>
-        <li>dein MockingBird-Konto,</li>
-        <li>deine gespeicherten Kontodaten,</li>
-        <li>gespeicherte Social-Media-Verbindungen,</li>
-        <li>OAuth-Zugriffstokens,</li>
-        <li>Entwürfe und noch nicht veröffentlichte hochgeladene Medien,</li>
-        <li>dein Veröffentlichungsverlauf und</li>
-        <li>sonstige deinem Konto zugeordnete Daten</li>
+        <li>your MockingBird account,</li>
+        <li>your stored account data,</li>
+        <li>stored social media connections,</li>
+        <li>OAuth access tokens (YouTube access is also revoked at Google),</li>
+        <li>drafts and uploaded media that has not been published,</li>
+        <li>your publishing history, and</li>
+        <li>any other data associated with your account,</li>
       </ul>
+      <p>unless statutory retention obligations or other legal reasons prevent deletion.</p>
+      <p>Deleting your MockingBird account does not delete posts already published on social media platforms.</p>
       <p>
-        gelöscht, soweit keine gesetzlichen Aufbewahrungspflichten oder sonstigen rechtlichen Gründe einer Löschung
-        entgegenstehen.
-      </p>
-      <p>Die Löschung deines MockingBird-Kontos löscht keine bereits auf Social-Media-Plattformen veröffentlichten Beiträge.</p>
-      <p>
-        Falls du dich nicht mehr anmelden kannst, sende eine Löschanfrage an:{" "}
+        If you can no longer sign in, send a deletion request to:{" "}
         <strong>
           <a href="mailto:beshtawi.ashraf@gmail.com">beshtawi.ashraf@gmail.com</a>
         </strong>
       </p>
-      <p>Stand: September 2026</p>
+      <p>Last updated: October 2026</p>
     </main>
   );
 }

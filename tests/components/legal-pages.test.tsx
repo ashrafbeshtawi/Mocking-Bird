@@ -44,7 +44,7 @@ describe('legal pages', () => {
 
   it('account deletion page points to the in-app flow', () => {
     render(<DeleteAccountPage />);
-    expect(heading()).toHaveTextContent('Account löschen');
+    expect(heading()).toHaveTextContent('Delete Account');
     expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute('href', '/dashboard');
     expect(mailto()).toBeInTheDocument();
   });

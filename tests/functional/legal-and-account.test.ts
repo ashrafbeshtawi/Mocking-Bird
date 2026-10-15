@@ -7,7 +7,7 @@ describe('legal pages', () => {
     ['/impressum', 'Legal Notice (Impressum)'],
     ['/privacy', 'Privacy Policy'],
     ['/terms', 'Terms of Service'],
-    ['/delete-account', 'Account löschen'],
+    ['/delete-account', 'Delete Account'],
   ])('%s is public and renders', async (pathname, heading) => {
     const response = await fetchPage(pathname);
 
