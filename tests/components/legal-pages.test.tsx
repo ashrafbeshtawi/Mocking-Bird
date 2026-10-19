@@ -35,6 +35,13 @@ describe('legal pages', () => {
     );
   });
 
+  it('privacy policy discloses how sensitive data and tokens are protected', () => {
+    render(<PrivacyPage />);
+    expect(screen.getByRole('heading', { name: '9. Data security' })).toBeInTheDocument();
+    expect(screen.getByText('Encryption in transit:')).toBeInTheDocument();
+    expect(screen.getByText('Handling of access tokens:')).toBeInTheDocument();
+  });
+
   it('privacy policy explains the TikTok API use and links to TikTok\'s terms and privacy policy', () => {
     render(<PrivacyPage />);
     expect(screen.getByRole('heading', { name: 'TikTok' })).toBeInTheDocument();
