@@ -181,7 +181,51 @@ export default function PrivacyPage() {
         publishing a post.
       </p>
 
-      <h2>9. Publishing posts</h2>
+      <h2>9. Data security</h2>
+      <p>
+        MockingBird protects personal data, and in particular the access tokens of connected accounts (including the
+        Google OAuth tokens for YouTube), with the following technical and organizational measures:
+      </p>
+      <ul>
+        <li>
+          <strong>Encryption in transit:</strong> all connections to MockingBird use HTTPS (TLS); plain HTTP requests are
+          redirected to HTTPS. MockingBird talks to Google, YouTube and the other platforms&apos; APIs only over HTTPS.
+        </li>
+        <li>
+          <strong>Protected storage:</strong> data is stored in a PostgreSQL database on MockingBird&apos;s own server in
+          Germany (see section 11). The database is not reachable from the internet; only the MockingBird application
+          connects to it.
+        </li>
+        <li>
+          <strong>Restricted access:</strong> access to the server and the database is limited to the controller named in
+          section 1. Within the application, every request is authenticated and users can only access their own data
+          and connected accounts.
+        </li>
+        <li>
+          <strong>Handling of access tokens:</strong> access and refresh tokens are used only on the server to carry out
+          actions the user requested. They are never sent to the user&apos;s browser or to anyone other than the platform
+          that issued them, and they are not written to logs.
+        </li>
+        <li>
+          <strong>Minimal permissions:</strong> MockingBird only requests the permissions it needs for its features (see
+          sections 4 and 5).
+        </li>
+        <li>
+          <strong>No passwords:</strong> sign-in works via OAuth (Google, GitHub, Discord); MockingBird does not store
+          passwords. Session cookies are HttpOnly and, over HTTPS, marked Secure.
+        </li>
+        <li>
+          <strong>Hashed MCP tokens:</strong> of the access tokens users create for AI assistants (MCP), only a SHA-256
+          hash is stored; the token itself cannot be read back.
+        </li>
+        <li>
+          <strong>Deletion and revocation:</strong> when a user disconnects an account or deletes their MockingBird
+          account, the stored tokens are deleted and, where the platform supports it (Google/YouTube, TikTok), access is
+          also revoked at the platform.
+        </li>
+      </ul>
+
+      <h2>10. Publishing posts</h2>
       <p>
         When a user publishes a post through MockingBird, the required content and technical information are sent to the
         social media platform the user selected.
@@ -189,7 +233,7 @@ export default function PrivacyPage() {
       <p>This transfer takes place so that the post can be published on the account the user has authorized.</p>
       <p>The social media platform additionally processes the data under its own privacy policy.</p>
 
-      <h2>10. Hosting and technical service providers</h2>
+      <h2>11. Hosting and technical service providers</h2>
       <p>External technical service providers may be used to operate MockingBird.</p>
       <p>These may include in particular:</p>
       <ul>
@@ -225,7 +269,7 @@ export default function PrivacyPage() {
         </li>
       </ul>
 
-      <h2>11. Server and log data</h2>
+      <h2>12. Server and log data</h2>
       <p>When MockingBird is accessed and used, technically necessary information may be processed.</p>
       <p>This may include in particular:</p>
       <ul>
@@ -240,7 +284,7 @@ export default function PrivacyPage() {
       <p>The processing serves in particular the technical provision, stability and security of the application.</p>
       <p>The specific retention period depends on the infrastructure used.</p>
 
-      <h2>12. Cookies and similar technologies</h2>
+      <h2>13. Cookies and similar technologies</h2>
       <p>MockingBird only uses technically necessary cookies and browser storage:</p>
       <ul>
         <li>
@@ -275,7 +319,7 @@ export default function PrivacyPage() {
       </p>
       <p>Any storage on or access to the user&apos;s device beyond that may require consent.</p>
 
-      <h2>13. Retention period</h2>
+      <h2>14. Retention period</h2>
       <p>
         Personal data is only stored for as long as necessary for the respective purposes or as required by statutory
         retention obligations.
@@ -288,7 +332,7 @@ export default function PrivacyPage() {
         other legally permitted reasons require further storage.
       </p>
 
-      <h2>14. Disconnecting social media accounts</h2>
+      <h2>15. Disconnecting social media accounts</h2>
       <p>Users can remove the connection between MockingBird and their social media accounts.</p>
       <p>
         The credentials or access tokens stored at MockingBird for that connection are then deleted, unless there is
@@ -296,7 +340,7 @@ export default function PrivacyPage() {
       </p>
       <p>Removing a connection in MockingBird does not by itself end the processing of data by the respective platform.</p>
 
-      <h2>15. Rights of data subjects</h2>
+      <h2>16. Rights of data subjects</h2>
       <p>Subject to the statutory requirements, users have in particular the following rights:</p>
       <ul>
         <li>right of access</li>
@@ -314,13 +358,13 @@ export default function PrivacyPage() {
         </strong>
       </p>
 
-      <h2>16. Right to lodge a complaint</h2>
+      <h2>17. Right to lodge a complaint</h2>
       <p>
         Data subjects have the right to lodge a complaint with a data protection supervisory authority about the
         processing of their personal data.
       </p>
 
-      <h2>17. Changes to this privacy policy</h2>
+      <h2>18. Changes to this privacy policy</h2>
       <p>
         This privacy policy may be updated when MockingBird&apos;s features, the technical services used or the legal
         requirements change.
