@@ -131,7 +131,31 @@ describe('TikTokPublisher', () => {
 
     const { failed } = await publisher.publishToAccounts({ text: '', settings, cloudinaryMedia: [video] }, [account(3_600_000)]);
 
-    expect(failed[0].error.message).toBe("TikTok could not read the account's posting options (HTTP 200): Daily post cap reached");
+    expect(failed[0].error.message).toBe(
+      "TikTok could not read the account's posting options (HTTP 200, spam_risk_too_many_posts): Daily post cap reached"
+    );
+  });
+
+  it('explains the sandbox restriction instead of TikTok\'s generic guidelines message', async () => {
+    const init = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation(async (url, options) =>
+      String(url).endsWith('/v2/post/publish/video/init/')
+        ? json({
+            error: {
+              code: 'unaudited_client_can_only_post_to_private_accounts',
+              message: 'Please review our integration guidelines at https://developers.tiktok.com/doc/content-sharing-guidelines/',
+            },
+          }, 403)
+        : init(url, options)
+    );
+
+    const { failed } = await publisher.publishToAccounts({ text: '', settings, cloudinaryMedia: [video] }, [account(3_600_000)]);
+
+    expect(failed[0].error.message).toBe(
+      'TikTok could not start the upload (HTTP 403, unaudited_client_can_only_post_to_private_accounts): ' +
+      'Until TikTok has audited this app, it can only post to private TikTok accounts. ' +
+      'Make the account private in the TikTok app (Settings and privacy → Privacy → Private account) and choose "Only me".'
+    );
   });
 
   it('fails without settings or with anything but one video, before calling TikTok', async () => {

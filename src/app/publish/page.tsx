@@ -70,6 +70,7 @@ function PublishPageInner() {
     linkedinAccounts,
     youtubeChannels,
     tiktokAccounts,
+    normalizedAccounts,
     loading,
   } = useConnectedAccounts();
 
@@ -682,7 +683,7 @@ function PublishPageInner() {
         />
 
         {/* Results */}
-        <PublishResults error={error} success={success} results={results} onClose={clearStatus} />
+        <PublishResults error={error} success={success} results={results} accounts={normalizedAccounts} onClose={clearStatus} />
 
         {!hasAnyAccount ? (
           <Fade in timeout={800}>

@@ -27,6 +27,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
 import CelebrationIcon from '@mui/icons-material/Celebration';
 import WarningIcon from '@mui/icons-material/Warning';
+import type { UseConnectedAccountsReturn } from '@/hooks/useConnectedAccounts';
 
 interface PublishResult {
   platform: string;
@@ -50,6 +51,8 @@ interface PublishResultsProps {
   error: { message: string; details?: unknown[] } | null;
   success: string | null;
   results: { successful: PublishResult[]; failed: PublishResult[] } | null;
+  /** The user's connected accounts, to show each result by account name. */
+  accounts: UseConnectedAccountsReturn['normalizedAccounts'];
   onClose?: () => void;
 }
 
@@ -63,26 +66,16 @@ const PLATFORM_CONFIG: Record<string, { icon: React.ElementType; color: string; 
   tiktok: { icon: TikTokIcon, color: '#ff0050', label: 'TikTok' },
 };
 
-export function PublishResults({ error, success, results, onClose }: PublishResultsProps) {
+export function PublishResults({ error, success, results, accounts, onClose }: PublishResultsProps) {
   const isOpen = !!(error || success);
 
+  /** The account's name when it is connected, else its id. */
   const getAccountLabel = (item: PublishResult): string => {
-    switch (item.platform) {
-      case 'facebook':
-        return item.page_id || 'Page';
-      case 'instagram':
-        const postType = item.post_type === 'story' ? 'Story' : 'Feed';
-        return `${item.instagram_account_id || 'Account'} (${postType})`;
-      case 'x':
-      case 'linkedin':
-      case 'youtube':
-      case 'tiktok':
-        return item.account_id || 'Account';
-      case 'telegram':
-        return item.telegram_channel_id || 'Channel';
-      default:
-        return 'Account';
-    }
+    const id = item.page_id ?? item.instagram_account_id ?? item.telegram_channel_id ?? item.account_id;
+    const platform = (item.platform === 'x' ? 'twitter' : item.platform) as keyof typeof accounts;
+    const label = accounts[platform]?.find((a) => a.id === id)?.name ?? id ?? 'Account';
+    if (item.platform !== 'instagram') return label;
+    return `${label} (${item.post_type === 'story' ? 'Story' : 'Feed'})`;
   };
 
   const getPlatformConfig = (platform: string) => {

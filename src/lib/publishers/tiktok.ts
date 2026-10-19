@@ -50,6 +50,14 @@ export interface TikTokPublishError {
   error: { message: string; code?: string };
 }
 
+// TikTok's message for these is a generic pointer to its guidelines, so they get a plain explanation.
+const TIKTOK_ERROR_HINTS: Record<string, string> = {
+  unaudited_client_can_only_post_to_private_accounts:
+    'Until TikTok has audited this app, it can only post to private TikTok accounts. ' +
+    'Make the account private in the TikTok app (Settings and privacy → Privacy → Private account) and choose "Only me".',
+  privacy_level_option_mismatch: 'TikTok does not allow the chosen visibility for this account. Choose another one.',
+};
+
 interface TikTokEnvelope<T> {
   data?: T;
   error?: { code?: string; message?: string };
@@ -242,8 +250,9 @@ export class TikTokPublisher {
       throw new Error('TikTok rejected the access token. Reconnect the account on the dashboard.');
     }
     if (!response.ok || !envelope?.data || (envelope.error?.code && envelope.error.code !== 'ok')) {
-      const message = envelope?.error?.message;
-      throw new Error(`TikTok could not ${action} (HTTP ${response.status})${message ? `: ${message}` : ''}`);
+      const code = envelope?.error?.code;
+      const reason = (code && TIKTOK_ERROR_HINTS[code]) ?? envelope?.error?.message;
+      throw new Error(`TikTok could not ${action} (HTTP ${response.status}${code ? `, ${code}` : ''})${reason ? `: ${reason}` : ''}`);
     }
     return envelope.data;
   }

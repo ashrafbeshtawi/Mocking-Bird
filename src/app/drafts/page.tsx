@@ -65,7 +65,7 @@ export default function DraftsPage() {
   const platform: Platform | 'all' = platformParam && PLATFORMS.includes(platformParam) ? platformParam : 'all';
 
   const { drafts, total, totalPages, loading, error, refetch, deleteDrafts } = useDrafts({ page, query, platform });
-  const { facebookPages, xAccounts, instagramAccounts, telegramChannels, linkedinAccounts, youtubeChannels, tiktokAccounts } = useConnectedAccounts();
+  const { facebookPages, xAccounts, instagramAccounts, telegramChannels, linkedinAccounts, youtubeChannels, tiktokAccounts, normalizedAccounts } = useConnectedAccounts();
   const { publish, isPublishing, statusMessage, error: publishError, success: publishSuccess, results: publishResults, clearStatus } =
     usePublish();
 
@@ -497,7 +497,7 @@ export default function DraftsPage() {
         )}
       </Container>
 
-      <PublishResults error={publishError} success={publishSuccess} results={publishResults} onClose={clearStatus} />
+      <PublishResults error={publishError} success={publishSuccess} results={publishResults} accounts={normalizedAccounts} onClose={clearStatus} />
 
       {/* Publish preview / confirmation */}
       <Dialog
