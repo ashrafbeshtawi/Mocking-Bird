@@ -31,7 +31,7 @@ beforeAll(async () => {
   ]);
   userId = rows[0].id;
   token = randomBytes(24).toString('hex');
-  await db.query('INSERT INTO mcp_tokens (user_id, token_hash) VALUES ($1, $2)', [
+  await db.query("INSERT INTO mcp_tokens (user_id, token_hash, title) VALUES ($1, $2, 'Functional test')", [
     userId,
     createHash('sha256').update(token).digest('hex'),
   ]);

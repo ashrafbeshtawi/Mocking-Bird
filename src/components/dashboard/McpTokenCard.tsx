@@ -18,6 +18,7 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import CheckIcon from '@mui/icons-material/Check';
 import KeyOutlinedIcon from '@mui/icons-material/KeyOutlined';
 import { fetchWithAuth } from '@/lib/fetch';
+import { MCP_TOKEN_TITLE_MAX_LENGTH, type McpTokenInfo } from '@/types/mcpTokens';
 
 const cardSx = {
   bgcolor: 'background.paper',
@@ -32,7 +33,8 @@ const fraunces = 'var(--font-fraunces), Georgia, serif';
 export function McpTokenCard() {
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
-  const [createdAt, setCreatedAt] = useState<string | null>(null);
+  const [tokens, setTokens] = useState<McpTokenInfo[]>([]);
+  const [title, setTitle] = useState('');
   const [newToken, setNewToken] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,9 +44,9 @@ export function McpTokenCard() {
       try {
         const response = await fetchWithAuth('/api/mcp-token');
         const data = await response.json();
-        if (response.ok) setCreatedAt(data.tokenInfo?.created_at ?? null);
+        if (response.ok) setTokens(data.tokens ?? []);
       } catch {
-        // status stays unknown; the card still allows generating a token
+        // list stays empty; the card still allows generating a token
       } finally {
         setLoading(false);
       }
@@ -55,29 +57,36 @@ export function McpTokenCard() {
     setWorking(true);
     setError(null);
     try {
-      const response = await fetchWithAuth('/api/mcp-token', { method: 'POST' });
+      const response = await fetchWithAuth('/api/mcp-token', {
+        method: 'POST',
+        body: JSON.stringify({ title }),
+      });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to generate token');
       setNewToken(data.token);
-      setCreatedAt(new Date().toISOString());
+      setTokens((prev) => [data.tokenInfo, ...prev]);
+      setTitle('');
       setCopied(false);
     } catch (err) {
       setError((err as Error).message);
     } finally {
       setWorking(false);
     }
-  }, []);
+  }, [title]);
 
-  const handleRevoke = useCallback(async () => {
+  const handleRevoke = useCallback(async (id: number) => {
     setWorking(true);
     setError(null);
     try {
-      const response = await fetchWithAuth('/api/mcp-token', { method: 'DELETE' });
+      const response = await fetchWithAuth('/api/mcp-token', {
+        method: 'DELETE',
+        body: JSON.stringify({ id }),
+      });
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
         throw new Error(data.error || 'Failed to revoke token');
       }
-      setCreatedAt(null);
+      setTokens((prev) => prev.filter((token) => token.id !== id));
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -91,6 +100,8 @@ export function McpTokenCard() {
     setCopied(true);
   }, [newToken]);
 
+  const trimmedTitle = title.trim();
+
   return (
     <Box sx={cardSx}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
@@ -101,8 +112,7 @@ export function McpTokenCard() {
       </Box>
       <Typography sx={{ fontSize: 12, color: 'text.secondary', lineHeight: 1.5, mb: 2 }}>
         Let AI clients like Claude manage your drafts via the MCP endpoint at{' '}
-        <code>/api/mcp</code>. One long-lived token per account — generating a new one replaces
-        the old.
+        <code>/api/mcp</code>. Create one token per client, so you can revoke each on its own.
       </Typography>
 
       {error && (
@@ -114,32 +124,56 @@ export function McpTokenCard() {
       {loading ? (
         <CircularProgress size={20} />
       ) : (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-          {createdAt ? (
-            <>
-              <Typography sx={{ fontSize: 12, color: 'text.secondary', mr: 'auto' }}>
-                Token active since {new Date(createdAt).toLocaleDateString()}
-              </Typography>
-              <Button size="small" onClick={handleGenerate} disabled={working} sx={{ textTransform: 'none' }}>
-                Regenerate
-              </Button>
-              <Button size="small" color="error" onClick={handleRevoke} disabled={working} sx={{ textTransform: 'none' }}>
+        <>
+          {tokens.map((token) => (
+            <Box key={token.id} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+              <Box sx={{ mr: 'auto', minWidth: 0 }}>
+                <Typography sx={{ fontSize: 13, fontWeight: 500, overflowWrap: 'anywhere' }}>{token.title}</Typography>
+                <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
+                  Created {new Date(token.created_at).toLocaleDateString()}
+                </Typography>
+              </Box>
+              <Button
+                size="small"
+                color="error"
+                onClick={() => handleRevoke(token.id)}
+                disabled={working}
+                aria-label={`Revoke ${token.title}`}
+                sx={{ textTransform: 'none' }}
+              >
                 Revoke
               </Button>
-            </>
-          ) : (
+            </Box>
+          ))}
+          <Box
+            component="form"
+            onSubmit={(event: React.FormEvent) => {
+              event.preventDefault();
+              if (trimmedTitle) handleGenerate();
+            }}
+            sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: tokens.length ? 2 : 0 }}
+          >
+            <TextField
+              size="small"
+              label="Token title"
+              placeholder="e.g. Claude Desktop"
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              slotProps={{ htmlInput: { maxLength: MCP_TOKEN_TITLE_MAX_LENGTH } }}
+              sx={{ flex: 1 }}
+            />
             <Button
+              type="submit"
               variant="outlined"
               size="small"
-              onClick={handleGenerate}
-              disabled={working}
+              disabled={working || !trimmedTitle}
               startIcon={working ? <CircularProgress size={14} /> : <KeyOutlinedIcon sx={{ fontSize: 15 }} />}
               sx={{ borderRadius: 3, textTransform: 'none', fontWeight: 500 }}
             >
               Generate token
             </Button>
-          )}
-        </Box>
+          </Box>
+        </>
       )}
 
       {/* One-time token reveal */}
