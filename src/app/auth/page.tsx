@@ -1,7 +1,8 @@
 "use client"
 
-import { signIn } from "next-auth/react"
-import { Box, Button, Container, Paper, Typography, Stack, Divider } from "@mui/material"
+import { useEffect, useState } from "react"
+import { getProviders, signIn } from "next-auth/react"
+import { Alert, Box, Button, Container, Paper, Typography, Stack, Divider, TextField } from "@mui/material"
 import GoogleIcon from "@mui/icons-material/Google"
 import GitHubIcon from "@mui/icons-material/GitHub"
 import Link from "next/link"
@@ -15,7 +16,46 @@ function DiscordIcon() {
   )
 }
 
+// Temporary test-account form for the TikTok app review; shown only while the
+// review-login provider is enabled (see src/lib/reviewLogin.ts).
+function ReviewLoginForm() {
+  const [error, setError] = useState(false)
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const form = new FormData(event.currentTarget)
+    const result = await signIn("review-login", {
+      username: form.get("username"),
+      password: form.get("password"),
+      redirect: false,
+    })
+    if (result?.error) {
+      setError(true)
+    } else {
+      window.location.href = "/dashboard"
+    }
+  }
+
+  return (
+    <Stack component="form" onSubmit={handleSubmit} spacing={2} sx={{ width: "100%", maxWidth: 320 }}>
+      <Divider>Test account</Divider>
+      {error && <Alert severity="error">Wrong username or password.</Alert>}
+      <TextField name="username" label="Username" autoComplete="username" required />
+      <TextField name="password" label="Password" type="password" autoComplete="current-password" required />
+      <Button type="submit" variant="outlined" size="large" sx={{ textTransform: "none" }}>
+        Sign in with test account
+      </Button>
+    </Stack>
+  )
+}
+
 export default function AuthPage() {
+  const [hasReviewLogin, setHasReviewLogin] = useState(false)
+
+  useEffect(() => {
+    getProviders().then((providers) => setHasReviewLogin(Boolean(providers?.["review-login"])))
+  }, [])
+
   const handleSignIn = (provider: string) => {
     signIn(provider, { callbackUrl: "/dashboard" })
   }
@@ -99,6 +139,8 @@ export default function AuthPage() {
               Continue with Discord
             </Button>
           </Stack>
+
+          {hasReviewLogin && <Box sx={{ mt: 3, width: "100%", display: "flex", justifyContent: "center" }}><ReviewLoginForm /></Box>}
 
           {/* Terms */}
           <Divider sx={{ width: "100%", my: 3 }} />
