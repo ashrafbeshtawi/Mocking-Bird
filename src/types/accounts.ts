@@ -52,15 +52,37 @@ export interface AccountData {
 }
 
 // One connected account a post goes to; account_id is the id the publish API takes
+export type InstagramPostType = 'feed' | 'story';
+export const INSTAGRAM_POST_TYPES: InstagramPostType[] = ['feed', 'story'];
+
 export interface TargetAccount {
   platform: Platform;
   account_id: string;
+  /** Instagram only: what to post there; feed when absent. */
+  post_types?: InstagramPostType[];
 }
 
 // Instagram selection state for publish page
 export interface InstagramSelection {
   publish: boolean;
   story: boolean;
+}
+
+/** The Instagram selection a draft target stands for; no target selects nothing. */
+export const getInstagramSelection = (target?: TargetAccount): InstagramSelection => ({
+  publish: !!target && (!target.post_types || target.post_types.includes('feed')),
+  story: !!target?.post_types?.includes('story'),
+});
+
+/** Draft target for an Instagram selection; null when nothing is selected. Feed alone is the default. */
+export function buildInstagramTarget(accountId: string, selection: InstagramSelection): TargetAccount | null {
+  if (!selection.publish && !selection.story) return null;
+  if (!selection.story) return { platform: 'instagram', account_id: accountId };
+  return {
+    platform: 'instagram',
+    account_id: accountId,
+    post_types: selection.publish ? ['feed', 'story'] : ['story'],
+  };
 }
 
 // API configuration for account operations

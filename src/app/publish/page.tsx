@@ -40,7 +40,7 @@ import { PublishResults } from '@/components/publish/PublishResults';
 import { PageHeader } from '@/components/PageHeader';
 import type { UploadedMedia } from '@/components/publish/MediaUploader';
 import { mapDraftMediaToUploaded } from '@/hooks/useDrafts';
-import type { InstagramSelection, Platform, TargetAccount } from '@/types/accounts';
+import { buildInstagramTarget, getInstagramSelection, PLATFORMS, type InstagramSelection, type Platform, type TargetAccount } from '@/types/accounts';
 import { TWITTER_CHAR_LIMIT } from '@/types/accounts';
 import { contentKinds, fitContent, needsChoice, resolveContent, type ContentKind, type ContentSelection } from '@/lib/publish/contentRules';
 import { PLATFORM_CONFIG } from '@/lib/platformConfig';
@@ -257,7 +257,7 @@ function PublishPageInner() {
     }
   }, [uploadedMedia.length, instagramAccounts]);
 
-  // Apply the draft's target accounts once accounts are loaded; targets no longer connected are dropped.
+  // Apply the draft's target accounts once accounts are loaded; targets no longer connected show separately.
   // Declared after the account-init and media effects so it overrides their defaults.
   useEffect(() => {
     if (!draftTargets || loading || draftTargetsApplied.current) return;
@@ -273,13 +273,20 @@ function PublishPageInner() {
     setSelectedTikTokAccounts(filterTargeted('tiktok', tiktokAccounts.map((a) => a.id)));
     const instagram: Record<string, InstagramSelection> = {};
     instagramAccounts.forEach((a) => {
-      instagram[a.id] = {
-        publish: isTargeted('instagram', a.id) && uploadedMedia.length > 0,
-        story: false,
-      };
+      instagram[a.id] = getInstagramSelection(
+        draftTargets.find((t) => t.platform === 'instagram' && t.account_id === a.id)
+      );
     });
     setSelectedInstagramAccounts(instagram);
-  }, [draftTargets, loading, facebookPages, xAccounts, telegramChannels, linkedinAccounts, youtubeChannels, tiktokAccounts, instagramAccounts, uploadedMedia.length]);
+  }, [draftTargets, loading, facebookPages, xAccounts, telegramChannels, linkedinAccounts, youtubeChannels, tiktokAccounts, instagramAccounts]);
+
+  /** The draft's targets on accounts that are no longer connected; saving the draft keeps them. */
+  const disconnectedDraftTargets =
+    draftTargets && !loading
+      ? draftTargets.filter(
+          (t) => !normalizedAccounts[t.platform].some((account) => account.id === t.account_id)
+        )
+      : [];
 
   // A published or queued draft is consumed: delete it and drop the ?draft param
   const consumeDraft = useCallback(async () => {
@@ -422,22 +429,18 @@ function PublishPageInner() {
   const handleSaveDraft = async () => {
     setIsSavingDraft(true);
 
-    // Targets = the selected accounts; an Instagram account counts when its feed or story is selected
+    // Targets = the selected accounts plus the draft's targets on disconnected accounts
     const buildTargetsOn = (platform: Platform, ids: string[]): TargetAccount[] =>
       ids.map((account_id) => ({ platform, account_id }));
     const targetAccounts = [
       ...buildTargetsOn('facebook', selectedFacebookPages),
       ...buildTargetsOn('twitter', selectedXAccounts),
-      ...buildTargetsOn(
-        'instagram',
-        Object.entries(selectedInstagramAccounts)
-          .filter(([, s]) => s.publish || s.story)
-          .map(([id]) => id)
-      ),
+      ...Object.entries(selectedInstagramAccounts).flatMap(([id, selection]) => buildInstagramTarget(id, selection) ?? []),
       ...buildTargetsOn('telegram', selectedTelegramChannels),
       ...buildTargetsOn('linkedin', selectedLinkedInAccounts),
       ...buildTargetsOn('youtube', selectedYouTubeChannels),
       ...buildTargetsOn('tiktok', selectedTikTokAccounts),
+      ...disconnectedDraftTargets,
     ];
 
     try {
@@ -782,6 +785,27 @@ function PublishPageInner() {
                   contentSelection={contentSelection}
                   onContentSelect={handleContentSelect}
                 />
+                {disconnectedDraftTargets.length > 0 && (
+                  <Box sx={{ mt: 2 }}>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                      Draft targets that are no longer connected
+                    </Typography>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                      {PLATFORMS.flatMap((platform) =>
+                        disconnectedDraftTargets
+                          .filter((t) => t.platform === platform)
+                          .map((t) => (
+                            <Chip
+                              key={`${t.platform}:${t.account_id}`}
+                              disabled
+                              size="small"
+                              label={`${PLATFORM_CONFIG[t.platform].label} · ${t.account_id} (disconnected)`}
+                            />
+                          ))
+                      )}
+                    </Box>
+                  </Box>
+                )}
                 {showYouTubeTitle && (
                   <Box sx={{ mt: 2 }}>
                     <YouTubeTitleField value={youtubeTitle} onChange={setYoutubeTitle} />

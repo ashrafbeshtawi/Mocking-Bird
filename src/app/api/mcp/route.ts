@@ -11,13 +11,12 @@ import {
   deleteDraft,
   getDraft,
   listDrafts,
-  getPlatformsOf,
   updateDraft,
   validateDraftInput,
   type Draft,
   type DraftMedia,
 } from '@/lib/drafts';
-import { PLATFORMS, type Platform, type TargetAccount } from '@/types/accounts';
+import { INSTAGRAM_POST_TYPES, PLATFORMS, type InstagramPostType, type Platform, type TargetAccount } from '@/types/accounts';
 
 const logger = createLogger('McpAPI');
 
@@ -27,7 +26,16 @@ const mediaUrls = z
   .optional()
   .describe('Optional list of media URLs to attach to the draft');
 const targetAccounts = z
-  .array(z.object({ platform: platformEnum, account_id: z.string().min(1) }))
+  .array(
+    z.object({
+      platform: platformEnum,
+      account_id: z.string().min(1),
+      post_types: z
+        .array(z.enum(INSTAGRAM_POST_TYPES as [InstagramPostType, ...InstagramPostType[]]))
+        .optional()
+        .describe('Instagram only: feed, story or both; feed when omitted'),
+    })
+  )
   .optional()
   .describe('Accounts this draft is meant to be published to: { platform, account_id } from list_connected_accounts');
 
@@ -59,20 +67,33 @@ const getTokenAuth = (extra: { http?: { authInfo?: { extra?: Record<string, unkn
   return { userId, accountAccess };
 };
 
-/** Accounts outside the token's access stay hidden from it. */
 const isVisible = (auth: TokenAuth, target: TargetAccount): boolean =>
   hasAccountAccess(auth.accountAccess, target.platform, target.account_id);
+
+/** A token may see, edit and delete a draft only when it may use every account the draft targets. */
+const canAccessDraft = (auth: TokenAuth, draft: Draft): boolean =>
+  draft.target_accounts.every((target) => isVisible(auth, target));
 
 const listAccessibleAccounts = async (auth: TokenAuth) =>
   (await listConnectedAccounts(auth.userId)).filter((account) =>
     hasAccountAccess(auth.accountAccess, account.platform, account.id)
   );
 
-/** Error message naming the targets the token may not use or that are not connected; null if there are none. */
-const checkTargets = async (auth: TokenAuth, targets: TargetAccount[]): Promise<string | null> => {
-  if (targets.length === 0) return null;
+const isSameAccount = (a: TargetAccount, b: TargetAccount) => a.platform === b.platform && a.account_id === b.account_id;
+
+/**
+ * Error message naming the targets the token may not use or that are not connected; null if there are none.
+ * Targets in currentTargets may stay on disconnected accounts.
+ */
+const checkTargets = async (
+  auth: TokenAuth,
+  targets: TargetAccount[],
+  currentTargets: TargetAccount[] = []
+): Promise<string | null> => {
+  const newTargets = targets.filter((target) => !currentTargets.some((current) => isSameAccount(current, target)));
+  if (newTargets.length === 0) return null;
   const accounts = await listAccessibleAccounts(auth);
-  const denied = targets.filter(
+  const denied = newTargets.filter(
     (target) => !accounts.some((account) => account.platform === target.platform && account.id === target.account_id)
   );
   return denied.length === 0
@@ -80,12 +101,6 @@ const checkTargets = async (auth: TokenAuth, targets: TargetAccount[]): Promise<
     : `Not a connected account this token may use: ${denied
         .map((target) => formatAccountGrant(target.platform, target.account_id))
         .join(', ')}. See list_connected_accounts.`;
-};
-
-/** The draft as the token sees it: only targets on accounts it may use. */
-const scopeDraft = (auth: TokenAuth, draft: Draft): Draft => {
-  const target_accounts = draft.target_accounts.filter((target) => isVisible(auth, target));
-  return { ...draft, target_accounts, target_platforms: getPlatformsOf(target_accounts) };
 };
 
 const handler = createMcpHandler(
@@ -118,13 +133,12 @@ const handler = createMcpHandler(
       'list_drafts',
       {
         description:
-          'List saved post drafts, most recently updated first. Each draft has `target_accounts`, `created_at` and `updated_at` (ISO 8601, UTC); `last_days` filters on `updated_at`. Paginated; the response includes `total`, so page with `offset` until you have them all.',
+          'List saved post drafts whose target accounts this token may all use, most recently updated first. Each draft has `target_accounts`, `created_at` and `updated_at` (ISO 8601, UTC); `last_days` filters on `updated_at`. Paginated; the response includes `total`, so page with `offset` until you have them all.',
         inputSchema: z.object({ ...pageArgs, last_days: lastDays }),
       },
       async ({ limit, offset, last_days }, extra) => {
         const auth = getTokenAuth(extra);
-        const page = await listDrafts(auth.userId, { limit, offset, lastDays: last_days });
-        return json({ ...page, drafts: page.drafts.map((draft) => scopeDraft(auth, draft)) });
+        return json(await listDrafts(auth.userId, { limit, offset, lastDays: last_days, accountAccess: auth.accountAccess }));
       }
     );
 
@@ -132,7 +146,7 @@ const handler = createMcpHandler(
       'search_drafts',
       {
         description:
-          'Search drafts by text (case-insensitive substring match), most recently updated first. `last_days` filters on `updated_at`. Paginated like list_drafts.',
+          'Search the drafts list_drafts returns by text (case-insensitive substring match), most recently updated first. `last_days` filters on `updated_at`. Paginated like list_drafts.',
         inputSchema: z.object({
           query: z.string().min(1).describe('Text to search for in the draft body'),
           ...pageArgs,
@@ -141,8 +155,9 @@ const handler = createMcpHandler(
       },
       async ({ query, limit, offset, last_days }, extra) => {
         const auth = getTokenAuth(extra);
-        const page = await listDrafts(auth.userId, { query, limit, offset, lastDays: last_days });
-        return json({ ...page, drafts: page.drafts.map((draft) => scopeDraft(auth, draft)) });
+        return json(
+          await listDrafts(auth.userId, { query, limit, offset, lastDays: last_days, accountAccess: auth.accountAccess })
+        );
       }
     );
 
@@ -150,12 +165,17 @@ const handler = createMcpHandler(
       'get_publish_history',
       {
         description:
-          'Publish history (what was posted where and whether it succeeded), newest first. Each entry has `created_at` (ISO 8601, UTC), the time the publish completed; `last_days` filters on it. Paginated: limit default 20 / max 100, offset default 0; the response includes `total`. Per-account report texts are omitted for efficiency; `publish_destinations` lists only accounts this token may use.',
+          'Publish history (what was posted where and whether it succeeded), newest first. Each entry has `created_at` (ISO 8601, UTC), the time the publish completed; `last_days` filters on it. Paginated: limit default 20 / max 100, offset default 0; the response includes `total`. Per-account report texts are omitted for efficiency. Lists only entries published to at least one account this token may use, and `publish_destinations` lists only those accounts.',
         inputSchema: z.object({ ...pageArgs, last_days: lastDays }),
       },
       async ({ limit, offset, last_days }, extra) => {
         const auth = getTokenAuth(extra);
-        const page = await listPublishHistory(auth.userId, { limit, offset, lastDays: last_days });
+        const page = await listPublishHistory(auth.userId, {
+          limit,
+          offset,
+          lastDays: last_days,
+          accountAccess: auth.accountAccess,
+        });
         return json({
           ...page,
           entries: page.entries.map((entry) => ({
@@ -197,7 +217,7 @@ const handler = createMcpHandler(
         }
 
         const draft = await createDraft(auth.userId, { text, target_accounts, media: storedMedia });
-        return json({ draft: scopeDraft(auth, draft) });
+        return json({ draft });
       }
     );
 
@@ -205,7 +225,7 @@ const handler = createMcpHandler(
       'edit_draft',
       {
         description:
-          'Edit an existing draft. Only the provided fields change; omitted fields keep their current value. `target_accounts` replaces the targets on accounts this token may use; targets on other accounts stay.',
+          'Edit an existing draft. Only the provided fields change; omitted fields keep their current value; `target_accounts` replaces all targets. Only drafts whose target accounts this token may all use can be edited.',
         inputSchema: z.object({
           id: z.number().int().describe('The draft id (from list_drafts)'),
           text: z.string().optional(),
@@ -216,12 +236,9 @@ const handler = createMcpHandler(
       async ({ id, text, target_accounts, media }, extra) => {
         const auth = getTokenAuth(extra);
         const existing = await getDraft(auth.userId, id);
-        if (!existing) return fail(`Draft ${id} not found.`);
+        if (!existing || !canAccessDraft(auth, existing)) return fail(`Draft ${id} not found.`);
 
-        const targets =
-          target_accounts !== undefined
-            ? [...target_accounts, ...existing.target_accounts.filter((target) => !isVisible(auth, target))]
-            : existing.target_accounts;
+        const targets = target_accounts ?? existing.target_accounts;
 
         // Validate before ingesting so bad input doesn't trigger uploads
         const validationError =
@@ -230,7 +247,7 @@ const handler = createMcpHandler(
             target_accounts: targets,
             media:
               media !== undefined ? media.map((publicUrl) => ({ publicUrl })) : existing.media,
-          }) ?? (await checkTargets(auth, target_accounts ?? []));
+          }) ?? (await checkTargets(auth, targets, existing.target_accounts));
         if (validationError) return fail(validationError);
 
         let storedMedia;
@@ -245,21 +262,24 @@ const handler = createMcpHandler(
           target_accounts: targets,
           media: storedMedia,
         });
-        return json({ draft: draft && scopeDraft(auth, draft) });
+        return json({ draft });
       }
     );
 
     server.registerTool(
       'delete_draft',
       {
-        description: 'Delete a draft permanently.',
+        description: 'Delete a draft permanently. Only drafts whose target accounts this token may all use can be deleted.',
         inputSchema: z.object({
           id: z.number().int().describe('The draft id (from list_drafts)'),
         }),
       },
       async ({ id }, extra) => {
-        const deleted = await deleteDraft(getTokenAuth(extra).userId, id);
-        if (!deleted) return fail(`Draft ${id} not found.`);
+        const auth = getTokenAuth(extra);
+        const existing = await getDraft(auth.userId, id);
+        if (!existing || !canAccessDraft(auth, existing) || !(await deleteDraft(auth.userId, id))) {
+          return fail(`Draft ${id} not found.`);
+        }
         return json({ deleted: true, id });
       }
     );
