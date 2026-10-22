@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { getProviders, signIn } from "next-auth/react"
-import { Alert, Box, Button, Container, Paper, Typography, Stack, Divider, TextField } from "@mui/material"
+import { Alert, Box, Button, Container, IconButton, Paper, Typography, Stack, Divider, TextField } from "@mui/material"
 import GoogleIcon from "@mui/icons-material/Google"
 import GitHubIcon from "@mui/icons-material/GitHub"
 import Link from "next/link"
@@ -16,9 +16,19 @@ function DiscordIcon() {
   )
 }
 
-// Temporary test-account form for the TikTok app review; shown only while the
+const OAUTH_PROVIDERS = [
+  { id: "google", label: "Google", icon: <GoogleIcon />, color: "#4285f4", hover: "#3367d6" },
+  { id: "github", label: "GitHub", icon: <GitHubIcon />, color: "#24292e", hover: "#1b1f23" },
+  { id: "discord", label: "Discord", icon: <DiscordIcon />, color: "#5865F2", hover: "#4752c4" },
+]
+
+const handleOAuthSignIn = (provider: string) => {
+  signIn(provider, { callbackUrl: "/dashboard" })
+}
+
+// Username/password form, temporary for the TikTok app review; shown only while the
 // review-login provider is enabled (see src/lib/reviewLogin.ts).
-function ReviewLoginForm() {
+function PasswordLoginForm() {
   const [error, setError] = useState(false)
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -38,27 +48,22 @@ function ReviewLoginForm() {
 
   return (
     <Stack component="form" onSubmit={handleSubmit} spacing={2} sx={{ width: "100%", maxWidth: 320 }}>
-      <Divider>Test account</Divider>
       {error && <Alert severity="error">Wrong username or password.</Alert>}
       <TextField name="username" label="Username" autoComplete="username" required />
       <TextField name="password" label="Password" type="password" autoComplete="current-password" required />
-      <Button type="submit" variant="outlined" size="large" sx={{ textTransform: "none" }}>
-        Sign in with test account
+      <Button type="submit" variant="contained" size="large" sx={{ textTransform: "none", py: 1.5 }}>
+        Sign in
       </Button>
     </Stack>
   )
 }
 
 export default function AuthPage() {
-  const [hasReviewLogin, setHasReviewLogin] = useState(false)
+  const [hasPasswordLogin, setHasPasswordLogin] = useState(false)
 
   useEffect(() => {
-    getProviders().then((providers) => setHasReviewLogin(Boolean(providers?.["review-login"])))
+    getProviders().then((providers) => setHasPasswordLogin(Boolean(providers?.["review-login"])))
   }, [])
-
-  const handleSignIn = (provider: string) => {
-    signIn(provider, { callbackUrl: "/dashboard" })
-  }
 
   return (
     <Box
@@ -92,55 +97,46 @@ export default function AuthPage() {
             Sign in to continue
           </Typography>
 
-          {/* OAuth Buttons */}
-          <Stack spacing={2} sx={{ width: "100%", maxWidth: 320 }}>
-            <Button
-              variant="contained"
-              size="large"
-              startIcon={<GoogleIcon />}
-              onClick={() => handleSignIn("google")}
-              sx={{
-                bgcolor: "#4285f4",
-                "&:hover": { bgcolor: "#3367d6" },
-                textTransform: "none",
-                py: 1.5,
-              }}
-            >
-              Continue with Google
-            </Button>
-
-            <Button
-              variant="contained"
-              size="large"
-              startIcon={<GitHubIcon />}
-              onClick={() => handleSignIn("github")}
-              sx={{
-                bgcolor: "#24292e",
-                "&:hover": { bgcolor: "#1b1f23" },
-                textTransform: "none",
-                py: 1.5,
-              }}
-            >
-              Continue with GitHub
-            </Button>
-
-            <Button
-              variant="contained"
-              size="large"
-              startIcon={<DiscordIcon />}
-              onClick={() => handleSignIn("discord")}
-              sx={{
-                bgcolor: "#5865F2",
-                "&:hover": { bgcolor: "#4752c4" },
-                textTransform: "none",
-                py: 1.5,
-              }}
-            >
-              Continue with Discord
-            </Button>
-          </Stack>
-
-          {hasReviewLogin && <Box sx={{ mt: 3, width: "100%", display: "flex", justifyContent: "center" }}><ReviewLoginForm /></Box>}
+          {hasPasswordLogin ? (
+            <>
+              <PasswordLoginForm />
+              <Divider sx={{ width: "100%", maxWidth: 320, my: 3 }}>
+                <Typography variant="caption" color="text.secondary">or continue with</Typography>
+              </Divider>
+              <Stack direction="row" spacing={2}>
+                {OAUTH_PROVIDERS.map((provider) => (
+                  <IconButton
+                    key={provider.id}
+                    aria-label={`Continue with ${provider.label}`}
+                    onClick={() => handleOAuthSignIn(provider.id)}
+                    sx={{ color: provider.color, border: "1px solid", borderColor: "divider" }}
+                  >
+                    {provider.icon}
+                  </IconButton>
+                ))}
+              </Stack>
+            </>
+          ) : (
+            <Stack spacing={2} sx={{ width: "100%", maxWidth: 320 }}>
+              {OAUTH_PROVIDERS.map((provider) => (
+                <Button
+                  key={provider.id}
+                  variant="contained"
+                  size="large"
+                  startIcon={provider.icon}
+                  onClick={() => handleOAuthSignIn(provider.id)}
+                  sx={{
+                    bgcolor: provider.color,
+                    "&:hover": { bgcolor: provider.hover },
+                    textTransform: "none",
+                    py: 1.5,
+                  }}
+                >
+                  Continue with {provider.label}
+                </Button>
+              ))}
+            </Stack>
+          )}
 
           {/* Terms */}
           <Divider sx={{ width: "100%", my: 3 }} />

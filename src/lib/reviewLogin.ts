@@ -29,7 +29,7 @@ export const reviewLoginProviders =
     ? [
         Credentials({
           id: "review-login",
-          name: "Test account",
+          name: "Username and password",
           credentials: { username: {}, password: {} },
           authorize: authorizeReviewer,
         }),
