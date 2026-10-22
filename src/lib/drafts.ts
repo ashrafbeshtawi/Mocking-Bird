@@ -1,5 +1,5 @@
 import pool from '@/lib/db';
-import { PLATFORMS, type Platform } from '@/types/accounts';
+import { PLATFORMS, type Platform, type TargetAccount } from '@/types/accounts';
 
 export interface DraftMedia {
   publicUrl: string;
@@ -14,6 +14,9 @@ export interface DraftMedia {
 export interface Draft {
   id: number;
   text: string;
+  /** The accounts the draft is meant to be published to. */
+  target_accounts: TargetAccount[];
+  /** The platforms of target_accounts, in PLATFORMS order. */
   target_platforms: Platform[];
   media: DraftMedia[] | null;
   created_at: string;
@@ -22,17 +25,34 @@ export interface Draft {
 
 export interface DraftInput {
   text: string;
-  target_platforms?: Platform[];
+  target_accounts?: TargetAccount[];
   media?: DraftMedia[] | null;
 }
 
-const DRAFT_COLUMNS = 'id, text, target_platforms, media, created_at, updated_at';
+const DRAFT_COLUMNS = 'id, text, target_accounts, media, created_at, updated_at';
+
+export const getPlatformsOf = (targets: TargetAccount[]): Platform[] =>
+  PLATFORMS.filter((platform) => targets.some((target) => target.platform === platform));
+
+const mapRowToDraft = (row: Omit<Draft, 'target_platforms'>): Draft => ({
+  ...row,
+  target_platforms: getPlatformsOf(row.target_accounts),
+});
+
+/** The targets without duplicates, as stored. */
+const serializeTargets = (targets: TargetAccount[]): string =>
+  JSON.stringify(
+    targets.filter(
+      (target, index) =>
+        targets.findIndex((t) => t.platform === target.platform && t.account_id === target.account_id) === index
+    )
+  );
 
 /**
  * Validate an untrusted draft payload. Returns an error message, or null if valid.
  */
 export function validateDraftInput(input: Record<string, unknown>): string | null {
-  const { text, target_platforms: targets, media } = input;
+  const { text, target_accounts: targets, media } = input;
 
   if (typeof text !== 'string') {
     return 'Text is required.';
@@ -40,9 +60,14 @@ export function validateDraftInput(input: Record<string, unknown>): string | nul
   if (targets !== undefined) {
     if (
       !Array.isArray(targets) ||
-      targets.some((t) => !PLATFORMS.includes(t as Platform))
+      targets.some(
+        (t) =>
+          !PLATFORMS.includes((t as TargetAccount)?.platform) ||
+          typeof (t as TargetAccount).account_id !== 'string' ||
+          !(t as TargetAccount).account_id
+      )
     ) {
-      return `target_platforms must be an array of: ${PLATFORMS.join(', ')}.`;
+      return `target_accounts must be an array of { platform, account_id } with platform one of: ${PLATFORMS.join(', ')}.`;
     }
   }
   if (media !== undefined && media !== null) {
@@ -64,13 +89,13 @@ export async function getDraft(userId: number, id: number): Promise<Draft | null
     `SELECT ${DRAFT_COLUMNS} FROM drafts WHERE id = $1 AND user_id = $2`,
     [id, userId]
   );
-  return rows[0] ?? null;
+  return rows[0] ? mapRowToDraft(rows[0]) : null;
 }
 
 export interface ListDraftsOptions {
   /** Case-insensitive substring match on the draft text. */
   query?: string;
-  /** Only drafts that target this platform. */
+  /** Only drafts that target an account on this platform. */
   platform?: Platform;
   /** Only drafts updated within the last N days (rolling, from now). */
   lastDays?: number;
@@ -102,7 +127,7 @@ export async function listDrafts(
   const lastDays = options.lastDays ?? null;
 
   const where = `user_id = $1 AND ($2::text IS NULL OR text ILIKE $2)
-    AND ($3::text IS NULL OR $3 = ANY(target_platforms))
+    AND ($3::text IS NULL OR target_accounts @> jsonb_build_array(jsonb_build_object('platform', $3::text)))
     AND ($4::int IS NULL OR updated_at >= NOW() - make_interval(days => $4::int))`;
   const [countResult, pageResult] = await Promise.all([
     pool.query(`SELECT COUNT(*) FROM drafts WHERE ${where}`, [userId, pattern, platform, lastDays]),
@@ -115,7 +140,7 @@ export async function listDrafts(
   ]);
 
   return {
-    drafts: pageResult.rows,
+    drafts: pageResult.rows.map(mapRowToDraft),
     total: parseInt(countResult.rows[0].count, 10),
     limit,
     offset,
@@ -123,27 +148,27 @@ export async function listDrafts(
 }
 
 export async function createDraft(userId: number, input: DraftInput): Promise<Draft> {
-  const { text, target_platforms = [], media = null } = input;
+  const { text, target_accounts = [], media = null } = input;
   const { rows } = await pool.query(
-    `INSERT INTO drafts (user_id, text, target_platforms, media)
+    `INSERT INTO drafts (user_id, text, target_accounts, media)
      VALUES ($1, $2, $3, $4)
      RETURNING ${DRAFT_COLUMNS}`,
-    [userId, text, target_platforms, media === null ? null : JSON.stringify(media)]
+    [userId, text, serializeTargets(target_accounts), media === null ? null : JSON.stringify(media)]
   );
-  return rows[0];
+  return mapRowToDraft(rows[0]);
 }
 
 /** Full update of a draft. Returns the updated draft, or null if not found / not owned. */
 export async function updateDraft(userId: number, id: number, input: DraftInput): Promise<Draft | null> {
-  const { text, target_platforms = [], media = null } = input;
+  const { text, target_accounts = [], media = null } = input;
   const { rows } = await pool.query(
     `UPDATE drafts
-     SET text = $1, target_platforms = $2, media = $3, updated_at = CURRENT_TIMESTAMP
+     SET text = $1, target_accounts = $2, media = $3, updated_at = CURRENT_TIMESTAMP
      WHERE id = $4 AND user_id = $5
      RETURNING ${DRAFT_COLUMNS}`,
-    [text, target_platforms, media === null ? null : JSON.stringify(media), id, userId]
+    [text, serializeTargets(target_accounts), media === null ? null : JSON.stringify(media), id, userId]
   );
-  return rows[0] ?? null;
+  return rows[0] ? mapRowToDraft(rows[0]) : null;
 }
 
 /** Returns true if a draft was deleted, false if not found / not owned. */

@@ -17,7 +17,7 @@ const mockQuery = pool.query as jest.Mock;
 const draftRow = {
   id: 1,
   text: 'hello',
-  target_platforms: ['facebook'],
+  target_accounts: [{ platform: 'facebook', account_id: 'p1' }],
   media: null,
   created_at: '2026-09-11T00:00:00Z',
   updated_at: '2026-09-11T00:00:00Z',
@@ -64,7 +64,7 @@ describe('Drafts API', () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.draft).toEqual(draftRow);
+    expect(data.draft).toEqual({ ...draftRow, target_platforms: ['facebook'] });
     expect(mockQuery.mock.calls[0][1]).toEqual([1, 42]);
   });
 
@@ -84,12 +84,15 @@ describe('Drafts API', () => {
     expect(mockQuery.mock.calls[1][1]).toEqual([42, pattern, null, null, 100, 0]);
   });
 
-  it('rejects a draft with an unknown target platform', async () => {
-    const response = await POST(request('POST', { text: 'hi', target_platforms: ['myspace'] }));
+  it.each([[{ platform: 'myspace', account_id: 'a1' }], [{ platform: 'facebook' }], ['facebook']])(
+    'rejects a draft with an invalid target account: %j',
+    async (target) => {
+      const response = await POST(request('POST', { text: 'hi', target_accounts: [target] }));
 
-    expect(response.status).toBe(400);
-    expect(mockQuery).not.toHaveBeenCalled();
-  });
+      expect(response.status).toBe(400);
+      expect(mockQuery).not.toHaveBeenCalled();
+    }
+  );
 
   it('rejects a draft with neither text nor media', async () => {
     const response = await POST(request('POST', { text: '   ' }));
@@ -101,13 +104,24 @@ describe('Drafts API', () => {
     mockQuery.mockResolvedValue({ rows: [draftRow] });
 
     const response = await POST(
-      request('POST', { text: 'hello', target_platforms: ['facebook'] })
+      request('POST', {
+        text: 'hello',
+        target_accounts: [
+          { platform: 'facebook', account_id: 'p1' },
+          { platform: 'facebook', account_id: 'p1' },
+        ],
+      })
     );
     const data = await response.json();
 
     expect(response.status).toBe(201);
-    expect(data.draft).toEqual(draftRow);
-    expect(mockQuery.mock.calls[0][1]).toEqual([42, 'hello', ['facebook'], null]);
+    expect(data.draft).toEqual({ ...draftRow, target_platforms: ['facebook'] });
+    expect(mockQuery.mock.calls[0][1]).toEqual([
+      42,
+      'hello',
+      JSON.stringify([{ platform: 'facebook', account_id: 'p1' }]),
+      null,
+    ]);
   });
 
   it('returns 404 when updating a draft that is not owned', async () => {
@@ -153,7 +167,9 @@ describe('Drafts API', () => {
     await GET(getRequest('?platform=facebook'));
 
     expect(mockQuery.mock.calls[0][1]).toEqual([42, null, 'facebook', null]);
-    expect(mockQuery.mock.calls[1][0]).toContain('= ANY(target_platforms)');
+    expect(mockQuery.mock.calls[1][0]).toContain(
+      "target_accounts @> jsonb_build_array(jsonb_build_object('platform', $3::text))"
+    );
   });
 
   it('ignores an unknown platform filter', async () => {

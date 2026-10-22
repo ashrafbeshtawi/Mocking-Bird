@@ -41,6 +41,7 @@ const mockFetch = fetchWithAuth as jest.Mock;
 const draft = (id: number, text: string) => ({
   id,
   text,
+  target_accounts: [{ platform: 'facebook', account_id: 'p1' }],
   target_platforms: ['facebook'],
   media: null,
   created_at: '2026-09-30T10:00:00Z',

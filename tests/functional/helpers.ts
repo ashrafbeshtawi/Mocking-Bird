@@ -43,3 +43,22 @@ export function authedFetch(userId: number | string, pathname: string, init: Req
   headers.set('x-forwarded-proto', 'https');
   return fetchPage(pathname, { ...init, headers });
 }
+
+/** Calls an MCP tool over HTTP like a real client: bearer token, JSON-RPC tools/call. */
+export async function callMcpTool(token: string, name: string, args: Record<string, unknown>) {
+  const response = await fetchPage('/api/mcp', {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${token}`,
+      'content-type': 'application/json',
+      accept: 'application/json, text/event-stream',
+    },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }),
+  });
+  const body = await response.text();
+  // Streamable HTTP answers with one SSE `data:` line or plain JSON.
+  const payload = JSON.parse(body.includes('data: ') ? body.split('data: ')[1].split('\n')[0] : body);
+  return payload.result as { content: { text: string }[]; isError?: boolean };
+}
+
+export const mcpToolJson = (result: { content: { text: string }[] }) => JSON.parse(result.content[0].text);

@@ -51,6 +51,12 @@ export interface AccountData {
   platform: Platform;
 }
 
+// One connected account a post goes to; account_id is the id the publish API takes
+export interface TargetAccount {
+  platform: Platform;
+  account_id: string;
+}
+
 // Instagram selection state for publish page
 export interface InstagramSelection {
   publish: boolean;

@@ -2,19 +2,22 @@ import { createMcpHandler, withMcpAuth } from 'mcp-handler';
 import { z } from 'zod';
 import { createLogger } from '@/lib/logger';
 import { ingestRemoteMedia } from '@/lib/services/cloudinaryService';
-import { getUserIdByMcpToken } from '@/lib/mcpTokens';
+import { findMcpToken } from '@/lib/mcpTokens';
 import { listPublishHistory } from '@/lib/publishHistory';
-import { getConnectedPlatformTypes } from '@/lib/connectedPlatforms';
+import { listConnectedAccounts } from '@/lib/connectedAccounts';
+import { formatAccountGrant, hasAccountAccess, type McpAccountAccess } from '@/lib/mcpAccess';
 import {
   createDraft,
   deleteDraft,
   getDraft,
   listDrafts,
+  getPlatformsOf,
   updateDraft,
   validateDraftInput,
+  type Draft,
   type DraftMedia,
 } from '@/lib/drafts';
-import { PLATFORMS, type Platform } from '@/types/accounts';
+import { PLATFORMS, type Platform, type TargetAccount } from '@/types/accounts';
 
 const logger = createLogger('McpAPI');
 
@@ -23,6 +26,10 @@ const mediaUrls = z
   .array(z.string())
   .optional()
   .describe('Optional list of media URLs to attach to the draft');
+const targetAccounts = z
+  .array(z.object({ platform: platformEnum, account_id: z.string().min(1) }))
+  .optional()
+  .describe('Accounts this draft is meant to be published to: { platform, account_id } from list_connected_accounts');
 
 // External URLs can expire, so drafts must not reference them directly.
 // Ingest them into Cloudinary (same store the UI uploads to) at write time.
@@ -38,27 +45,60 @@ const fail = (message: string) => ({
   isError: true,
 });
 
-/** The user the verified token belongs to (set by verifyToken below). */
-const userIdFrom = (extra: { http?: { authInfo?: { extra?: Record<string, unknown> } } }): number => {
-  const userId = extra.http?.authInfo?.extra?.userId;
-  if (typeof userId !== 'number') {
+interface TokenAuth {
+  userId: number;
+  accountAccess: McpAccountAccess;
+}
+
+/** The user and account access of the verified token (set by verifyToken below). */
+const getTokenAuth = (extra: { http?: { authInfo?: { extra?: Record<string, unknown> } } }): TokenAuth => {
+  const { userId, accountAccess } = extra.http?.authInfo?.extra ?? {};
+  if (typeof userId !== 'number' || !Array.isArray(accountAccess)) {
     throw new Error('Unauthorized: no user bound to this token.');
   }
-  return userId;
+  return { userId, accountAccess };
+};
+
+/** Accounts outside the token's access stay hidden from it. */
+const isVisible = (auth: TokenAuth, target: TargetAccount): boolean =>
+  hasAccountAccess(auth.accountAccess, target.platform, target.account_id);
+
+const listAccessibleAccounts = async (auth: TokenAuth) =>
+  (await listConnectedAccounts(auth.userId)).filter((account) =>
+    hasAccountAccess(auth.accountAccess, account.platform, account.id)
+  );
+
+/** Error message naming the targets the token may not use or that are not connected; null if there are none. */
+const checkTargets = async (auth: TokenAuth, targets: TargetAccount[]): Promise<string | null> => {
+  if (targets.length === 0) return null;
+  const accounts = await listAccessibleAccounts(auth);
+  const denied = targets.filter(
+    (target) => !accounts.some((account) => account.platform === target.platform && account.id === target.account_id)
+  );
+  return denied.length === 0
+    ? null
+    : `Not a connected account this token may use: ${denied
+        .map((target) => formatAccountGrant(target.platform, target.account_id))
+        .join(', ')}. See list_connected_accounts.`;
+};
+
+/** The draft as the token sees it: only targets on accounts it may use. */
+const scopeDraft = (auth: TokenAuth, draft: Draft): Draft => {
+  const target_accounts = draft.target_accounts.filter((target) => isVisible(auth, target));
+  return { ...draft, target_accounts, target_platforms: getPlatformsOf(target_accounts) };
 };
 
 const handler = createMcpHandler(
   (server) => {
     server.registerTool(
-      'get_connected_social_media_types',
+      'list_connected_accounts',
       {
         description:
-          'List the social media platform types the user has connected accounts for (facebook, instagram, twitter, telegram, linkedin, youtube, tiktok).',
+          `List the connected social media accounts this token may use. Each has \`platform\` (${PLATFORMS.join(', ')}), \`id\` and \`name\`. Target a draft at one with \`{ platform, account_id: id }\` in \`target_accounts\`.`,
         inputSchema: z.object({}),
       },
       async (_args, extra) => {
-        const connected = await getConnectedPlatformTypes(userIdFrom(extra));
-        return json({ connected });
+        return json({ accounts: await listAccessibleAccounts(getTokenAuth(extra)) });
       }
     );
 
@@ -78,11 +118,13 @@ const handler = createMcpHandler(
       'list_drafts',
       {
         description:
-          'List saved post drafts, most recently updated first. Each draft has `created_at` and `updated_at` (ISO 8601, UTC); `last_days` filters on `updated_at`. Paginated; the response includes `total`, so page with `offset` until you have them all.',
+          'List saved post drafts, most recently updated first. Each draft has `target_accounts`, `created_at` and `updated_at` (ISO 8601, UTC); `last_days` filters on `updated_at`. Paginated; the response includes `total`, so page with `offset` until you have them all.',
         inputSchema: z.object({ ...pageArgs, last_days: lastDays }),
       },
       async ({ limit, offset, last_days }, extra) => {
-        return json(await listDrafts(userIdFrom(extra), { limit, offset, lastDays: last_days }));
+        const auth = getTokenAuth(extra);
+        const page = await listDrafts(auth.userId, { limit, offset, lastDays: last_days });
+        return json({ ...page, drafts: page.drafts.map((draft) => scopeDraft(auth, draft)) });
       }
     );
 
@@ -98,7 +140,9 @@ const handler = createMcpHandler(
         }),
       },
       async ({ query, limit, offset, last_days }, extra) => {
-        return json(await listDrafts(userIdFrom(extra), { query, limit, offset, lastDays: last_days }));
+        const auth = getTokenAuth(extra);
+        const page = await listDrafts(auth.userId, { query, limit, offset, lastDays: last_days });
+        return json({ ...page, drafts: page.drafts.map((draft) => scopeDraft(auth, draft)) });
       }
     );
 
@@ -106,11 +150,21 @@ const handler = createMcpHandler(
       'get_publish_history',
       {
         description:
-          'Publish history (what was posted where and whether it succeeded), newest first. Each entry has `created_at` (ISO 8601, UTC), the time the publish completed; `last_days` filters on it. Paginated: limit default 20 / max 100, offset default 0; the response includes `total`. Per-account report texts are omitted for efficiency.',
+          'Publish history (what was posted where and whether it succeeded), newest first. Each entry has `created_at` (ISO 8601, UTC), the time the publish completed; `last_days` filters on it. Paginated: limit default 20 / max 100, offset default 0; the response includes `total`. Per-account report texts are omitted for efficiency; `publish_destinations` lists only accounts this token may use.',
         inputSchema: z.object({ ...pageArgs, last_days: lastDays }),
       },
       async ({ limit, offset, last_days }, extra) => {
-        return json(await listPublishHistory(userIdFrom(extra), { limit, offset, lastDays: last_days }));
+        const auth = getTokenAuth(extra);
+        const page = await listPublishHistory(auth.userId, { limit, offset, lastDays: last_days });
+        return json({
+          ...page,
+          entries: page.entries.map((entry) => ({
+            ...entry,
+            publish_destinations: ((entry.publish_destinations ?? []) as TargetAccount[]).filter((destination) =>
+              isVisible(auth, destination)
+            ),
+          })),
+        });
       }
     );
 
@@ -120,21 +174,19 @@ const handler = createMcpHandler(
         description: 'Save a new post draft. A draft needs text or at least one media URL.',
         inputSchema: z.object({
           text: z.string().describe('The post text'),
-          target_platforms: z
-            .array(platformEnum)
-            .optional()
-            .describe('Platforms this draft is intended for'),
+          target_accounts: targetAccounts,
           media: mediaUrls,
         }),
       },
-      async ({ text, target_platforms, media }, extra) => {
-        const userId = userIdFrom(extra);
+      async ({ text, target_accounts, media }, extra) => {
+        const auth = getTokenAuth(extra);
         // Validate before ingesting so bad input doesn't trigger uploads
-        const validationError = validateDraftInput({
-          text,
-          target_platforms,
-          media: media?.map((publicUrl) => ({ publicUrl })) ?? null,
-        });
+        const validationError =
+          validateDraftInput({
+            text,
+            target_accounts,
+            media: media?.map((publicUrl) => ({ publicUrl })) ?? null,
+          }) ?? (await checkTargets(auth, target_accounts ?? []));
         if (validationError) return fail(validationError);
 
         let storedMedia;
@@ -144,8 +196,8 @@ const handler = createMcpHandler(
           return fail((error as Error).message);
         }
 
-        const draft = await createDraft(userId, { text, target_platforms, media: storedMedia });
-        return json({ draft });
+        const draft = await createDraft(auth.userId, { text, target_accounts, media: storedMedia });
+        return json({ draft: scopeDraft(auth, draft) });
       }
     );
 
@@ -153,26 +205,32 @@ const handler = createMcpHandler(
       'edit_draft',
       {
         description:
-          'Edit an existing draft. Only the provided fields change; omitted fields keep their current value.',
+          'Edit an existing draft. Only the provided fields change; omitted fields keep their current value. `target_accounts` replaces the targets on accounts this token may use; targets on other accounts stay.',
         inputSchema: z.object({
           id: z.number().int().describe('The draft id (from list_drafts)'),
           text: z.string().optional(),
-          target_platforms: z.array(platformEnum).optional(),
+          target_accounts: targetAccounts,
           media: mediaUrls,
         }),
       },
-      async ({ id, text, target_platforms, media }, extra) => {
-        const userId = userIdFrom(extra);
-        const existing = await getDraft(userId, id);
+      async ({ id, text, target_accounts, media }, extra) => {
+        const auth = getTokenAuth(extra);
+        const existing = await getDraft(auth.userId, id);
         if (!existing) return fail(`Draft ${id} not found.`);
 
+        const targets =
+          target_accounts !== undefined
+            ? [...target_accounts, ...existing.target_accounts.filter((target) => !isVisible(auth, target))]
+            : existing.target_accounts;
+
         // Validate before ingesting so bad input doesn't trigger uploads
-        const validationError = validateDraftInput({
-          text: text ?? existing.text,
-          target_platforms: target_platforms ?? existing.target_platforms,
-          media:
-            media !== undefined ? media.map((publicUrl) => ({ publicUrl })) : existing.media,
-        });
+        const validationError =
+          validateDraftInput({
+            text: text ?? existing.text,
+            target_accounts: targets,
+            media:
+              media !== undefined ? media.map((publicUrl) => ({ publicUrl })) : existing.media,
+          }) ?? (await checkTargets(auth, target_accounts ?? []));
         if (validationError) return fail(validationError);
 
         let storedMedia;
@@ -182,12 +240,12 @@ const handler = createMcpHandler(
           return fail((error as Error).message);
         }
 
-        const draft = await updateDraft(userId, id, {
+        const draft = await updateDraft(auth.userId, id, {
           text: text ?? existing.text,
-          target_platforms: target_platforms ?? existing.target_platforms,
+          target_accounts: targets,
           media: storedMedia,
         });
-        return json({ draft });
+        return json({ draft: draft && scopeDraft(auth, draft) });
       }
     );
 
@@ -200,7 +258,7 @@ const handler = createMcpHandler(
         }),
       },
       async ({ id }, extra) => {
-        const deleted = await deleteDraft(userIdFrom(extra), id);
+        const deleted = await deleteDraft(getTokenAuth(extra).userId, id);
         if (!deleted) return fail(`Draft ${id} not found.`);
         return json({ deleted: true, id });
       }
@@ -209,19 +267,19 @@ const handler = createMcpHandler(
   { serverInfo: { name: 'mockingbird', version: '1.0.0' } }
 );
 
-// Per-user long-lived tokens, generated on the dashboard (MCP Access card).
+// Per-user long-lived tokens, generated on the MCP page; each carries its own account access.
 const verifyToken = async (_req: Request, bearerToken?: string) => {
   if (!bearerToken) return undefined;
 
-  let userId: number | null = null;
+  let token: Awaited<ReturnType<typeof findMcpToken>> = null;
   try {
-    userId = await getUserIdByMcpToken(bearerToken);
+    token = await findMcpToken(bearerToken);
   } catch (error) {
     logger.error('Token lookup failed', error);
     return undefined;
   }
 
-  if (!userId) {
+  if (!token) {
     logger.warn('Rejected MCP request with unknown token');
     return undefined;
   }
@@ -230,7 +288,7 @@ const verifyToken = async (_req: Request, bearerToken?: string) => {
     token: bearerToken,
     clientId: 'mockingbird-mcp',
     scopes: [],
-    extra: { userId },
+    extra: { userId: token.userId, accountAccess: token.accountAccess },
   };
 };
 
