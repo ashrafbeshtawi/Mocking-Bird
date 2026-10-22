@@ -3,7 +3,7 @@
 import React from 'react';
 import { Autocomplete, TextField } from '@mui/material';
 import { PLATFORM_CONFIG } from '@/lib/platformConfig';
-import { ALL_ACCOUNTS, accountGrant, addAccountGrant, parseGrant, type McpAccountAccess } from '@/lib/mcpAccess';
+import { ALL_ACCOUNTS, formatAccountGrant, addAccountGrant, parseGrant, type McpAccountAccess } from '@/lib/mcpAccess';
 import { PLATFORMS, type AccountData, type Platform } from '@/types/accounts';
 
 interface GrantOption {
@@ -13,7 +13,7 @@ interface GrantOption {
 }
 
 /** Human-readable name of a grant; an account that is no longer connected shows its id. */
-export function grantLabel(grant: string, accounts: AccountData[]): string {
+export function getGrantLabel(grant: string, accounts: AccountData[]): string {
   if (grant === ALL_ACCOUNTS) return 'All accounts';
   const { platform, accountId } = parseGrant(grant);
   const platformLabel = PLATFORM_CONFIG[platform as Platform]?.label ?? platform;
@@ -34,21 +34,21 @@ interface McpAccountAccessFieldProps {
  */
 export function McpAccountAccessField({ accounts, value, onChange }: McpAccountAccessFieldProps) {
   const options: GrantOption[] = [
-    { grant: ALL_ACCOUNTS, label: grantLabel(ALL_ACCOUNTS, accounts), group: 'Everything' },
+    { grant: ALL_ACCOUNTS, label: getGrantLabel(ALL_ACCOUNTS, accounts), group: 'Everything' },
     ...PLATFORMS.flatMap((platform) => [
-      { grant: platform, label: grantLabel(platform, accounts), group: PLATFORM_CONFIG[platform].label },
+      { grant: platform, label: getGrantLabel(platform, accounts), group: PLATFORM_CONFIG[platform].label },
       ...accounts
         .filter((account) => account.platform === platform)
         .map((account) => {
-          const grant = accountGrant(platform, account.id);
-          return { grant, label: grantLabel(grant, accounts), group: PLATFORM_CONFIG[platform].label };
+          const grant = formatAccountGrant(platform, account.id);
+          return { grant, label: getGrantLabel(grant, accounts), group: PLATFORM_CONFIG[platform].label };
         }),
     ]),
   ];
   // Granted accounts that are no longer connected stay visible, so they can be removed
   const unlisted = value
     .filter((grant) => !options.some((option) => option.grant === grant))
-    .map((grant) => ({ grant, label: grantLabel(grant, accounts), group: 'Disconnected' }));
+    .map((grant) => ({ grant, label: getGrantLabel(grant, accounts), group: 'Disconnected' }));
   const allOptions = [...options, ...unlisted];
 
   const isCovered = (option: GrantOption) => {

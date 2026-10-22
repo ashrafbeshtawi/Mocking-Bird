@@ -21,7 +21,7 @@ import { fetchWithAuth } from '@/lib/fetch';
 import { useConnectedAccounts } from '@/hooks/useConnectedAccounts';
 import type { McpAccountAccess } from '@/lib/mcpAccess';
 import { MCP_TOKEN_TITLE_MAX_LENGTH, type McpTokenInfo } from '@/types/mcpTokens';
-import { McpAccountAccessField, grantLabel } from './McpAccountAccessField';
+import { McpAccountAccessField, getGrantLabel } from './McpAccountAccessField';
 
 const cardSx = {
   bgcolor: 'background.paper',
@@ -131,7 +131,7 @@ export function McpTokenCard() {
 
   const trimmedTitle = title.trim();
   const describeAccess = (tokenAccess: McpAccountAccess) =>
-    tokenAccess.map((grant) => grantLabel(grant, accounts)).join(', ');
+    tokenAccess.map((grant) => getGrantLabel(grant, accounts)).join(', ');
 
   return (
     <Box sx={cardSx}>

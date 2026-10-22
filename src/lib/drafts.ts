@@ -31,16 +31,16 @@ export interface DraftInput {
 
 const DRAFT_COLUMNS = 'id, text, target_accounts, media, created_at, updated_at';
 
-export const platformsOf = (targets: TargetAccount[]): Platform[] =>
+export const getPlatformsOf = (targets: TargetAccount[]): Platform[] =>
   PLATFORMS.filter((platform) => targets.some((target) => target.platform === platform));
 
-const toDraft = (row: Omit<Draft, 'target_platforms'>): Draft => ({
+const mapRowToDraft = (row: Omit<Draft, 'target_platforms'>): Draft => ({
   ...row,
-  target_platforms: platformsOf(row.target_accounts),
+  target_platforms: getPlatformsOf(row.target_accounts),
 });
 
 /** The targets without duplicates, as stored. */
-const targetsJson = (targets: TargetAccount[]): string =>
+const serializeTargets = (targets: TargetAccount[]): string =>
   JSON.stringify(
     targets.filter(
       (target, index) =>
@@ -89,7 +89,7 @@ export async function getDraft(userId: number, id: number): Promise<Draft | null
     `SELECT ${DRAFT_COLUMNS} FROM drafts WHERE id = $1 AND user_id = $2`,
     [id, userId]
   );
-  return rows[0] ? toDraft(rows[0]) : null;
+  return rows[0] ? mapRowToDraft(rows[0]) : null;
 }
 
 export interface ListDraftsOptions {
@@ -140,7 +140,7 @@ export async function listDrafts(
   ]);
 
   return {
-    drafts: pageResult.rows.map(toDraft),
+    drafts: pageResult.rows.map(mapRowToDraft),
     total: parseInt(countResult.rows[0].count, 10),
     limit,
     offset,
@@ -153,9 +153,9 @@ export async function createDraft(userId: number, input: DraftInput): Promise<Dr
     `INSERT INTO drafts (user_id, text, target_accounts, media)
      VALUES ($1, $2, $3, $4)
      RETURNING ${DRAFT_COLUMNS}`,
-    [userId, text, targetsJson(target_accounts), media === null ? null : JSON.stringify(media)]
+    [userId, text, serializeTargets(target_accounts), media === null ? null : JSON.stringify(media)]
   );
-  return toDraft(rows[0]);
+  return mapRowToDraft(rows[0]);
 }
 
 /** Full update of a draft. Returns the updated draft, or null if not found / not owned. */
@@ -166,9 +166,9 @@ export async function updateDraft(userId: number, id: number, input: DraftInput)
      SET text = $1, target_accounts = $2, media = $3, updated_at = CURRENT_TIMESTAMP
      WHERE id = $4 AND user_id = $5
      RETURNING ${DRAFT_COLUMNS}`,
-    [text, targetsJson(target_accounts), media === null ? null : JSON.stringify(media), id, userId]
+    [text, serializeTargets(target_accounts), media === null ? null : JSON.stringify(media), id, userId]
   );
-  return rows[0] ? toDraft(rows[0]) : null;
+  return rows[0] ? mapRowToDraft(rows[0]) : null;
 }
 
 /** Returns true if a draft was deleted, false if not found / not owned. */

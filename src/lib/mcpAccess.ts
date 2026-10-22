@@ -10,7 +10,7 @@ export type McpAccountAccess = string[];
 
 export const ALL_ACCOUNTS = 'all';
 
-export const accountGrant = (platform: Platform, accountId: string): string => `${platform}:${accountId}`;
+export const formatAccountGrant = (platform: Platform, accountId: string): string => `${platform}:${accountId}`;
 
 export function parseGrant(grant: string): { platform: string; accountId?: string } {
   const separator = grant.indexOf(':');
@@ -20,7 +20,7 @@ export function parseGrant(grant: string): { platform: string; accountId?: strin
 }
 
 export const hasAccountAccess = (access: McpAccountAccess, platform: Platform, accountId: string): boolean =>
-  access.includes(ALL_ACCOUNTS) || access.includes(platform) || access.includes(accountGrant(platform, accountId));
+  access.includes(ALL_ACCOUNTS) || access.includes(platform) || access.includes(formatAccountGrant(platform, accountId));
 
 /**
  * Validate an untrusted account_access payload against the user's connected accounts.
@@ -56,6 +56,6 @@ export function validateAccountAccess(input: unknown, accounts: AccountData[]): 
 export function addAccountGrant(access: McpAccountAccess, grant: string): McpAccountAccess {
   if (grant === ALL_ACCOUNTS) return [ALL_ACCOUNTS];
   const { accountId } = parseGrant(grant);
-  const covered = (other: string) => accountId === undefined && parseGrant(other).platform === grant;
-  return [...access.filter((other) => !covered(other)), grant];
+  const isCoveredByGrant = (other: string) => accountId === undefined && parseGrant(other).platform === grant;
+  return [...access.filter((other) => !isCoveredByGrant(other)), grant];
 }

@@ -264,13 +264,13 @@ function PublishPageInner() {
     draftTargetsApplied.current = true;
     const isTargeted = (platform: Platform, id: string) =>
       draftTargets.some((t) => t.platform === platform && t.account_id === id);
-    const targeted = (platform: Platform, ids: string[]) => ids.filter((id) => isTargeted(platform, id));
-    setSelectedFacebookPages(targeted('facebook', facebookPages.map((p) => p.page_id)));
-    setSelectedXAccounts(targeted('twitter', xAccounts.map((a) => a.id)));
-    setSelectedTelegramChannels(targeted('telegram', telegramChannels.map((c) => c.channel_id)));
-    setSelectedLinkedInAccounts(targeted('linkedin', linkedinAccounts.map((a) => a.id)));
-    setSelectedYouTubeChannels(targeted('youtube', youtubeChannels.map((c) => c.id)));
-    setSelectedTikTokAccounts(targeted('tiktok', tiktokAccounts.map((a) => a.id)));
+    const filterTargeted = (platform: Platform, ids: string[]) => ids.filter((id) => isTargeted(platform, id));
+    setSelectedFacebookPages(filterTargeted('facebook', facebookPages.map((p) => p.page_id)));
+    setSelectedXAccounts(filterTargeted('twitter', xAccounts.map((a) => a.id)));
+    setSelectedTelegramChannels(filterTargeted('telegram', telegramChannels.map((c) => c.channel_id)));
+    setSelectedLinkedInAccounts(filterTargeted('linkedin', linkedinAccounts.map((a) => a.id)));
+    setSelectedYouTubeChannels(filterTargeted('youtube', youtubeChannels.map((c) => c.id)));
+    setSelectedTikTokAccounts(filterTargeted('tiktok', tiktokAccounts.map((a) => a.id)));
     const instagram: Record<string, InstagramSelection> = {};
     instagramAccounts.forEach((a) => {
       instagram[a.id] = {
@@ -423,21 +423,21 @@ function PublishPageInner() {
     setIsSavingDraft(true);
 
     // Targets = the selected accounts; an Instagram account counts when its feed or story is selected
-    const targetsOn = (platform: Platform, ids: string[]): TargetAccount[] =>
+    const buildTargetsOn = (platform: Platform, ids: string[]): TargetAccount[] =>
       ids.map((account_id) => ({ platform, account_id }));
     const targetAccounts = [
-      ...targetsOn('facebook', selectedFacebookPages),
-      ...targetsOn('twitter', selectedXAccounts),
-      ...targetsOn(
+      ...buildTargetsOn('facebook', selectedFacebookPages),
+      ...buildTargetsOn('twitter', selectedXAccounts),
+      ...buildTargetsOn(
         'instagram',
         Object.entries(selectedInstagramAccounts)
           .filter(([, s]) => s.publish || s.story)
           .map(([id]) => id)
       ),
-      ...targetsOn('telegram', selectedTelegramChannels),
-      ...targetsOn('linkedin', selectedLinkedInAccounts),
-      ...targetsOn('youtube', selectedYouTubeChannels),
-      ...targetsOn('tiktok', selectedTikTokAccounts),
+      ...buildTargetsOn('telegram', selectedTelegramChannels),
+      ...buildTargetsOn('linkedin', selectedLinkedInAccounts),
+      ...buildTargetsOn('youtube', selectedYouTubeChannels),
+      ...buildTargetsOn('tiktok', selectedTikTokAccounts),
     ];
 
     try {

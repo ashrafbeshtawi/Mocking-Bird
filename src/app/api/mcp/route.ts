@@ -5,13 +5,13 @@ import { ingestRemoteMedia } from '@/lib/services/cloudinaryService';
 import { findMcpToken } from '@/lib/mcpTokens';
 import { listPublishHistory } from '@/lib/publishHistory';
 import { listConnectedAccounts } from '@/lib/connectedAccounts';
-import { accountGrant, hasAccountAccess, type McpAccountAccess } from '@/lib/mcpAccess';
+import { formatAccountGrant, hasAccountAccess, type McpAccountAccess } from '@/lib/mcpAccess';
 import {
   createDraft,
   deleteDraft,
   getDraft,
   listDrafts,
-  platformsOf,
+  getPlatformsOf,
   updateDraft,
   validateDraftInput,
   type Draft,
@@ -51,7 +51,7 @@ interface TokenAuth {
 }
 
 /** The user and account access of the verified token (set by verifyToken below). */
-const authFrom = (extra: { http?: { authInfo?: { extra?: Record<string, unknown> } } }): TokenAuth => {
+const getTokenAuth = (extra: { http?: { authInfo?: { extra?: Record<string, unknown> } } }): TokenAuth => {
   const { userId, accountAccess } = extra.http?.authInfo?.extra ?? {};
   if (typeof userId !== 'number' || !Array.isArray(accountAccess)) {
     throw new Error('Unauthorized: no user bound to this token.');
@@ -63,7 +63,7 @@ const authFrom = (extra: { http?: { authInfo?: { extra?: Record<string, unknown>
 const isVisible = (auth: TokenAuth, target: TargetAccount): boolean =>
   hasAccountAccess(auth.accountAccess, target.platform, target.account_id);
 
-const accessibleAccounts = async (auth: TokenAuth) =>
+const listAccessibleAccounts = async (auth: TokenAuth) =>
   (await listConnectedAccounts(auth.userId)).filter((account) =>
     hasAccountAccess(auth.accountAccess, account.platform, account.id)
   );
@@ -71,21 +71,21 @@ const accessibleAccounts = async (auth: TokenAuth) =>
 /** Error message naming the targets the token may not use or that are not connected; null if there are none. */
 const checkTargets = async (auth: TokenAuth, targets: TargetAccount[]): Promise<string | null> => {
   if (targets.length === 0) return null;
-  const accounts = await accessibleAccounts(auth);
+  const accounts = await listAccessibleAccounts(auth);
   const denied = targets.filter(
     (target) => !accounts.some((account) => account.platform === target.platform && account.id === target.account_id)
   );
   return denied.length === 0
     ? null
     : `Not a connected account this token may use: ${denied
-        .map((target) => accountGrant(target.platform, target.account_id))
+        .map((target) => formatAccountGrant(target.platform, target.account_id))
         .join(', ')}. See list_connected_accounts.`;
 };
 
 /** The draft as the token sees it: only targets on accounts it may use. */
 const scopeDraft = (auth: TokenAuth, draft: Draft): Draft => {
   const target_accounts = draft.target_accounts.filter((target) => isVisible(auth, target));
-  return { ...draft, target_accounts, target_platforms: platformsOf(target_accounts) };
+  return { ...draft, target_accounts, target_platforms: getPlatformsOf(target_accounts) };
 };
 
 const handler = createMcpHandler(
@@ -98,7 +98,7 @@ const handler = createMcpHandler(
         inputSchema: z.object({}),
       },
       async (_args, extra) => {
-        return json({ accounts: await accessibleAccounts(authFrom(extra)) });
+        return json({ accounts: await listAccessibleAccounts(getTokenAuth(extra)) });
       }
     );
 
@@ -122,7 +122,7 @@ const handler = createMcpHandler(
         inputSchema: z.object({ ...pageArgs, last_days: lastDays }),
       },
       async ({ limit, offset, last_days }, extra) => {
-        const auth = authFrom(extra);
+        const auth = getTokenAuth(extra);
         const page = await listDrafts(auth.userId, { limit, offset, lastDays: last_days });
         return json({ ...page, drafts: page.drafts.map((draft) => scopeDraft(auth, draft)) });
       }
@@ -140,7 +140,7 @@ const handler = createMcpHandler(
         }),
       },
       async ({ query, limit, offset, last_days }, extra) => {
-        const auth = authFrom(extra);
+        const auth = getTokenAuth(extra);
         const page = await listDrafts(auth.userId, { query, limit, offset, lastDays: last_days });
         return json({ ...page, drafts: page.drafts.map((draft) => scopeDraft(auth, draft)) });
       }
@@ -154,7 +154,7 @@ const handler = createMcpHandler(
         inputSchema: z.object({ ...pageArgs, last_days: lastDays }),
       },
       async ({ limit, offset, last_days }, extra) => {
-        const auth = authFrom(extra);
+        const auth = getTokenAuth(extra);
         const page = await listPublishHistory(auth.userId, { limit, offset, lastDays: last_days });
         return json({
           ...page,
@@ -179,7 +179,7 @@ const handler = createMcpHandler(
         }),
       },
       async ({ text, target_accounts, media }, extra) => {
-        const auth = authFrom(extra);
+        const auth = getTokenAuth(extra);
         // Validate before ingesting so bad input doesn't trigger uploads
         const validationError =
           validateDraftInput({
@@ -214,7 +214,7 @@ const handler = createMcpHandler(
         }),
       },
       async ({ id, text, target_accounts, media }, extra) => {
-        const auth = authFrom(extra);
+        const auth = getTokenAuth(extra);
         const existing = await getDraft(auth.userId, id);
         if (!existing) return fail(`Draft ${id} not found.`);
 
@@ -258,7 +258,7 @@ const handler = createMcpHandler(
         }),
       },
       async ({ id }, extra) => {
-        const deleted = await deleteDraft(authFrom(extra).userId, id);
+        const deleted = await deleteDraft(getTokenAuth(extra).userId, id);
         if (!deleted) return fail(`Draft ${id} not found.`);
         return json({ deleted: true, id });
       }
