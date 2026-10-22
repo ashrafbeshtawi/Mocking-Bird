@@ -22,13 +22,14 @@ const readBody = async (request: Request): Promise<Record<string, unknown>> => {
 /** Validate the title and account access a token is created or edited with. */
 const readTokenFields = async (
   userId: number,
-  body: Record<string, unknown>
+  body: Record<string, unknown>,
+  currentAccess: McpAccountAccess = []
 ): Promise<{ error: string } | { title: string; accountAccess: McpAccountAccess }> => {
   const title = typeof body.title === 'string' ? body.title.trim() : '';
   if (!title || title.length > MCP_TOKEN_TITLE_MAX_LENGTH) {
     return { error: `Title is required and may have at most ${MCP_TOKEN_TITLE_MAX_LENGTH} characters.` };
   }
-  const accessError = validateAccountAccess(body.account_access, await listConnectedAccounts(userId));
+  const accessError = validateAccountAccess(body.account_access, await listConnectedAccounts(userId), currentAccess);
   if (accessError) return { error: accessError };
   return { title, accountAccess: body.account_access as McpAccountAccess };
 };
@@ -83,7 +84,11 @@ export async function PUT(request: Request) {
   }
 
   try {
-    const fields = await readTokenFields(userId, body);
+    const current = (await listMcpTokens(userId)).find((token) => token.id === body.id);
+    if (!current) {
+      return NextResponse.json({ error: 'Token not found.' }, { status: 404 });
+    }
+    const fields = await readTokenFields(userId, body, current.account_access);
     if ('error' in fields) {
       return NextResponse.json({ error: fields.error }, { status: 400 });
     }

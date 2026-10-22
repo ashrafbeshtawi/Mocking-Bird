@@ -34,6 +34,7 @@ const mockDb = (tokenRows: unknown[], rowCount = tokenRows.length) =>
   );
 
 const tokenQueries = () => mockQuery.mock.calls.filter(([sql]) => (sql as string).includes('mcp_tokens'));
+const tokenUpdates = () => mockQuery.mock.calls.filter(([sql]) => (sql as string).includes('UPDATE mcp_tokens'));
 
 describe('MCP Token API', () => {
   beforeEach(() => {
@@ -112,7 +113,24 @@ describe('MCP Token API', () => {
 
     expect(response.status).toBe(200);
     expect((await response.json()).tokenInfo).toEqual(tokenInfo);
-    expect(tokenQueries()[0][1]).toEqual(['Cursor', ['all'], 3, 42]);
+    expect(tokenUpdates()[0][1]).toEqual(['Cursor', ['all'], 3, 42]);
+  });
+
+  it('keeps access to a disconnected account the token already holds when editing it', async () => {
+    const tokenInfo = { id: 3, title: 'Cursor', account_access: ['twitter:x9'], created_at: '2026-10-19T00:00:00Z' };
+    mockDb([tokenInfo]);
+
+    const response = await PUT(request({ id: 3, title: 'Renamed', account_access: ['twitter:x9', 'facebook:p1'] }, 'PUT'));
+
+    expect(response.status).toBe(200);
+    expect(tokenUpdates()[0][1]).toEqual(['Renamed', ['twitter:x9', 'facebook:p1'], 3, 42]);
+  });
+
+  it('rejects editing a token to add a disconnected account', async () => {
+    mockDb([{ id: 3, title: 'Cursor', account_access: ['all'], created_at: '2026-10-19T00:00:00Z' }]);
+
+    expect((await PUT(request({ id: 3, title: 'Cursor', account_access: ['twitter:x9'] }, 'PUT'))).status).toBe(400);
+    expect(tokenUpdates()).toHaveLength(0);
   });
 
   it('returns 404 when editing a token that does not belong to the user', async () => {
@@ -120,9 +138,10 @@ describe('MCP Token API', () => {
   });
 
   it('rejects editing without a token id or with invalid account access', async () => {
+    mockDb([{ id: 3, title: 'Cursor', account_access: ['all'], created_at: '2026-10-19T00:00:00Z' }]);
     expect((await PUT(request({ title: 'Cursor', account_access: ['all'] }, 'PUT'))).status).toBe(400);
     expect((await PUT(request({ id: 3, title: 'Cursor', account_access: ['myspace'] }, 'PUT'))).status).toBe(400);
-    expect(tokenQueries()).toHaveLength(0);
+    expect(tokenUpdates()).toHaveLength(0);
   });
 
   it("revokes one of the user's tokens by id", async () => {

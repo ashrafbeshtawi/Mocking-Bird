@@ -30,6 +30,11 @@ describe('validateAccountAccess', () => {
   ])('rejects %j', (access, message) => {
     expect(validateAccountAccess(access, accounts)).toContain(message);
   });
+
+  it('accepts disconnected accounts the token already holds, but no new ones', () => {
+    expect(validateAccountAccess(['twitter:x9', 'facebook:p1'], accounts, ['twitter:x9'])).toBeNull();
+    expect(validateAccountAccess(['twitter:x8'], accounts, ['twitter:x9'])).toContain('not one of your connected accounts');
+  });
 });
 
 describe('hasAccountAccess', () => {
