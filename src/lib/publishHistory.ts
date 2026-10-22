@@ -1,4 +1,5 @@
 import pool from '@/lib/db';
+import { ALL_ACCOUNTS, buildGrantCoverageSql, type McpAccountAccess } from '@/lib/mcpAccess';
 
 export interface PublishHistoryEntry {
   id: number;
@@ -25,24 +26,31 @@ const MAX_PAGE_SIZE = 100;
  */
 export async function listPublishHistory(
   userId: number,
-  /** lastDays: only entries published within the last N days (rolling, from now). */
-  options: { lastDays?: number; limit?: number; offset?: number } = {}
+  /**
+   * lastDays: only entries published within the last N days (rolling, from now).
+   * accountAccess: only entries with at least one destination these grants cover.
+   */
+  options: { lastDays?: number; accountAccess?: McpAccountAccess; limit?: number; offset?: number } = {}
 ): Promise<PublishHistoryPage> {
   const limit = Math.min(Math.max(options.limit ?? DEFAULT_PAGE_SIZE, 1), MAX_PAGE_SIZE);
   const offset = Math.max(options.offset ?? 0, 0);
 
   const lastDays = options.lastDays ?? null;
+  const accountAccess = options.accountAccess ?? null;
 
-  const where = 'user_id = $1 AND ($2::int IS NULL OR created_at >= NOW() - make_interval(days => $2::int))';
+  const where = `user_id = $1 AND ($2::int IS NULL OR created_at >= NOW() - make_interval(days => $2::int))
+    AND ($3::text[] IS NULL OR $3::text[] @> ARRAY['${ALL_ACCOUNTS}'] OR EXISTS (
+      SELECT 1 FROM jsonb_array_elements(COALESCE(publish_destinations, '[]'::jsonb)) destination
+      WHERE ${buildGrantCoverageSql('destination', '$3::text[]')}))`;
   const [countResult, pageResult] = await Promise.all([
-    pool.query(`SELECT COUNT(*) FROM publish_history WHERE ${where}`, [userId, lastDays]),
+    pool.query(`SELECT COUNT(*) FROM publish_history WHERE ${where}`, [userId, lastDays, accountAccess]),
     pool.query(
       `SELECT id, content, publish_status, publish_destinations, created_at
        FROM publish_history
        WHERE ${where}
        ORDER BY created_at DESC, id DESC
-       LIMIT $3 OFFSET $4`,
-      [userId, lastDays, limit, offset]
+       LIMIT $4 OFFSET $5`,
+      [userId, lastDays, accountAccess, limit, offset]
     ),
   ]);
 

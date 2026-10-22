@@ -1,5 +1,6 @@
 import pool from '@/lib/db';
-import { PLATFORMS, type Platform, type TargetAccount } from '@/types/accounts';
+import { buildGrantCoverageSql, type McpAccountAccess } from '@/lib/mcpAccess';
+import { INSTAGRAM_POST_TYPES, PLATFORMS, type Platform, type TargetAccount } from '@/types/accounts';
 
 export interface DraftMedia {
   publicUrl: string;
@@ -69,6 +70,18 @@ export function validateDraftInput(input: Record<string, unknown>): string | nul
     ) {
       return `target_accounts must be an array of { platform, account_id } with platform one of: ${PLATFORMS.join(', ')}.`;
     }
+    const hasInvalidPostTypes = (targets as TargetAccount[]).some(
+      ({ platform, post_types }) =>
+        post_types !== undefined &&
+        (platform !== 'instagram' ||
+          !Array.isArray(post_types) ||
+          post_types.length === 0 ||
+          new Set(post_types).size !== post_types.length ||
+          post_types.some((type) => !INSTAGRAM_POST_TYPES.includes(type)))
+    );
+    if (hasInvalidPostTypes) {
+      return `post_types is for Instagram targets only: a non-empty list of ${INSTAGRAM_POST_TYPES.join(', ')}.`;
+    }
   }
   if (media !== undefined && media !== null) {
     if (
@@ -99,6 +112,8 @@ export interface ListDraftsOptions {
   platform?: Platform;
   /** Only drafts updated within the last N days (rolling, from now). */
   lastDays?: number;
+  /** Only drafts whose every target account these grants cover. */
+  accountAccess?: McpAccountAccess;
   limit?: number;
   offset?: number;
 }
@@ -125,17 +140,22 @@ export async function listDrafts(
 
   const platform = options.platform ?? null;
   const lastDays = options.lastDays ?? null;
+  const accountAccess = options.accountAccess ?? null;
 
   const where = `user_id = $1 AND ($2::text IS NULL OR text ILIKE $2)
     AND ($3::text IS NULL OR target_accounts @> jsonb_build_array(jsonb_build_object('platform', $3::text)))
-    AND ($4::int IS NULL OR updated_at >= NOW() - make_interval(days => $4::int))`;
+    AND ($4::int IS NULL OR updated_at >= NOW() - make_interval(days => $4::int))
+    AND ($5::text[] IS NULL OR NOT EXISTS (
+      SELECT 1 FROM jsonb_array_elements(target_accounts) target
+      WHERE NOT ${buildGrantCoverageSql('target', '$5::text[]')}))`;
+  const filters = [userId, pattern, platform, lastDays, accountAccess];
   const [countResult, pageResult] = await Promise.all([
-    pool.query(`SELECT COUNT(*) FROM drafts WHERE ${where}`, [userId, pattern, platform, lastDays]),
+    pool.query(`SELECT COUNT(*) FROM drafts WHERE ${where}`, filters),
     pool.query(
       `SELECT ${DRAFT_COLUMNS} FROM drafts WHERE ${where}
        ORDER BY updated_at DESC, id DESC
-       LIMIT $5 OFFSET $6`,
-      [userId, pattern, platform, lastDays, limit, offset]
+       LIMIT $6 OFFSET $7`,
+      [...filters, limit, offset]
     ),
   ]);
 

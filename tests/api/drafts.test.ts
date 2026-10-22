@@ -53,8 +53,8 @@ describe('Drafts API', () => {
     expect(response.status).toBe(200);
     expect(data.drafts).toHaveLength(1);
     expect(data.total).toBe(7);
-    expect(mockQuery.mock.calls[0][1]).toEqual([42, null, null, null]);
-    expect(mockQuery.mock.calls[1][1]).toEqual([42, null, null, null, 20, 0]);
+    expect(mockQuery.mock.calls[0][1]).toEqual([42, null, null, null, null]);
+    expect(mockQuery.mock.calls[1][1]).toEqual([42, null, null, null, null, 20, 0]);
   });
 
   it('fetches a single draft by id', async () => {
@@ -80,8 +80,8 @@ describe('Drafts API', () => {
     await GET(getRequest('?q=100%25_done&limit=500&offset=-5'));
 
     const pattern = '%100\\%\\_done%';
-    expect(mockQuery.mock.calls[0][1]).toEqual([42, pattern, null, null]);
-    expect(mockQuery.mock.calls[1][1]).toEqual([42, pattern, null, null, 100, 0]);
+    expect(mockQuery.mock.calls[0][1]).toEqual([42, pattern, null, null, null]);
+    expect(mockQuery.mock.calls[1][1]).toEqual([42, pattern, null, null, null, 100, 0]);
   });
 
   it.each([[{ platform: 'myspace', account_id: 'a1' }], [{ platform: 'facebook' }], ['facebook']])(
@@ -166,7 +166,7 @@ describe('Drafts API', () => {
 
     await GET(getRequest('?platform=facebook'));
 
-    expect(mockQuery.mock.calls[0][1]).toEqual([42, null, 'facebook', null]);
+    expect(mockQuery.mock.calls[0][1]).toEqual([42, null, 'facebook', null, null]);
     expect(mockQuery.mock.calls[1][0]).toContain(
       "target_accounts @> jsonb_build_array(jsonb_build_object('platform', $3::text))"
     );
@@ -177,6 +177,6 @@ describe('Drafts API', () => {
 
     await GET(getRequest('?platform=myspace'));
 
-    expect(mockQuery.mock.calls[0][1]).toEqual([42, null, null, null]);
+    expect(mockQuery.mock.calls[0][1]).toEqual([42, null, null, null, null]);
   });
 });

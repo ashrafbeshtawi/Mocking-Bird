@@ -11,7 +11,7 @@ jest.mock('@/hooks/useConnectedAccounts', () => ({
   useConnectedAccounts: () => ({
     facebookPages: [{ page_id: 'p1', page_name: 'My Page' }],
     xAccounts: [],
-    instagramAccounts: [],
+    instagramAccounts: [{ id: 'ig1', username: 'insta' }],
     telegramChannels: [],
     normalizedAccounts: { facebook: [{ id: 'p1', name: 'My Page', platform: 'facebook' }] },
   }),
@@ -169,6 +169,41 @@ describe('Drafts page', () => {
       )
     );
     expect(mockFetch).not.toHaveBeenCalledWith('/api/drafts', expect.objectContaining({ method: 'DELETE' }));
+  });
+
+  it('shows disconnected targets as disabled and publishes Instagram stories the draft targets', async () => {
+    mockPublish.mockResolvedValue(false);
+    mockFetch.mockResolvedValue(
+      listResponse([
+        {
+          ...draft(1, 'story draft'),
+          media: [{ publicUrl: 'https://cdn/cat.jpg', resourceType: 'image' }],
+          target_accounts: [
+            { platform: 'facebook', account_id: 'p1' },
+            { platform: 'facebook', account_id: 'p9' },
+            { platform: 'instagram', account_id: 'ig1', post_types: ['story'] },
+          ],
+          target_platforms: ['facebook', 'instagram'],
+        },
+      ])
+    );
+    const user = userEvent.setup();
+    render(<DraftsPage />);
+    await screen.findByText('story draft');
+
+    await user.click(screen.getByTitle('Publish draft'));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('p9 (disconnected)').closest('.MuiChip-root')).toHaveClass('Mui-disabled');
+    await user.click(within(dialog).getByRole('button', { name: /^Publish to/ }));
+
+    await waitFor(() =>
+      expect(mockPublish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          selectedFacebookPages: ['p1'],
+          selectedInstagramAccounts: { ig1: { publish: false, story: true } },
+        })
+      )
+    );
   });
 
   it('previews a draft image full size from the publish dialog', async () => {

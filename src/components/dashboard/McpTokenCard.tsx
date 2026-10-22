@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
   Box,
@@ -18,8 +18,8 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import CheckIcon from '@mui/icons-material/Check';
 import KeyOutlinedIcon from '@mui/icons-material/KeyOutlined';
 import { fetchWithAuth } from '@/lib/fetch';
-import { useConnectedAccounts } from '@/hooks/useConnectedAccounts';
 import type { McpAccountAccess } from '@/lib/mcpAccess';
+import type { AccountData } from '@/types/accounts';
 import { MCP_TOKEN_TITLE_MAX_LENGTH, type McpTokenInfo } from '@/types/mcpTokens';
 import { McpAccountAccessField, getGrantLabel } from './McpAccountAccessField';
 
@@ -44,17 +44,20 @@ export function McpTokenCard() {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { normalizedAccounts } = useConnectedAccounts();
-  const accounts = useMemo(() => Object.values(normalizedAccounts).flat(), [normalizedAccounts]);
+  // Loaded with the tokens, so a granted account counts as disconnected only once both are known
+  const [accounts, setAccounts] = useState<AccountData[]>([]);
 
   useEffect(() => {
     (async () => {
       try {
         const response = await fetchWithAuth('/api/mcp-token');
         const data = await response.json();
-        if (response.ok) setTokens(data.tokens ?? []);
+        if (!response.ok) throw new Error(data.error || 'Failed to load tokens');
+        setTokens(data.tokens ?? []);
+        setAccounts(data.accounts ?? []);
       } catch {
         // list stays empty; the card still allows generating a token
+        setError('Could not load your tokens and connected accounts.');
       } finally {
         setLoading(false);
       }
