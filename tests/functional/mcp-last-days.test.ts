@@ -1,29 +1,13 @@
 import { createHash, randomBytes } from 'crypto';
-import { db, fetchPage } from './helpers';
+import { callMcpTool, db, mcpToolJson as toolJson } from './helpers';
 
-// Drives the MCP endpoint over HTTP like a real client: bearer token, JSON-RPC
-// tools/call. Rows are backdated so `last_days` has something to cut off.
+// Drives the MCP endpoint over HTTP like a real client. Rows are backdated so
+// `last_days` has something to cut off.
 
 let userId: number;
 let token: string;
 
-async function callTool(name: string, args: Record<string, unknown>) {
-  const response = await fetchPage('/api/mcp', {
-    method: 'POST',
-    headers: {
-      authorization: `Bearer ${token}`,
-      'content-type': 'application/json',
-      accept: 'application/json, text/event-stream',
-    },
-    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }),
-  });
-  const body = await response.text();
-  // Streamable HTTP answers with one SSE `data:` line or plain JSON.
-  const payload = JSON.parse(body.includes('data: ') ? body.split('data: ')[1].split('\n')[0] : body);
-  return payload.result;
-}
-
-const toolJson = (result: { content: { text: string }[] }) => JSON.parse(result.content[0].text);
+const callTool = (name: string, args: Record<string, unknown>) => callMcpTool(token, name, args);
 
 beforeAll(async () => {
   const { rows } = await db.query(`INSERT INTO users (name, email) VALUES ('MCP Test', $1) RETURNING id`, [
@@ -31,7 +15,7 @@ beforeAll(async () => {
   ]);
   userId = rows[0].id;
   token = randomBytes(24).toString('hex');
-  await db.query("INSERT INTO mcp_tokens (user_id, token_hash, title) VALUES ($1, $2, 'Functional test')", [
+  await db.query("INSERT INTO mcp_tokens (user_id, token_hash, title, account_access) VALUES ($1, $2, 'Functional test', '{all}')", [
     userId,
     createHash('sha256').update(token).digest('hex'),
   ]);

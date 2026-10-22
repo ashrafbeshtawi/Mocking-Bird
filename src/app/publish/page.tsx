@@ -40,7 +40,7 @@ import { PublishResults } from '@/components/publish/PublishResults';
 import { PageHeader } from '@/components/PageHeader';
 import type { UploadedMedia } from '@/components/publish/MediaUploader';
 import { mapDraftMediaToUploaded } from '@/hooks/useDrafts';
-import type { InstagramSelection, Platform } from '@/types/accounts';
+import type { InstagramSelection, Platform, TargetAccount } from '@/types/accounts';
 import { TWITTER_CHAR_LIMIT } from '@/types/accounts';
 import { contentKinds, fitContent, needsChoice, resolveContent, type ContentKind, type ContentSelection } from '@/lib/publish/contentRules';
 import { PLATFORM_CONFIG } from '@/lib/platformConfig';
@@ -199,7 +199,7 @@ function PublishPageInner() {
   }, [tiktokAccounts]);
 
   // Draft loading state
-  const [draftTargets, setDraftTargets] = useState<Platform[] | null>(null);
+  const [draftTargets, setDraftTargets] = useState<TargetAccount[] | null>(null);
   const draftTargetsApplied = useRef(false);
 
   // Load the draft's content into the composer
@@ -214,7 +214,7 @@ function PublishPageInner() {
         if (cancelled) return;
         setPostText(data.draft.text);
         setUploadedMedia(mapDraftMediaToUploaded(data.draft.media));
-        setDraftTargets(data.draft.target_platforms);
+        setDraftTargets(data.draft.target_accounts);
       } catch (err) {
         if (!cancelled) {
           setSnackbar({ open: true, message: (err as Error).message, severity: 'error' });
@@ -257,25 +257,24 @@ function PublishPageInner() {
     }
   }, [uploadedMedia.length, instagramAccounts]);
 
-  // Apply the draft's target platforms once accounts are loaded.
+  // Apply the draft's target accounts once accounts are loaded; targets no longer connected are dropped.
   // Declared after the account-init and media effects so it overrides their defaults.
   useEffect(() => {
     if (!draftTargets || loading || draftTargetsApplied.current) return;
     draftTargetsApplied.current = true;
-    setSelectedFacebookPages(
-      draftTargets.includes('facebook') ? facebookPages.map((p) => p.page_id) : []
-    );
-    setSelectedXAccounts(draftTargets.includes('twitter') ? xAccounts.map((a) => a.id) : []);
-    setSelectedTelegramChannels(
-      draftTargets.includes('telegram') ? telegramChannels.map((c) => c.channel_id) : []
-    );
-    setSelectedLinkedInAccounts(draftTargets.includes('linkedin') ? linkedinAccounts.map((a) => a.id) : []);
-    setSelectedYouTubeChannels(draftTargets.includes('youtube') ? youtubeChannels.map((c) => c.id) : []);
-    setSelectedTikTokAccounts(draftTargets.includes('tiktok') ? tiktokAccounts.map((a) => a.id) : []);
+    const isTargeted = (platform: Platform, id: string) =>
+      draftTargets.some((t) => t.platform === platform && t.account_id === id);
+    const targeted = (platform: Platform, ids: string[]) => ids.filter((id) => isTargeted(platform, id));
+    setSelectedFacebookPages(targeted('facebook', facebookPages.map((p) => p.page_id)));
+    setSelectedXAccounts(targeted('twitter', xAccounts.map((a) => a.id)));
+    setSelectedTelegramChannels(targeted('telegram', telegramChannels.map((c) => c.channel_id)));
+    setSelectedLinkedInAccounts(targeted('linkedin', linkedinAccounts.map((a) => a.id)));
+    setSelectedYouTubeChannels(targeted('youtube', youtubeChannels.map((c) => c.id)));
+    setSelectedTikTokAccounts(targeted('tiktok', tiktokAccounts.map((a) => a.id)));
     const instagram: Record<string, InstagramSelection> = {};
     instagramAccounts.forEach((a) => {
       instagram[a.id] = {
-        publish: draftTargets.includes('instagram') && uploadedMedia.length > 0,
+        publish: isTargeted('instagram', a.id) && uploadedMedia.length > 0,
         story: false,
       };
     });
@@ -423,16 +422,23 @@ function PublishPageInner() {
   const handleSaveDraft = async () => {
     setIsSavingDraft(true);
 
-    // Targets = platforms with at least one selected account
-    const targetPlatforms = [
-      selectedFacebookPages.length > 0 ? 'facebook' : null,
-      selectedXAccounts.length > 0 ? 'twitter' : null,
-      Object.values(selectedInstagramAccounts).some((s) => s.publish || s.story) ? 'instagram' : null,
-      selectedTelegramChannels.length > 0 ? 'telegram' : null,
-      selectedLinkedInAccounts.length > 0 ? 'linkedin' : null,
-      selectedYouTubeChannels.length > 0 ? 'youtube' : null,
-      selectedTikTokAccounts.length > 0 ? 'tiktok' : null,
-    ].filter(Boolean);
+    // Targets = the selected accounts; an Instagram account counts when its feed or story is selected
+    const targetsOn = (platform: Platform, ids: string[]): TargetAccount[] =>
+      ids.map((account_id) => ({ platform, account_id }));
+    const targetAccounts = [
+      ...targetsOn('facebook', selectedFacebookPages),
+      ...targetsOn('twitter', selectedXAccounts),
+      ...targetsOn(
+        'instagram',
+        Object.entries(selectedInstagramAccounts)
+          .filter(([, s]) => s.publish || s.story)
+          .map(([id]) => id)
+      ),
+      ...targetsOn('telegram', selectedTelegramChannels),
+      ...targetsOn('linkedin', selectedLinkedInAccounts),
+      ...targetsOn('youtube', selectedYouTubeChannels),
+      ...targetsOn('tiktok', selectedTikTokAccounts),
+    ];
 
     try {
       const response = await fetch('/api/drafts', {
@@ -442,7 +448,7 @@ function PublishPageInner() {
         body: JSON.stringify({
           ...(draftId ? { id: draftId } : {}),
           text: postText,
-          target_platforms: targetPlatforms,
+          target_accounts: targetAccounts,
           media: uploadedMedia.map((media) => ({
             publicId: media.publicId,
             publicUrl: media.publicUrl,

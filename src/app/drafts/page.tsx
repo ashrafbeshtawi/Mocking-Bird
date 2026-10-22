@@ -137,24 +137,32 @@ export default function DraftsPage() {
     else refetch();
   };
 
-  const accountNamesFor = (platform: Platform): string[] => {
+  const connectedAccountsOn = (platform: Platform): { id: string; name: string }[] => {
     switch (platform) {
       case 'facebook':
-        return facebookPages.map((p) => p.page_name);
+        return facebookPages.map((p) => ({ id: p.page_id, name: p.page_name }));
       case 'twitter':
-        return xAccounts.map((a) => `@${a.name}`);
+        return xAccounts.map((a) => ({ id: a.id, name: `@${a.name}` }));
       case 'instagram':
-        return instagramAccounts.map((a) => `@${a.username}`);
+        return instagramAccounts.map((a) => ({ id: a.id, name: `@${a.username}` }));
       case 'telegram':
-        return telegramChannels.map((c) => c.channel_title);
+        return telegramChannels.map((c) => ({ id: c.channel_id, name: c.channel_title }));
       case 'linkedin':
-        return linkedinAccounts.map((a) => a.name);
+        return linkedinAccounts.map((a) => ({ id: a.id, name: a.name }));
       case 'youtube':
-        return youtubeChannels.map((c) => c.name);
+        return youtubeChannels.map((c) => ({ id: c.id, name: c.name }));
       case 'tiktok':
-        return tiktokAccounts.map((a) => a.name);
+        return tiktokAccounts.map((a) => ({ id: a.id, name: a.name }));
     }
   };
+
+  /** The preview draft's target accounts on this platform that are still connected. */
+  const previewTargetsOn = (platform: Platform) => {
+    const ids = previewDraft?.target_accounts.filter((t) => t.platform === platform).map((t) => t.account_id) ?? [];
+    return ids.length === 0 ? [] : connectedAccountsOn(platform).filter((account) => ids.includes(account.id));
+  };
+  const previewTargetIdsOn = (platform: Platform) => previewTargetsOn(platform).map((account) => account.id);
+  const accountNamesFor = (platform: Platform) => previewTargetsOn(platform).map((account) => account.name);
 
   const previewHasMedia = (previewDraft?.media?.length ?? 0) > 0;
   const previewKinds = previewDraft ? draftKinds(previewDraft) : [];
@@ -164,7 +172,7 @@ export default function DraftsPage() {
     accountNamesFor(platform).length > 0 && needsChoice(platform, previewKinds, previewSelection[platform]);
   const isPreviewUndecided = previewDraft?.target_platforms.some(previewNeedsChoice) ?? false;
 
-  const isPreviewTikTok = (previewDraft?.target_platforms.includes('tiktok') ?? false) && tiktokAccounts.length > 0 &&
+  const isPreviewTikTok = previewTargetIdsOn('tiktok').length > 0 &&
     isPreviewSendable('tiktok');
 
   /** Accounts the confirm button would actually publish to. */
@@ -184,27 +192,25 @@ export default function DraftsPage() {
 
   const handleConfirmPublish = async () => {
     if (!previewDraft) return;
-    const targets = previewDraft.target_platforms;
     const media = mapDraftMediaToUploaded(previewDraft.media);
 
+    const instagramTargets = previewTargetIdsOn('instagram');
     const instagram: Record<string, InstagramSelection> = {};
     instagramAccounts.forEach((a) => {
-      instagram[a.id] = { publish: targets.includes('instagram'), story: false };
+      instagram[a.id] = { publish: instagramTargets.includes(a.id), story: false };
     });
 
     const ok = await publish({
       postText: previewDraft.text,
       uploadedMedia: media,
-      selectedFacebookPages: targets.includes('facebook') ? facebookPages.map((p) => p.page_id) : [],
-      selectedXAccounts: targets.includes('twitter') ? xAccounts.map((a) => a.id) : [],
+      selectedFacebookPages: previewTargetIdsOn('facebook'),
+      selectedXAccounts: previewTargetIdsOn('twitter'),
       selectedInstagramAccounts: instagram,
-      selectedTelegramChannels: targets.includes('telegram')
-        ? telegramChannels.map((c) => c.channel_id)
-        : [],
-      selectedLinkedInAccounts: targets.includes('linkedin') ? linkedinAccounts.map((a) => a.id) : [],
-      selectedYouTubeChannels: targets.includes('youtube') ? youtubeChannels.map((c) => c.id) : [],
+      selectedTelegramChannels: previewTargetIdsOn('telegram'),
+      selectedLinkedInAccounts: previewTargetIdsOn('linkedin'),
+      selectedYouTubeChannels: previewTargetIdsOn('youtube'),
       youtubeTitle: previewYoutubeTitle,
-      selectedTikTokAccounts: targets.includes('tiktok') ? tiktokAccounts.map((a) => a.id) : [],
+      selectedTikTokAccounts: previewTargetIdsOn('tiktok'),
       tiktokSettings: previewTiktokSettings,
       contentSelection: previewSelection,
     });
@@ -593,7 +599,7 @@ export default function DraftsPage() {
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75, mt: 0.5 }}>
             {previewDraft?.target_platforms.length === 0 && (
               <Alert severity="warning" sx={{ py: 0.5 }}>
-                This draft has no target platforms — edit it in the composer first.
+                This draft has no target accounts — edit it in the composer first.
               </Alert>
             )}
             {previewDraft?.target_platforms.map((platform) => {
@@ -623,7 +629,7 @@ export default function DraftsPage() {
             })}
           </Box>
 
-          {previewDraft?.target_platforms.includes('youtube') && youtubeChannels.length > 0 &&
+          {previewTargetIdsOn('youtube').length > 0 &&
             fitContent('youtube', previewKinds).status !== 'unsupported' && (
               <Box sx={{ mt: 2 }}>
                 <YouTubeTitleField value={previewYoutubeTitle} onChange={setPreviewYoutubeTitle} />
@@ -633,7 +639,7 @@ export default function DraftsPage() {
           {isPreviewTikTok && (
             <Box sx={{ mt: 2 }}>
               <TikTokSettingsField
-                accountIds={tiktokAccounts.map((a) => a.id)}
+                accountIds={previewTargetIdsOn('tiktok')}
                 videoUrl={previewDraft?.media?.find((m) => m.resourceType === 'video')?.publicUrl}
                 value={previewTiktokSettings}
                 onChange={setPreviewTiktokSettings}

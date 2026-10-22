@@ -5,8 +5,13 @@ const newUser = async (label: string): Promise<number> =>
     .rows[0].id;
 
 const insertDraft = async (userId: number, text: string, platforms: string[]): Promise<number> =>
-  (await db.query(`INSERT INTO drafts (user_id, text, target_platforms) VALUES ($1, $2, $3) RETURNING id`, [userId, text, platforms]))
-    .rows[0].id;
+  (
+    await db.query(`INSERT INTO drafts (user_id, text, target_accounts) VALUES ($1, $2, $3) RETURNING id`, [
+      userId,
+      text,
+      JSON.stringify(platforms.map((platform) => ({ platform, account_id: `${platform}-1` }))),
+    ])
+  ).rows[0].id;
 
 let owner: number;
 let other: number;
