@@ -114,22 +114,46 @@ const bodySx = {
   color: 'text.secondary',
 } as const;
 
+const cardSx = {
+  p: 3,
+  bgcolor: 'background.paper',
+  border: '1px solid',
+  borderColor: 'divider',
+  borderRadius: 2,
+} as const;
+
+// Title on the left, content on the right; stacks on small screens.
 function Section({ label, title, children }: { label: string; title: string; children: React.ReactNode }) {
   return (
-    <Box component="section" sx={{ maxWidth: 1040, mx: 'auto', px: 3, py: { xs: 8, md: 12 }, borderTop: '1px solid', borderColor: 'divider' }}>
-      <Typography sx={{ ...monoLabelSx, mb: 2 }}>{label}</Typography>
-      <Typography component="h2" sx={{ ...headingSx, fontSize: { xs: '1.75rem', md: '2.5rem' }, mb: { xs: 4, md: 6 } }}>
-        {title}
-      </Typography>
+    <Box
+      component="section"
+      sx={{
+        maxWidth: 1120,
+        mx: 'auto',
+        px: 3,
+        py: { xs: 5, md: 7 },
+        borderTop: '1px solid',
+        borderColor: 'divider',
+        display: 'grid',
+        gridTemplateColumns: { xs: '1fr', md: '280px 1fr' },
+        gap: { xs: 3, md: 6 },
+      }}
+    >
+      <Box>
+        <Typography sx={{ ...monoLabelSx, mb: 1.5 }}>{label}</Typography>
+        <Typography component="h2" sx={{ ...headingSx, fontSize: { xs: '1.75rem', md: '2rem' }, lineHeight: 1.15 }}>
+          {title}
+        </Typography>
+      </Box>
       {children}
     </Box>
   );
 }
 
-const gridSx = {
+const cardGridSx = {
   display: 'grid',
-  gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' },
-  gap: { xs: 4, md: 5 },
+  gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' },
+  gap: 2,
 } as const;
 
 export default function LandingPage() {
@@ -141,14 +165,13 @@ export default function LandingPage() {
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          justifyContent: 'center',
           textAlign: 'center',
-          pt: { xs: 10, md: 16 },
-          pb: { xs: 12, md: 16 },
+          pt: { xs: 8, md: 12 },
+          pb: { xs: 6, md: 8 },
           px: 3,
         }}
       >
-        <Typography sx={{ ...monoLabelSx, mb: 4 }}>
+        <Typography sx={{ ...monoLabelSx, mb: 3 }}>
           Publish across seven · in one keystroke
         </Typography>
 
@@ -156,11 +179,11 @@ export default function LandingPage() {
           component="h1"
           sx={{
             ...headingSx,
-            fontSize: { xs: '2.25rem', sm: '3.5rem', md: '6.5rem' },
+            fontSize: { xs: '2.25rem', sm: '3.5rem', md: '5.5rem' },
             lineHeight: 0.92,
             letterSpacing: '-0.04em',
             maxWidth: 980,
-            mb: 4,
+            mb: 3,
           }}
         >
           Write once.
@@ -177,10 +200,10 @@ export default function LandingPage() {
         <Typography
           sx={{
             ...bodySx,
-            fontSize: { xs: '1.1rem', md: '1.4rem' },
+            fontSize: { xs: '1.1rem', md: '1.3rem' },
             lineHeight: 1.45,
             maxWidth: 620,
-            mb: 5,
+            mb: 4,
           }}
         >
           Mockingbird lets creators and small businesses publish one post to their own TikTok, YouTube, Instagram,
@@ -203,52 +226,42 @@ export default function LandingPage() {
           </Button>
         </Link>
 
-        {/* Platform marks */}
+        {/* Supported platforms */}
         <Box
-          sx={{
-            mt: 9,
-            display: 'flex',
-            flexWrap: 'wrap',
-            justifyContent: 'center',
-            gap: 3.5,
-            color: 'text.disabled',
-            opacity: 0.7,
-          }}
+          component="ul"
+          aria-label="Supported platforms"
+          sx={{ mt: 5, p: 0, listStyle: 'none', display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 1, maxWidth: 720 }}
         >
           {PLATFORMS.map((p) => (
-            <p.icon key={p.label} titleAccess={p.label} sx={{ fontSize: 20 }} />
+            <Box
+              component="li"
+              key={p.label}
+              sx={{ ...cardSx, p: 0, px: 1.5, py: 0.75, borderRadius: 999, display: 'flex', alignItems: 'center', gap: 1 }}
+            >
+              <p.icon sx={{ fontSize: 18, color: p.color }} />
+              <Typography sx={{ ...bodySx, color: 'text.primary', lineHeight: 1 }}>{p.label}</Typography>
+            </Box>
           ))}
         </Box>
       </Box>
 
       <Section label="How it works" title="From one draft to every account">
-        <Box component="ol" sx={{ ...gridSx, gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }, listStyle: 'none', p: 0, m: 0 }}>
+        <Box component="ol" sx={{ ...cardGridSx, listStyle: 'none', p: 0, m: 0 }}>
           {STEPS.map((step, i) => (
-            <Box component="li" key={step.title}>
-              <Typography sx={{ ...monoLabelSx, color: 'text.secondary', mb: 1 }}>{String(i + 1).padStart(2, '0')}</Typography>
-              <Typography component="h3" sx={{ ...headingSx, fontSize: '1.25rem', mb: 1 }}>{step.title}</Typography>
+            <Box component="li" key={step.title} sx={cardSx}>
+              <Typography sx={{ ...monoLabelSx, mb: 1 }}>{String(i + 1).padStart(2, '0')}</Typography>
+              <Typography component="h3" sx={{ ...headingSx, fontSize: '1.2rem', mb: 0.5 }}>{step.title}</Typography>
               <Typography sx={bodySx}>{step.description}</Typography>
             </Box>
           ))}
         </Box>
       </Section>
 
-      <Section label="Supported platforms" title="Your accounts, one place">
-        <Box sx={{ ...gridSx, gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(4, 1fr)', md: 'repeat(7, 1fr)' } }}>
-          {PLATFORMS.map((p) => (
-            <Box key={p.label} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-              <p.icon sx={{ fontSize: 32, color: p.color }} />
-              <Typography sx={{ ...bodySx, color: 'text.primary' }}>{p.label}</Typography>
-            </Box>
-          ))}
-        </Box>
-      </Section>
-
       <Section label="Features" title="Everything a post needs, nothing it doesn't">
-        <Box sx={gridSx}>
+        <Box sx={cardGridSx}>
           {FEATURES.map((feature) => (
-            <Box key={feature.title}>
-              <Typography component="h3" sx={{ ...headingSx, fontSize: '1.25rem', mb: 1 }}>{feature.title}</Typography>
+            <Box key={feature.title} sx={cardSx}>
+              <Typography component="h3" sx={{ ...headingSx, fontSize: '1.2rem', mb: 0.5 }}>{feature.title}</Typography>
               <Typography sx={bodySx}>{feature.description}</Typography>
             </Box>
           ))}
@@ -256,10 +269,10 @@ export default function LandingPage() {
       </Section>
 
       <Section label="FAQ" title="Questions, answered">
-        <Box sx={{ display: 'grid', gap: 4, maxWidth: 720 }}>
-          {FAQ.map((item) => (
-            <Box key={item.question}>
-              <Typography component="h3" sx={{ ...headingSx, fontSize: '1.25rem', mb: 1 }}>{item.question}</Typography>
+        <Box>
+          {FAQ.map((item, i) => (
+            <Box key={item.question} sx={{ py: 2, borderTop: i ? '1px solid' : 'none', borderColor: 'divider', pt: i ? 2 : 0 }}>
+              <Typography component="h3" sx={{ ...headingSx, fontSize: '1.2rem', mb: 0.5 }}>{item.question}</Typography>
               <Typography sx={{ ...bodySx, '& a': { color: 'primary.main' } }}>{item.answer}</Typography>
             </Box>
           ))}
