@@ -60,3 +60,44 @@ describe('TikTokSettingsField suggestion', () => {
     expect(screen.queryByText(/Suggested by your assistant/)).not.toBeInTheDocument();
   });
 });
+
+describe('TikTokSettingsField branded content visibility', () => {
+  beforeEach(() => {
+    (fetchWithAuth as jest.Mock).mockResolvedValue({ ok: true, json: async () => ({ creator }) });
+  });
+
+  const renderField = (value: TikTokPostSettings, onChange = jest.fn()) =>
+    render(<TikTokSettingsField accountIds={['oid-1']} value={value} onChange={onChange} onReadyChange={jest.fn()} />);
+
+  it('disables branded content for a private post and says why on hover', async () => {
+    renderField({ ...EMPTY_TIKTOK_SETTINGS, privacyLevel: 'SELF_ONLY', isYourBrand: true });
+
+    const branded = await screen.findByRole('checkbox', { name: /Branded content/ });
+    expect(branded).toBeDisabled();
+    expect(screen.getByText(/Branded content cannot be private/)).toBeInTheDocument();
+
+    fireEvent.mouseOver(branded);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Branded content visibility cannot be set to private.');
+  });
+
+  it('keeps branded content enabled while it is checked on a private post, so it can be unchecked', async () => {
+    renderField({ ...EMPTY_TIKTOK_SETTINGS, privacyLevel: 'SELF_ONLY', isBrandedContent: true });
+
+    expect(await screen.findByRole('checkbox', { name: /Branded content/ })).toBeEnabled();
+  });
+
+  it('disables "Only me" for branded content, says why on hover and ignores a click on it', async () => {
+    const onChange = jest.fn();
+    renderField({ ...EMPTY_TIKTOK_SETTINGS, privacyLevel: 'PUBLIC_TO_EVERYONE', isBrandedContent: true }, onChange);
+
+    fireEvent.mouseDown(await screen.findByRole('combobox'));
+    const onlyMe = screen.getByRole('option', { name: /Only me/ });
+    expect(onlyMe).toHaveAttribute('aria-disabled', 'true');
+
+    fireEvent.mouseOver(screen.getByText(/Only me/));
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Branded content visibility cannot be set to private.');
+
+    fireEvent.click(onlyMe);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+});
