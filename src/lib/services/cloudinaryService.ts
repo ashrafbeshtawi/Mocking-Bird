@@ -196,6 +196,56 @@ export async function ingestRemoteMedia(urls: string[]): Promise<
   );
 }
 
+// Same rules as thumbnails uploaded in the composer: JPEG, at most YouTube's 2 MB.
+const THUMBNAIL_MAX_BYTES = 2 * 1024 * 1024;
+
+/**
+ * Copies a remote image into Cloudinary as a video thumbnail. It is stored as a JPEG
+ * no larger than 1280px, the format and size every platform's thumbnail accepts.
+ */
+export async function ingestRemoteThumbnail(url: string): Promise<{ publicId: string; publicUrl: string }> {
+  ensureConfigured();
+
+  let result;
+  try {
+    result = await cloudinary.uploader.upload(url, {
+      resource_type: 'image',
+      folder: 'mocking-bird/drafts',
+      type: 'upload',
+      format: 'jpg',
+      transformation: [{ width: 1280, height: 1280, crop: 'limit', quality: 'auto' }],
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown upload error';
+    logger.error('Remote thumbnail ingestion failed', { url, error: message });
+    throw new Error(`Could not ingest thumbnail URL "${url}": ${message}`);
+  }
+
+  if (result.bytes > THUMBNAIL_MAX_BYTES) {
+    await cloudinary.uploader.destroy(result.public_id, { resource_type: 'image' });
+    throw new Error(`The thumbnail "${url}" is larger than 2 MB even as a JPEG.`);
+  }
+  return { publicId: result.public_id, publicUrl: result.secure_url };
+}
+
+/** A remote media URL, or a video URL with the URL of its custom thumbnail. */
+export type RemoteMediaItem = string | { url: string; thumbnail_url?: string };
+
+/** Ingests remote media and, for videos given one, their custom thumbnails. */
+export async function ingestRemoteDraftMedia(items: RemoteMediaItem[]) {
+  const media = await ingestRemoteMedia(items.map((item) => (typeof item === 'string' ? item : item.url)));
+  return Promise.all(
+    media.map(async (m, i) => {
+      const item = items[i];
+      if (typeof item === 'string' || !item.thumbnail_url) return m;
+      if (m.resourceType !== 'video') {
+        throw new Error(`thumbnail_url only applies to videos, and "${item.url}" is an image.`);
+      }
+      return { ...m, thumbnail: await ingestRemoteThumbnail(item.thumbnail_url) };
+    })
+  );
+}
+
 /**
  * Deletes a media file from Cloudinary by its public ID
  */
