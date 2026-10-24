@@ -16,9 +16,8 @@ export interface DraftMedia {
   thumbnail?: MediaThumbnail;
 }
 
-/** Whether an untrusted media item's thumbnail is absent or well-formed. */
+/** Whether an untrusted value is a thumbnail with publicId and publicUrl strings. */
 const isValidThumbnail = (thumbnail: unknown): boolean => {
-  if (thumbnail === undefined) return true;
   const t = thumbnail as Partial<MediaThumbnail> | null;
   return typeof t?.publicId === 'string' && typeof t.publicUrl === 'string' && t.publicUrl !== '';
 };
@@ -117,7 +116,8 @@ export function validateDraftInput(input: Record<string, unknown>): string | nul
     ) {
       return 'media must be an array of objects with a publicUrl string.';
     }
-    if (media.some((m) => !isValidThumbnail((m as DraftMedia).thumbnail))) {
+    // The thumbnail is optional: only one that is present has to be well-formed
+    if (media.some((m) => (m as DraftMedia).thumbnail !== undefined && !isValidThumbnail((m as DraftMedia).thumbnail))) {
       return 'A media thumbnail must be an object with publicId and publicUrl strings.';
     }
   }
