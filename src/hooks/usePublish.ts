@@ -14,6 +14,8 @@ interface PublishResult {
   account_id?: string;
   instagram_account_id?: string;
   telegram_channel_id?: string;
+  /** Successful results only: something that went wrong after publishing. */
+  warning?: string;
   error?: {
     message?: string;
     code?: string;
@@ -261,6 +263,7 @@ export function usePublish(): UsePublishReturn {
           width: media.width,
           height: media.height,
           originalFilename: media.originalFilename,
+          ...(media.thumbnail && { thumbnail: media.thumbnail }),
         })),
       };
 

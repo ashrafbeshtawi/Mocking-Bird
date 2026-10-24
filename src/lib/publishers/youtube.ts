@@ -6,6 +6,7 @@ import { GOOGLE_REVOKE_URL, GOOGLE_TOKEN_URL, YOUTUBE_TITLE_MAX } from '@/lib/yo
 const logger = createLogger('YouTubePublisher');
 
 const UPLOAD_URL = 'https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status';
+const THUMBNAIL_URL = 'https://www.googleapis.com/upload/youtube/v3/thumbnails/set';
 const DESCRIPTION_MAX = 5000;
 // Refresh tokens this close to expiry, so they cannot lapse mid-upload.
 const TOKEN_EXPIRY_MARGIN_MS = 5 * 60_000;
@@ -33,6 +34,8 @@ export interface YouTubePublishResult {
   account_id: string;
   name: string;
   post_id: string;
+  /** Set when the video was uploaded but its custom thumbnail was not. */
+  warning?: string;
 }
 
 export interface YouTubePublishError {
@@ -103,8 +106,14 @@ export class YouTubePublisher {
 
     for (const token of tokens) {
       try {
-        const videoId = await this.uploadVideo(token, options);
-        successful.push({ platform: 'youtube', account_id: token.channel_id, name: token.title, post_id: videoId });
+        const { videoId, warning } = await this.uploadVideo(token, options);
+        successful.push({
+          platform: 'youtube',
+          account_id: token.channel_id,
+          name: token.title,
+          post_id: videoId,
+          ...(warning && { warning }),
+        });
         logger.info('Uploaded to YouTube', { channel_id: token.channel_id, video_id: videoId });
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown error';
@@ -116,7 +125,10 @@ export class YouTubePublisher {
     return { successful, failed };
   }
 
-  private async uploadVideo(token: YouTubeChannelToken, options: YouTubePublishOptions): Promise<string> {
+  private async uploadVideo(
+    token: YouTubeChannelToken,
+    options: YouTubePublishOptions
+  ): Promise<{ videoId: string; warning?: string }> {
     const media = options.cloudinaryMedia ?? [];
     const videos = media.filter((m) => m.resourceType === 'video');
     if (videos.length !== 1 || media.length !== 1) {
@@ -155,7 +167,31 @@ export class YouTubePublisher {
     });
     if (!upload.ok) throw await this.apiError(upload, 'upload the video');
     const { id } = (await upload.json()) as { id: string };
-    return id;
+    if (!video.thumbnail) return { videoId: id };
+
+    try {
+      await this.setThumbnail(accessToken, id, video.thumbnail.publicUrl);
+      return { videoId: id };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      logger.warn('YouTube thumbnail was not set', { channel_id: token.channel_id, video_id: id, error: message });
+      return { videoId: id, warning: `The video was uploaded, but its thumbnail was not set: ${message}` };
+    }
+  }
+
+  private async setThumbnail(accessToken: string, videoId: string, thumbnailUrl: string): Promise<void> {
+    const image = await fetch(thumbnailUrl);
+    if (!image.ok) throw new Error(`Could not download the thumbnail (HTTP ${image.status})`);
+
+    const response = await fetch(`${THUMBNAIL_URL}?videoId=${encodeURIComponent(videoId)}&uploadType=media`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'image/jpeg' },
+      body: await image.arrayBuffer(),
+    });
+    if (response.status === 403) {
+      throw new Error('This channel cannot use custom thumbnails yet. Verify the channel in YouTube Studio to unlock them.');
+    }
+    if (!response.ok) throw await this.apiError(response, 'set the thumbnail');
   }
 
   /** The channel's access token, refreshed and stored first when it is about to expire. */

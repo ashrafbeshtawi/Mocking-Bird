@@ -122,6 +122,60 @@ describe('LinkedInPublisher', () => {
     expect(postBody().content).toEqual({ media: { id: 'urn:li:video:9' } });
   });
 
+  describe('with a custom thumbnail', () => {
+    const video: CloudinaryMediaInfo = {
+      ...image(1),
+      resourceType: 'video',
+      thumbnail: { publicId: 'thumb1', publicUrl: 'https://res.cloudinary.com/thumb1.jpg' },
+    };
+
+    const mockVideoFlow = (thumbnailStatus: number) =>
+      fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+        if (url.startsWith('https://res.cloudinary.com')) return new Response(url.endsWith('thumb1.jpg') ? 'jpeg' : '0123');
+        if (url.includes('videos?action=initializeUpload')) {
+          return json({
+            value: {
+              video: 'urn:li:video:9',
+              uploadToken: '',
+              uploadInstructions: [{ uploadUrl: 'https://upload/a', firstByte: 0, lastByte: 3 }],
+              thumbnailUploadUrl: 'https://upload/thumb',
+            },
+          });
+        }
+        if (url === 'https://upload/thumb') return new Response(null, { status: thumbnailStatus });
+        if (url.startsWith('https://upload/')) return new Response(null, { status: 200, headers: { etag: 'etag-a' } });
+        if (url.includes('videos?action=finalizeUpload')) return new Response(null, { status: 200 });
+        if (url.includes('/videos/') && !init?.method) return json({ status: 'AVAILABLE' });
+        return new Response(null, { status: 201, headers: { 'x-restli-id': 'urn:li:share:4' } });
+      });
+
+    it('asks for a thumbnail slot and uploads the thumbnail before finalizing', async () => {
+      mockVideoFlow(201);
+
+      const { successful } = await publisher.publishToAccounts({ text: 'clip', cloudinaryMedia: [video] }, [account]);
+
+      expect(successful).toEqual([{ platform: 'linkedin', account_id: 'abc123', name: 'Ada Lovelace', post_id: 'urn:li:share:4' }]);
+      const urls = fetchMock.mock.calls.map(([u]) => String(u));
+      const init = fetchMock.mock.calls.find(([u]) => String(u).includes('videos?action=initializeUpload'));
+      expect(JSON.parse(init[1].body).initializeUploadRequest.uploadThumbnail).toBe(true);
+      const thumbnail = fetchMock.mock.calls.find(([u]) => u === 'https://upload/thumb');
+      expect(thumbnail[1]).toMatchObject({ method: 'PUT', headers: { 'media-type-family': 'STILLIMAGE' } });
+      expect(Buffer.from(thumbnail[1].body).toString()).toBe('jpeg');
+      expect(urls.indexOf('https://upload/thumb')).toBeLessThan(urls.findIndex((u) => u.includes('finalizeUpload')));
+    });
+
+    it('posts the video and warns when the thumbnail upload fails', async () => {
+      jest.spyOn(console, 'warn').mockImplementation(() => {});
+      mockVideoFlow(500);
+
+      const { successful, failed } = await publisher.publishToAccounts({ text: 'clip', cloudinaryMedia: [video] }, [account]);
+
+      expect(failed).toEqual([]);
+      expect(successful[0].post_id).toBe('urn:li:share:4');
+      expect(successful[0].warning).toMatch(/thumbnail was not set: LinkedIn could not upload the thumbnail \(HTTP 500\)/);
+    });
+  });
+
   it('fails when LinkedIn cannot process the video', async () => {
     fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
       if (url.startsWith('https://res.cloudinary.com')) return new Response('0123');

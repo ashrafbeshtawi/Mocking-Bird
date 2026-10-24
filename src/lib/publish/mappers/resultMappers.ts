@@ -61,7 +61,8 @@ export function mapFacebookSuccess(successful: FacebookSuccessItem[]): Successfu
   return successful.map(item => ({
     platform: item.platform,
     page_id: item.page_id,
-    post_id: item.result?.id
+    post_id: item.result?.id,
+    ...(item.warning && { warning: item.warning })
   }));
 }
 
@@ -158,7 +159,8 @@ export function mapLinkedInSuccess(successful: LinkedInPublishResult[]): Success
   return successful.map(item => ({
     platform: item.platform,
     account_id: item.account_id,
-    post_id: item.post_id
+    post_id: item.post_id,
+    ...(item.warning && { warning: item.warning })
   }));
 }
 
@@ -180,7 +182,8 @@ export function mapYouTubeSuccess(successful: YouTubePublishResult[]): Successfu
   return successful.map(item => ({
     platform: item.platform,
     account_id: item.account_id,
-    post_id: item.post_id
+    post_id: item.post_id,
+    ...(item.warning && { warning: item.warning })
   }));
 }
 

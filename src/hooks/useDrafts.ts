@@ -19,6 +19,7 @@ export function mapDraftMediaToUploaded(media: Draft['media']): UploadedMedia[] 
     height: m.height,
     originalFilename: m.originalFilename ?? 'media',
     previewUrl: m.publicUrl,
+    ...(m.thumbnail && { thumbnail: m.thumbnail }),
   }));
 }
 

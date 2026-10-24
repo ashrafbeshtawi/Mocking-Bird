@@ -67,6 +67,7 @@ export async function processCloudinaryMedia(
         buffer,
         filename: media.originalFilename,
         mimetype,
+        ...(media.thumbnail && { thumbnailUrl: media.thumbnail.publicUrl }),
       });
 
       reportLogger?.add(
