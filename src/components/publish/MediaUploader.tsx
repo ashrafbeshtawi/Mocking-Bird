@@ -1,15 +1,22 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { Box, Button, LinearProgress, Typography, Alert } from '@mui/material';
+import { Box, Button, CircularProgress, LinearProgress, Tooltip, Typography, Alert } from '@mui/material';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
 import CloudDoneIcon from '@mui/icons-material/CloudDone';
 import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
+import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
+import HideImageIcon from '@mui/icons-material/HideImage';
 import { MediaPreviewDialog } from '@/components/publish/MediaPreviewDialog';
 import {
   uploadToCloudinaryClient,
   getCloudinaryClientConfig,
 } from '@/lib/cloudinary/clientUpload';
+import type { MediaThumbnail } from '@/lib/publish/types';
+
+// JPEG is the one format every platform's cover accepts; 2 MB is YouTube's thumbnail limit.
+const THUMBNAIL_TYPE = 'image/jpeg';
+const THUMBNAIL_MAX_BYTES = 2 * 1024 * 1024;
 
 export interface UploadedMedia {
   publicId: string;
@@ -21,6 +28,8 @@ export interface UploadedMedia {
   originalFilename: string;
   // For preview
   previewUrl: string;
+  /** Videos only: the custom thumbnail sent to platforms that support one. */
+  thumbnail?: MediaThumbnail;
 }
 
 interface MediaUploaderProps {
@@ -39,6 +48,8 @@ export function MediaUploader({ uploadedMedia, onMediaChange, onUploadingChange 
   const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [preview, setPreview] = useState<UploadedMedia | null>(null);
+  /** publicId of the video whose thumbnail is uploading. */
+  const [thumbnailUploadingFor, setThumbnailUploadingFor] = useState<string | null>(null);
 
   // null = config still loading; only a definite "not configured" hides the uploader
   const [isConfigured, setIsConfigured] = useState<boolean | null>(null);
@@ -161,7 +172,45 @@ export function MediaUploader({ uploadedMedia, onMediaChange, onUploadingChange 
     [uploadedMedia, onMediaChange]
   );
 
-  const isUploading = uploadingFiles.length > 0;
+  const setThumbnail = useCallback(
+    (videoPublicId: string, thumbnail: MediaThumbnail | undefined) => {
+      onMediaChange(
+        uploadedMedia.map((m) => (m.publicId === videoPublicId ? { ...m, thumbnail } : m))
+      );
+    },
+    [uploadedMedia, onMediaChange]
+  );
+
+  const handleThumbnailChange = useCallback(
+    async (video: UploadedMedia, e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      e.target.value = '';
+      if (!file) return;
+
+      setUploadError(null);
+      if (file.type !== THUMBNAIL_TYPE) {
+        setUploadError('Thumbnails must be JPEG images.');
+        return;
+      }
+      if (file.size > THUMBNAIL_MAX_BYTES) {
+        setUploadError('Thumbnails can be at most 2 MB.');
+        return;
+      }
+
+      setThumbnailUploadingFor(video.publicId);
+      try {
+        const result = await uploadToCloudinaryClient(file);
+        setThumbnail(video.publicId, { publicId: result.publicId, publicUrl: result.publicUrl });
+      } catch (error) {
+        setUploadError(`Failed to upload the thumbnail: ${error instanceof Error ? error.message : 'Upload failed'}`);
+      } finally {
+        setThumbnailUploadingFor(null);
+      }
+    },
+    [setThumbnail]
+  );
+
+  const isUploading = uploadingFiles.length > 0 || thumbnailUploadingFor !== null;
 
   useEffect(() => {
     onUploadingChange?.(isUploading);
@@ -254,6 +303,7 @@ export function MediaUploader({ uploadedMedia, onMediaChange, onUploadingChange 
                     <>
                       <video
                         src={media.previewUrl}
+                        poster={media.thumbnail?.publicUrl}
                         muted
                         preload="metadata"
                         style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8 }}
@@ -272,6 +322,45 @@ export function MediaUploader({ uploadedMedia, onMediaChange, onUploadingChange 
                     </>
                   )}
                 </Box>
+                {isVideo && (
+                  <Box sx={{ position: 'absolute', top: 4, left: 4, display: 'flex', gap: 0.5 }}>
+                    <Tooltip title={media.thumbnail ? 'Replace thumbnail' : 'Add thumbnail (JPEG, max 2 MB)'}>
+                      <Button
+                        component="label"
+                        size="small"
+                        variant="contained"
+                        disabled={thumbnailUploadingFor !== null}
+                        aria-label={`${media.thumbnail ? 'Replace' : 'Add'} thumbnail for ${media.originalFilename}`}
+                        sx={{ minWidth: 0, p: 0.5 }}
+                      >
+                        {thumbnailUploadingFor === media.publicId
+                          ? <CircularProgress size={16} color="inherit" />
+                          : <AddPhotoAlternateIcon sx={{ fontSize: 16 }} />}
+                        <input
+                          type="file"
+                          accept={THUMBNAIL_TYPE}
+                          hidden
+                          data-testid={`thumbnail-input-${media.publicId}`}
+                          onChange={(e) => handleThumbnailChange(media, e)}
+                        />
+                      </Button>
+                    </Tooltip>
+                    {media.thumbnail && (
+                      <Tooltip title="Remove thumbnail">
+                        <Button
+                          size="small"
+                          variant="contained"
+                          color="inherit"
+                          aria-label={`Remove thumbnail for ${media.originalFilename}`}
+                          onClick={() => setThumbnail(media.publicId, undefined)}
+                          sx={{ minWidth: 0, p: 0.5 }}
+                        >
+                          <HideImageIcon sx={{ fontSize: 16 }} />
+                        </Button>
+                      </Tooltip>
+                    )}
+                  </Box>
+                )}
                 {/* Cloud upload indicator */}
                 <Box
                   sx={{

@@ -122,12 +122,14 @@ export class InstagramPublisher {
     options: {
       imageUrl?: string;
       videoUrl?: string;
+      /** Reels only: the cover image shown in the Reels tab. */
+      coverUrl?: string;
       caption?: string;
       mediaType?: MediaType;
       isCarouselItem?: boolean;
     }
   ): Promise<string> {
-    const { imageUrl, videoUrl, caption, mediaType, isCarouselItem } = options;
+    const { imageUrl, videoUrl, coverUrl, caption, mediaType, isCarouselItem } = options;
 
     logger.info('Creating Instagram media container', {
       instagramAccountId,
@@ -148,6 +150,10 @@ export class InstagramPublisher {
     if (videoUrl) {
       params.video_url = videoUrl;
       params.media_type = mediaType || 'REELS';
+    }
+
+    if (coverUrl) {
+      params.cover_url = coverUrl;
     }
 
     if (caption && !isCarouselItem) {
@@ -465,12 +471,13 @@ export class InstagramPublisher {
   private async publishSingleVideo(
     token: InstagramAccountToken,
     videoUrl: string,
-    caption?: string
+    caption?: string,
+    coverUrl?: string
   ): Promise<unknown> {
     const containerId = await this.createMediaContainer(
       token.instagram_account_id,
       token.page_access_token,
-      { videoUrl, caption, mediaType: 'REELS' }
+      { videoUrl, coverUrl, caption, mediaType: 'REELS' }
     );
 
     // Videos need processing time
@@ -620,7 +627,8 @@ export class InstagramPublisher {
           result = await this.publishSingleVideo(
             token,
             videos[0].publicUrl,
-            text
+            text,
+            videos[0].thumbnail?.publicUrl
           );
         } else if (images.length === 1) {
           result = await this.publishSingleImage(

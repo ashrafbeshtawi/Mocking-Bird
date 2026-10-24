@@ -65,6 +65,23 @@ describe('DELETE /api/account', () => {
     expect(mockQuery).toHaveBeenLastCalledWith(expect.stringContaining('DELETE FROM users WHERE id = $1'), ['42']);
   });
 
+  it("removes a video's custom thumbnail together with the video", async () => {
+    mockQuery
+      .mockResolvedValueOnce({
+        rows: [{ media: { publicId: 'v1', resourceType: 'video', thumbnail: { publicId: 't1', publicUrl: 'https://x/t1.jpg' } } }],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rowCount: 1 });
+
+    await DELETE();
+
+    expect(mockCleanup).toHaveBeenCalledWith([
+      { publicId: 'v1', resourceType: 'video' },
+      { publicId: 't1', resourceType: 'image' },
+    ]);
+  });
+
   it("revokes the user's YouTube access at Google before deleting the user row", async () => {
     mockQuery
       .mockResolvedValueOnce({ rows: [] })

@@ -162,6 +162,25 @@ describe('Drafts API', () => {
     expect(mockQuery).not.toHaveBeenCalled();
   });
 
+  it('stores a video with its thumbnail', async () => {
+    mockQuery.mockResolvedValue({ rows: [draftRow] });
+    const media = [{ publicUrl: 'https://x/v.mp4', resourceType: 'video', thumbnail: { publicId: 't1', publicUrl: 'https://x/t1.jpg' } }];
+
+    const response = await POST(request('POST', { text: 'hello', media }));
+
+    expect(response.status).toBe(201);
+    expect(callTo('INSERT INTO drafts ')[1][2]).toBe(JSON.stringify(media));
+  });
+
+  it('rejects a media thumbnail without a publicUrl', async () => {
+    const media = [{ publicUrl: 'https://x/v.mp4', thumbnail: { publicId: 't1' } }];
+
+    const response = await POST(request('POST', { text: 'hello', media }));
+
+    expect(response.status).toBe(400);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
   it('rejects a YouTube title YouTube would refuse', async () => {
     const response = await POST(request('POST', { text: 'hello', youtube_title: 'a <b>' }));
 

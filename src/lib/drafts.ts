@@ -2,6 +2,7 @@ import pool from '@/lib/db';
 import { PLATFORMS, type Platform, type TargetAccount } from '@/types/accounts';
 import { youtubeTitleError } from '@/lib/youtube';
 import { TIKTOK_PRIVACY_LEVELS, tiktokSettingsError, type TikTokPostSettings } from '@/lib/tiktok';
+import type { MediaThumbnail } from '@/lib/publish/types';
 
 export interface DraftMedia {
   publicUrl: string;
@@ -11,7 +12,16 @@ export interface DraftMedia {
   width?: number;
   height?: number;
   originalFilename?: string;
+  /** Videos only: the custom thumbnail. */
+  thumbnail?: MediaThumbnail;
 }
+
+/** Whether an untrusted media item's thumbnail is absent or well-formed. */
+const isValidThumbnail = (thumbnail: unknown): boolean => {
+  if (thumbnail === undefined) return true;
+  const t = thumbnail as Partial<MediaThumbnail> | null;
+  return typeof t?.publicId === 'string' && typeof t.publicUrl === 'string' && t.publicUrl !== '';
+};
 
 export interface Draft {
   id: number;
@@ -106,6 +116,9 @@ export function validateDraftInput(input: Record<string, unknown>): string | nul
       media.some((m) => typeof (m as DraftMedia)?.publicUrl !== 'string' || !(m as DraftMedia).publicUrl)
     ) {
       return 'media must be an array of objects with a publicUrl string.';
+    }
+    if (media.some((m) => !isValidThumbnail((m as DraftMedia).thumbnail))) {
+      return 'A media thumbnail must be an object with publicId and publicUrl strings.';
     }
   }
   if (youtubeTitle !== undefined) {

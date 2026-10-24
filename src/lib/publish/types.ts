@@ -2,6 +2,12 @@ import { MediaFile, SuccessfulPublishResult, FailedPublishResult } from '@/types
 import type { ContentSelection } from './contentRules';
 import type { TikTokPostSettings } from '@/lib/tiktok';
 
+/** A custom thumbnail for a video: a JPEG uploaded to Cloudinary. */
+export interface MediaThumbnail {
+  publicId: string;
+  publicUrl: string;
+}
+
 /**
  * Cloudinary media info sent from the frontend
  */
@@ -13,6 +19,8 @@ export interface CloudinaryMediaInfo {
   width?: number;
   height?: number;
   originalFilename: string;
+  /** Videos only: sent to the platforms that take a custom thumbnail or cover. */
+  thumbnail?: MediaThumbnail;
 }
 
 /**
