@@ -131,6 +131,7 @@ function PublishPageInner() {
   const [youtubeTitle, setYoutubeTitle] = useState('');
   const [selectedTikTokAccounts, setSelectedTikTokAccounts] = useState<string[]>([]);
   const [tiktokSettings, setTiktokSettings] = useState<TikTokPostSettings>(EMPTY_TIKTOK_SETTINGS);
+  const [tiktokSuggestion, setTiktokSuggestion] = useState<TikTokPostSettings | null>(null);
   const [isTiktokReady, setIsTiktokReady] = useState(false);
   // What to send to platforms that cannot take the whole post
   const [contentSelection, setContentSelection] = useState<ContentSelection>({});
@@ -215,6 +216,8 @@ function PublishPageInner() {
         setPostText(data.draft.text);
         setUploadedMedia(mapDraftMediaToUploaded(data.draft.media));
         setDraftTargets(data.draft.target_accounts);
+        setYoutubeTitle(data.draft.youtube_title);
+        setTiktokSuggestion(data.draft.tiktok_settings);
       } catch (err) {
         if (!cancelled) {
           setSnackbar({ open: true, message: (err as Error).message, severity: 'error' });
@@ -367,6 +370,7 @@ function PublishPageInner() {
     setContentSelection({});
     setYoutubeTitle('');
     setTiktokSettings(EMPTY_TIKTOK_SETTINGS);
+    setTiktokSuggestion(null);
     setSelectedFacebookPages(facebookPages.map((p) => p.page_id));
     setSelectedXAccounts(xAccounts.map((a) => a.id));
     setSelectedTelegramChannels(telegramChannels.map((c) => c.channel_id));
@@ -449,6 +453,7 @@ function PublishPageInner() {
           ...(draftId ? { id: draftId } : {}),
           text: postText,
           target_accounts: targetAccounts,
+          youtube_title: youtubeTitle,
           media: uploadedMedia.map((media) => ({
             publicId: media.publicId,
             publicUrl: media.publicUrl,
@@ -795,6 +800,7 @@ function PublishPageInner() {
                       value={tiktokSettings}
                       onChange={setTiktokSettings}
                       onReadyChange={setIsTiktokReady}
+                      suggestion={tiktokSuggestion}
                     />
                   </Box>
                 )}
