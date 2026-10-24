@@ -1,7 +1,7 @@
 import { createMcpHandler, withMcpAuth } from 'mcp-handler';
 import { z } from 'zod';
 import { createLogger } from '@/lib/logger';
-import { ingestRemoteMedia } from '@/lib/services/cloudinaryService';
+import { ingestRemoteDraftMedia, type RemoteMediaItem } from '@/lib/services/cloudinaryService';
 import { findMcpToken } from '@/lib/mcpTokens';
 import { listPublishHistory } from '@/lib/publishHistory';
 import { listConnectedAccounts } from '@/lib/connectedAccounts';
@@ -23,10 +23,23 @@ import { TIKTOK_PRIVACY_LEVELS } from '@/lib/tiktok';
 const logger = createLogger('McpAPI');
 
 const platformEnum = z.enum(PLATFORMS as [Platform, ...Platform[]]);
-const mediaUrls = z
-  .array(z.string())
+const mediaItems = z
+  .array(
+    z.union([
+      z.string().describe('URL of an image or video'),
+      z.object({
+        url: z.string().describe('URL of an image or video'),
+        thumbnail_url: z
+          .string()
+          .optional()
+          .describe('Videos only: URL of a custom thumbnail image, stored as a JPEG up to 2 MB'),
+      }),
+    ])
+  )
   .optional()
-  .describe('Optional list of media URLs to attach to the draft');
+  .describe('Optional list of media to attach to the draft: a URL, or { url, thumbnail_url } to give a video a custom thumbnail');
+
+const urlOf = (item: RemoteMediaItem) => (typeof item === 'string' ? item : item.url);
 const targetAccounts = z
   .array(z.object({ platform: platformEnum, account_id: z.string().min(1) }))
   .optional()
@@ -50,8 +63,8 @@ const tiktokSettings = z
 
 // External URLs can expire, so drafts must not reference them directly.
 // Ingest them into Cloudinary (same store the UI uploads to) at write time.
-const toMedia = async (urls?: string[]): Promise<DraftMedia[] | null> =>
-  urls && urls.length > 0 ? ingestRemoteMedia(urls) : null;
+const toMedia = async (items?: RemoteMediaItem[]): Promise<DraftMedia[] | null> =>
+  items && items.length > 0 ? ingestRemoteDraftMedia(items) : null;
 
 const json = (data: unknown) => ({
   content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }],
@@ -192,7 +205,7 @@ const handler = createMcpHandler(
         inputSchema: z.object({
           text: z.string().describe('The post text'),
           target_accounts: targetAccounts,
-          media: mediaUrls,
+          media: mediaItems,
           youtube_title: youtubeTitle.optional(),
           tiktok_settings: tiktokSettings.optional(),
         }),
@@ -204,7 +217,7 @@ const handler = createMcpHandler(
           validateDraftInput({
             text,
             target_accounts,
-            media: media?.map((publicUrl) => ({ publicUrl })) ?? null,
+            media: media?.map((item) => ({ publicUrl: urlOf(item) })) ?? null,
             youtube_title,
             tiktok_settings,
           }) ?? (await checkTargets(auth, target_accounts ?? []));
@@ -226,12 +239,12 @@ const handler = createMcpHandler(
       'edit_draft',
       {
         description:
-          'Edit an existing draft. Only the provided fields change; omitted fields keep their current value. `target_accounts` replaces the targets on accounts this token may use; targets on other accounts stay.',
+          'Edit an existing draft. Only the provided fields change; omitted fields keep their current value. `target_accounts` replaces the targets on accounts this token may use; targets on other accounts stay. `media` replaces all media: to keep a video\'s thumbnail, pass it again as `thumbnail_url` (list_drafts shows it as `thumbnail.publicUrl`).',
         inputSchema: z.object({
           id: z.number().int().describe('The draft id (from list_drafts)'),
           text: z.string().optional(),
           target_accounts: targetAccounts,
-          media: mediaUrls,
+          media: mediaItems,
           youtube_title: youtubeTitle.optional(),
           tiktok_settings: tiktokSettings.nullable().optional().describe('Suggested TikTok post settings; null removes them'),
         }),
@@ -252,7 +265,7 @@ const handler = createMcpHandler(
             text: text ?? existing.text,
             target_accounts: targets,
             media:
-              media !== undefined ? media.map((publicUrl) => ({ publicUrl })) : existing.media,
+              media !== undefined ? media.map((item) => ({ publicUrl: urlOf(item) })) : existing.media,
             youtube_title: youtube_title ?? existing.youtube_title,
             tiktok_settings,
           }) ?? (await checkTargets(auth, target_accounts ?? []));
