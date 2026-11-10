@@ -1,13 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import pool from '@/lib/db';
 import { getAuthUserId } from '@/lib/api-auth';
+import { escapeHtml } from '@/lib/escapeHtml';
+import { createLogger } from '@/lib/logger';
 
+const logger = createLogger('DownloadReport');
+
+// Only these get a status-* class; anything else renders without one.
+const KNOWN_STATUSES = new Set(['success', 'partial_success', 'failed', 'pending']);
 
 export async function GET(req: NextRequest) {
   try {
     const userId = await getAuthUserId();
     if (!userId) {
-      console.error('[DownloadReport API Error] User ID not found in session.');
+      logger.error('User ID not found in session.');
       return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
     }
 
@@ -16,6 +22,11 @@ export async function GET(req: NextRequest) {
 
     if (!historyId) {
       return NextResponse.json({ error: 'Publish history ID is required.' }, { status: 400 });
+    }
+
+    // parseInt alone accepts '5<img ...>' as 5; only plain digits are an id.
+    if (!/^\d+$/.test(historyId)) {
+      return NextResponse.json({ error: 'Invalid ID format.' }, { status: 400 });
     }
 
     const parsedUserId = parseInt(userId, 10);
@@ -38,8 +49,10 @@ export async function GET(req: NextRequest) {
 
       const { content, publish_report, publish_status, created_at } = rows[0];
 
-      const formattedStatus = publish_status.replace(/_/g, ' ').split(' ').map((word: string) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+      const status = String(publish_status ?? '');
+      const formattedStatus = status.replace(/_/g, ' ').split(' ').map((word: string) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
       const formattedDate = new Date(created_at).toLocaleString();
+      const statusClass = KNOWN_STATUSES.has(status.toLowerCase()) ? `status-${status.toLowerCase()}` : '';
 
       const htmlContent = `
                             <!DOCTYPE html>
@@ -47,7 +60,7 @@ export async function GET(req: NextRequest) {
                             <head>
                                 <meta charset="UTF-8">
                                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                                <title>Publish Report - History ID: ${historyId}</title>
+                                <title>Publish Report - History ID: ${parsedHistoryId}</title>
                                 <style>
                                     body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 20px; background-color: #f4f4f4; }
                                     .container { background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); max-width: 800px; margin: auto; }
@@ -63,15 +76,15 @@ export async function GET(req: NextRequest) {
                             </head>
                             <body>
                                 <div class="container">
-                                    <h1>Publish Report - History ID: ${historyId}</h1>
-                                    <p><strong>Published At:</strong> ${formattedDate}</p>
-                                    <p><strong>Status:</strong> <span class="status-${publish_status.toLowerCase()}">${formattedStatus}</span></p>
+                                    <h1>Publish Report - History ID: ${parsedHistoryId}</h1>
+                                    <p><strong>Published At:</strong> ${escapeHtml(formattedDate)}</p>
+                                    <p><strong>Status:</strong> <span class="${statusClass}">${escapeHtml(formattedStatus)}</span></p>
 
                                     <h2>Content:</h2>
-                                    <pre>${content}</pre>
+                                    <pre>${escapeHtml(content)}</pre>
 
                                     <h2>Publish Log:</h2>
-                                    <pre>${publish_report}</pre>
+                                    <pre>${escapeHtml(publish_report)}</pre>
                                 </div>
                             </body>
                             </html> 
@@ -79,8 +92,8 @@ export async function GET(req: NextRequest) {
 
       return new NextResponse(htmlContent, {
         headers: {
-          'Content-Type': 'text/html',
-          'Content-Disposition': `attachment; filename="publish_report_${historyId}.html"`,
+          'Content-Type': 'text/html; charset=utf-8',
+          'Content-Disposition': `attachment; filename="publish_report_${parsedHistoryId}.html"`,
         },
       });
 
@@ -88,7 +101,7 @@ export async function GET(req: NextRequest) {
       client.release();
     }
   } catch (error) {
-    console.error('[DownloadReport API Error]', error);
+    logger.error('Failed to build the publish report', error);
     return NextResponse.json({ error: 'Internal Server Error.' }, { status: 500 });
   }
 }
