@@ -3,13 +3,14 @@ import pool from '@/lib/db';
 import { getAuthUserId } from '@/lib/api-auth';
 import { cleanupCloudinaryMedia } from '@/lib/services/cloudinaryService';
 import { createLogger } from '@/lib/logger';
+import { mediaAssets } from '@/lib/mediaAssets';
 import { revokeYouTubeTokens } from '@/lib/publishers/youtube';
 import { revokeTikTokTokens } from '@/lib/publishers/tiktok';
 
 const logger = createLogger('AccountAPI');
 
 interface MediaRow {
-  media: { publicId?: unknown; resourceType?: unknown; thumbnail?: { publicId?: unknown } } | null;
+  media: unknown;
 }
 
 // Media attached to drafts lives in Cloudinary and
@@ -36,15 +37,7 @@ export async function DELETE() {
 
   try {
     const { rows } = await pool.query<MediaRow>(USER_MEDIA_SQL, [userId]);
-    const media = rows.flatMap(({ media: item }): Array<{ publicId: string; resourceType: 'image' | 'video' }> => [
-      ...(typeof item?.publicId === 'string' && (item.resourceType === 'image' || item.resourceType === 'video')
-        ? [{ publicId: item.publicId, resourceType: item.resourceType as 'image' | 'video' }]
-        : []),
-      // A video's custom thumbnail is an image of its own in Cloudinary
-      ...(typeof item?.thumbnail?.publicId === 'string'
-        ? [{ publicId: item.thumbnail.publicId, resourceType: 'image' as const }]
-        : []),
-    ]);
+    const media = mediaAssets(rows.map((row) => row.media));
     // Best effort: individual Cloudinary failures are logged inside and never block the deletion.
     await cleanupCloudinaryMedia(media);
 
