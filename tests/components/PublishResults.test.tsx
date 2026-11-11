@@ -36,4 +36,20 @@ describe('PublishResults', () => {
     expect(screen.getByText('Mocking Creator')).toBeInTheDocument();
     expect(screen.getByText('-100123')).toBeInTheDocument();
   });
+
+  it('shows the warning of a successful result under it', () => {
+    render(
+      <PublishResults
+        error={null}
+        success="Published"
+        accounts={accounts}
+        results={{
+          successful: [{ platform: 'x', account_id: 'x-1', warning: 'The video was uploaded, but its thumbnail was not set.' }],
+          failed: [],
+        }}
+      />
+    );
+
+    expect(screen.getByText('The video was uploaded, but its thumbnail was not set.')).toBeInTheDocument();
+  });
 });

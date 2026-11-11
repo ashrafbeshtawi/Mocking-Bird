@@ -17,6 +17,8 @@ export interface FacebookPublishResult {
   platform: 'facebook';
   page_id: string;
   result: unknown;
+  /** Set when the post was published but a video's custom thumbnail was not. */
+  warning?: string;
 }
 
 export interface FacebookPublishError {
@@ -131,6 +133,37 @@ export class FacebookPublisher {
     }
   }
 
+  /**
+   * Uploads a video and, when it has a custom thumbnail, makes that the preferred one.
+   * A thumbnail failure is returned as a warning, since the video is already published.
+   */
+  private async publishVideo(
+    pageId: string,
+    accessToken: string,
+    video: MediaFile,
+    description?: string
+  ): Promise<{ videoId: string; warning?: string }> {
+    const videoId = await this.uploadMediaToFacebook(pageId, accessToken, video, true, description);
+    if (!video.thumbnailUrl) return { videoId };
+
+    try {
+      const image = await axios.get<ArrayBuffer>(video.thumbnailUrl, { responseType: 'arraybuffer' });
+      const formData = new FormData();
+      formData.append('source', Buffer.from(image.data), { filename: 'thumbnail.jpg', contentType: 'image/jpeg' });
+      formData.append('is_preferred', 'true');
+      await axios.post(`https://graph.facebook.com/v19.0/${videoId}/thumbnails`, formData, {
+        headers: { ...formData.getHeaders(), Authorization: `Bearer ${accessToken}` },
+      });
+      return { videoId };
+    } catch (error) {
+      const message = axios.isAxiosError(error)
+        ? error.response?.data?.error?.message || error.message
+        : error instanceof Error ? error.message : 'Unknown error';
+      logger.warn(`Facebook thumbnail was not set for video ${videoId}`, { pageId, error: message });
+      return { videoId, warning: `${video.filename} was published, but its thumbnail was not set: ${message}` };
+    }
+  }
+
   private async publishTextPost(
     pageId: string, 
     accessToken: string, 
@@ -224,6 +257,7 @@ export class FacebookPublisher {
       
       try {
         let result: unknown;
+        const warnings: string[] = [];
 
         if (files.length === 0) {
           if (!text) {
@@ -240,8 +274,9 @@ export class FacebookPublisher {
             const results: unknown[] = [];
 
             for (const video of videos) {
-              const videoResult = await this.uploadMediaToFacebook(pageId, token.page_access_token, video, true, text);
-              results.push(videoResult);
+              const { videoId, warning } = await this.publishVideo(pageId, token.page_access_token, video, text);
+              results.push(videoId);
+              if (warning) warnings.push(warning);
             }
 
             if (photos.length > 0) {
@@ -258,8 +293,9 @@ export class FacebookPublisher {
           } else if (videos.length > 0) {
             const results: unknown[] = [];
             for (const video of videos) {
-              const videoResult = await this.uploadMediaToFacebook(pageId, token.page_access_token, video, true, text);
-              results.push(videoResult);
+              const { videoId, warning } = await this.publishVideo(pageId, token.page_access_token, video, text);
+              results.push(videoId);
+              if (warning) warnings.push(warning);
             }
             result = { video_posts: results };
           } else {
@@ -275,7 +311,8 @@ export class FacebookPublisher {
         successful.push({ 
           platform: 'facebook', 
           page_id: token.page_id, 
-          result 
+          result,
+          ...(warnings.length > 0 && { warning: warnings.join(' ') }),
         });
       } catch (error) {
         logger.error(`Failed to publish to Facebook page: ${pageId}`, {

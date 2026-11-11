@@ -193,7 +193,7 @@ export default function DraftsPage() {
 
   const openPreview = (draft: Draft) => {
     setPreviewSelection({});
-    setPreviewYoutubeTitle('');
+    setPreviewYoutubeTitle(draft.youtube_title);
     setPreviewTiktokSettings(EMPTY_TIKTOK_SETTINGS);
     setPreviewDraft(draft);
   };
@@ -656,6 +656,7 @@ export default function DraftsPage() {
                 value={previewTiktokSettings}
                 onChange={setPreviewTiktokSettings}
                 onReadyChange={setIsPreviewTiktokReady}
+                suggestion={previewDraft?.tiktok_settings}
               />
             </Box>
           )}

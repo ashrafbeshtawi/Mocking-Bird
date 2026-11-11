@@ -36,6 +36,8 @@ interface PublishResult {
   instagram_account_id?: string;
   telegram_channel_id?: string;
   post_type?: 'feed' | 'story';
+  /** Successful results only: something that went wrong after publishing. */
+  warning?: string;
   error?: {
     message?: string;
     code?: string;
@@ -181,6 +183,8 @@ export function PublishResults({ error, success, results, accounts, onClose }: P
                           />
                         </Box>
                       }
+                      secondary={item.warning}
+                      slotProps={{ secondary: { color: 'warning.main', variant: 'caption' } }}
                     />
                   </ListItem>
                 );

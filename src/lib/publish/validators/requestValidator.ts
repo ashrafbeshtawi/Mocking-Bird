@@ -1,4 +1,4 @@
-import { PublishRequest, CloudinaryMediaInfo } from '../types';
+import { PublishRequest, CloudinaryMediaInfo, MediaThumbnail } from '../types';
 import { parseContentSelection } from '../contentRules';
 import { youtubeTitleError } from '@/lib/youtube';
 import { parseTikTokSettings, tiktokSettingsError } from '@/lib/tiktok';
@@ -124,6 +124,17 @@ export function validateAccountArrays(
   return { success: true };
 }
 
+/** The thumbnail of a video item when it is well-formed; images and malformed thumbnails get none. */
+function parseThumbnail(item: CloudinaryMediaInfo): MediaThumbnail | undefined {
+  const thumbnail = item.thumbnail as Partial<MediaThumbnail> | undefined;
+  return item.resourceType === 'video' &&
+    typeof thumbnail?.publicId === 'string' &&
+    typeof thumbnail.publicUrl === 'string' &&
+    thumbnail.publicUrl
+    ? { publicId: thumbnail.publicId, publicUrl: thumbnail.publicUrl }
+    : undefined;
+}
+
 /**
  * Validates Cloudinary media info
  */
@@ -147,6 +158,7 @@ function validateCloudinaryMedia(media: unknown[]): ValidationResult<CloudinaryM
         typeof mediaItem.publicUrl === 'string' &&
         (mediaItem.resourceType === 'image' || mediaItem.resourceType === 'video')
       ) {
+        const thumbnail = parseThumbnail(mediaItem);
         validMedia.push({
           publicId: mediaItem.publicId,
           publicUrl: mediaItem.publicUrl,
@@ -155,6 +167,7 @@ function validateCloudinaryMedia(media: unknown[]): ValidationResult<CloudinaryM
           width: mediaItem.width,
           height: mediaItem.height,
           originalFilename: mediaItem.originalFilename || 'unknown',
+          ...(thumbnail && { thumbnail }),
         });
       }
     }

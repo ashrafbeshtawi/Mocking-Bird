@@ -39,6 +39,8 @@ export interface SuccessfulPublishResult {
   telegram_channel_id?: string; // For Telegram channels
   telegram_message_id?: string; // For Telegram message ID
   post_type?: 'feed' | 'story'; // For Instagram post type
+  /** Something that went wrong after the post was published, e.g. its thumbnail was not set. */
+  warning?: string;
 }
 
 // Define the overall structure for publish results
@@ -107,6 +109,7 @@ export interface FacebookSuccessItem {
   result?: {
     id?: string;
   };
+  warning?: string;
 }
 
 export interface TwitterSuccessItem {
@@ -186,6 +189,8 @@ export interface MediaFile {
   buffer: Buffer;
   filename: string;
   mimetype: string;
+  /** Videos only: URL of the custom thumbnail. */
+  thumbnailUrl?: string;
 }
 
 export interface TwitterMediaUploadResult {

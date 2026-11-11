@@ -327,6 +327,7 @@ export class TelegramPublisher {
           body: JSON.stringify({
             chat_id: channelId,
             [mediaKey]: media.publicUrl,
+            cover: isVideo ? media.thumbnail?.publicUrl : undefined,
             caption: text || undefined,
             parse_mode: 'HTML',
           }),

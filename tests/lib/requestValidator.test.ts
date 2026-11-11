@@ -17,3 +17,29 @@ describe('hasAnyDestination', () => {
     expect(hasAnyDestination(await parsed({ [field]: ids, ...extra }))).toBe(true);
   });
 });
+
+describe('parsePublishRequest media thumbnails', () => {
+  const thumbnail = { publicId: 'thumb1', publicUrl: 'https://res.cloudinary.com/thumb1.jpg' };
+  const item = (resourceType: 'image' | 'video', extra: object) => ({
+    publicId: 'm1',
+    publicUrl: 'https://res.cloudinary.com/m1',
+    resourceType,
+    ...extra,
+  });
+
+  it('keeps the thumbnail of a video', async () => {
+    const { cloudinaryMedia } = await parsed({ cloudinaryMedia: [item('video', { thumbnail })] });
+
+    expect(cloudinaryMedia[0].thumbnail).toEqual(thumbnail);
+  });
+
+  it.each([
+    ['an image', item('image', { thumbnail })],
+    ['a video with a malformed thumbnail', item('video', { thumbnail: { publicUrl: 42 } })],
+  ])('drops the thumbnail of %s', async (_case, media) => {
+    const { cloudinaryMedia } = await parsed({ cloudinaryMedia: [media] });
+
+    expect(cloudinaryMedia).toHaveLength(1);
+    expect(cloudinaryMedia[0]).not.toHaveProperty('thumbnail');
+  });
+});

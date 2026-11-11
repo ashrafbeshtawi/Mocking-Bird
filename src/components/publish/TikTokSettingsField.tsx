@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import {
   Alert,
   Box,
+  Button,
   Checkbox,
   CircularProgress,
   FormControl,
@@ -15,6 +16,7 @@ import {
   MenuItem,
   Select,
   Switch,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import { fetchWithAuth } from '@/lib/fetch';
@@ -38,7 +40,27 @@ interface TikTokSettingsFieldProps {
   onChange: (value: TikTokPostSettings) => void;
   /** Called with whether the post can go to TikTok as configured. */
   onReadyChange: (isReady: boolean) => void;
+  /** Settings suggested for this post (e.g. saved on a draft by an AI assistant); offered, never preset. */
+  suggestion?: TikTokPostSettings | null;
 }
+
+const onOff = (label: string, isOn: boolean) => `${label} ${isOn ? 'on' : 'off'}`;
+
+/** One line describing the settings, e.g. "Only me · Comments on · Duet off · Stitch off". */
+function describeSettings(settings: TikTokPostSettings): string {
+  return [
+    settings.privacyLevel ? TIKTOK_PRIVACY_LABELS[settings.privacyLevel] : 'No visibility',
+    onOff('Comments', settings.allowComment),
+    onOff('Duet', settings.allowDuet),
+    onOff('Stitch', settings.allowStitch),
+    ...(settings.isYourBrand ? ['Your brand'] : []),
+    ...(settings.isBrandedContent ? ['Branded content'] : []),
+  ].join(' · ');
+}
+
+const BRANDED_NOT_PRIVATE = 'Branded content visibility cannot be set to private.';
+
+const TIKTOK_SETTING_KEYS = ['privacyLevel', 'allowComment', 'allowDuet', 'allowStitch', 'isYourBrand', 'isBrandedContent'] as const;
 
 type CreatorState = { creator: TikTokCreatorInfo } | { error: string };
 
@@ -47,7 +69,7 @@ type CreatorState = { creator: TikTokCreatorInfo } | { error: string };
  * the target accounts, a visibility with no preset, interaction toggles that
  * start off, the commercial content disclosure and the consent notice.
  */
-export function TikTokSettingsField({ accountIds, videoUrl, value, onChange, onReadyChange }: TikTokSettingsFieldProps) {
+export function TikTokSettingsField({ accountIds, videoUrl, value, onChange, onReadyChange, suggestion }: TikTokSettingsFieldProps) {
   const [creators, setCreators] = useState<Record<string, CreatorState>>({});
   const [isCommercial, setIsCommercial] = useState(value.isYourBrand || value.isBrandedContent);
   const [videoDurationSec, setVideoDurationSec] = useState<number | null>(null);
@@ -88,6 +110,9 @@ export function TikTokSettingsField({ accountIds, videoUrl, value, onChange, onR
 
   const settingsError = tiktokSettingsError(value);
   const isCommercialIncomplete = isCommercial && !value.isYourBrand && !value.isBrandedContent;
+  const isOnlyMeBlocked = value.isBrandedContent;
+  // Stays enabled while checked, so an already private branded post can still be fixed.
+  const isBrandedBlocked = value.privacyLevel === 'SELF_ONLY' && !value.isBrandedContent;
   const isReady = !isLoading && errors.length === 0 && !settingsError && !isCommercialIncomplete && !isTooLong &&
     privacyOptions.includes(value.privacyLevel as TikTokPrivacyLevel);
 
@@ -101,6 +126,12 @@ export function TikTokSettingsField({ accountIds, videoUrl, value, onChange, onR
     setIsCommercial(isOn);
     if (!isOn) update({ isYourBrand: false, isBrandedContent: false });
   };
+
+  const applySuggestion = (settings: TikTokPostSettings) => {
+    onChange(settings);
+    setIsCommercial(settings.isYourBrand || settings.isBrandedContent);
+  };
+  const isSuggestionApplied = suggestion != null && TIKTOK_SETTING_KEYS.every((key) => suggestion[key] === value[key]);
 
   if (isLoading) {
     return (
@@ -121,20 +152,41 @@ export function TikTokSettingsField({ accountIds, videoUrl, value, onChange, onR
         Posting to TikTok as {infos.map((c) => c.nickname).join(', ')}
       </Typography>
 
+      {suggestion && !isSuggestionApplied && (
+        <Alert
+          severity="info"
+          action={<Button color="inherit" size="small" onClick={() => applySuggestion(suggestion)}>Apply</Button>}
+        >
+          Suggested by your assistant: {describeSettings(suggestion)}
+        </Alert>
+      )}
+
       <FormControl size="small" fullWidth required error={!value.privacyLevel}>
         <InputLabel id="tiktok-privacy-label">Who can view this video</InputLabel>
         <Select
           labelId="tiktok-privacy-label"
           label="Who can view this video"
           value={privacyOptions.includes(value.privacyLevel as TikTokPrivacyLevel) ? value.privacyLevel : ''}
-          onChange={(e) => update({ privacyLevel: e.target.value as TikTokPrivacyLevel })}
+          onChange={(e) => {
+            const level = e.target.value as TikTokPrivacyLevel;
+            if (level === 'SELF_ONLY' && isOnlyMeBlocked) return;
+            update({ privacyLevel: level });
+          }}
         >
-          {privacyOptions.map((level) => (
-            <MenuItem key={level} value={level} disabled={level === 'SELF_ONLY' && value.isBrandedContent}>
-              {TIKTOK_PRIVACY_LABELS[level]}
-              {level === 'SELF_ONLY' && value.isBrandedContent ? ' (not available for branded content)' : ''}
-            </MenuItem>
-          ))}
+          {privacyOptions.map((level) =>
+            level === 'SELF_ONLY' && isOnlyMeBlocked ? (
+              // Disabled items ignore the pointer; re-enable it so the tooltip shows on hover
+              <MenuItem key={level} value={level} disabled sx={{ '&.Mui-disabled': { pointerEvents: 'auto' } }}>
+                <Tooltip title={BRANDED_NOT_PRIVATE} placement="right" describeChild>
+                  <span>{TIKTOK_PRIVACY_LABELS[level]} (not available for branded content)</span>
+                </Tooltip>
+              </MenuItem>
+            ) : (
+              <MenuItem key={level} value={level}>
+                {TIKTOK_PRIVACY_LABELS[level]}
+              </MenuItem>
+            )
+          )}
         </Select>
         {settingsError && <FormHelperText>{settingsError}</FormHelperText>}
       </FormControl>
@@ -170,10 +222,18 @@ export function TikTokSettingsField({ accountIds, videoUrl, value, onChange, onR
               control={<Checkbox checked={value.isYourBrand} onChange={(e) => update({ isYourBrand: e.target.checked })} />}
               label="Your brand: you are promoting yourself or your own business"
             />
-            <FormControlLabel
-              control={<Checkbox checked={value.isBrandedContent} onChange={(e) => update({ isBrandedContent: e.target.checked })} />}
-              label="Branded content: you are promoting another brand or a third party"
-            />
+            <Tooltip title={isBrandedBlocked ? BRANDED_NOT_PRIVATE : ''} placement="bottom-start" describeChild>
+              <FormControlLabel
+                disabled={isBrandedBlocked}
+                control={<Checkbox checked={value.isBrandedContent} onChange={(e) => update({ isBrandedContent: e.target.checked })} />}
+                label="Branded content: you are promoting another brand or a third party"
+              />
+            </Tooltip>
+            {isBrandedBlocked && (
+              <Typography variant="caption" color="text.secondary">
+                Branded content cannot be private. Choose another visibility to select it.
+              </Typography>
+            )}
           </FormGroup>
           <Typography variant="caption" color={isCommercialIncomplete ? 'error' : 'text.secondary'}>
             {isCommercialIncomplete

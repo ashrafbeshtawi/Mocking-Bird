@@ -103,6 +103,49 @@ describe('YouTubePublisher', () => {
     expect(failed[0].error.message).toBe('YouTube uploads take exactly one video.');
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  describe('with a custom thumbnail', () => {
+    const thumbnailUrl = 'https://res.cloudinary.com/thumb1.jpg';
+    const withThumbnail = { ...video, thumbnail: { publicId: 'thumb1', publicUrl: thumbnailUrl } };
+    const thumbnailCall = () => callTo('https://www.googleapis.com/upload/youtube/v3/thumbnails/set');
+
+    beforeEach(() => {
+      const uploadMock = fetchMock.getMockImplementation()!;
+      fetchMock.mockImplementation(async (url, init) =>
+        String(url) === thumbnailUrl ? new Response(new Uint8Array([9, 9])) : uploadMock(url, init)
+      );
+    });
+
+    it('sets the thumbnail on the uploaded video', async () => {
+      const { successful } = await publisher.publishToAccounts(
+        { title: '', text: '', cloudinaryMedia: [withThumbnail] },
+        [channel(3_600_000)]
+      );
+
+      expect(successful).toEqual([{ platform: 'youtube', account_id: 'UC123', name: 'Ada Videos', post_id: 'vid-42' }]);
+      const [url, init] = thumbnailCall();
+      expect(url).toBe('https://www.googleapis.com/upload/youtube/v3/thumbnails/set?videoId=vid-42&uploadType=media');
+      expect(init.headers).toMatchObject({ Authorization: 'Bearer access', 'Content-Type': 'image/jpeg' });
+      expect(new Uint8Array(init.body)).toEqual(new Uint8Array([9, 9]));
+    });
+
+    it('keeps the upload and warns when the channel cannot use custom thumbnails', async () => {
+      jest.spyOn(console, 'warn').mockImplementation(() => {});
+      const thumbnailMock = fetchMock.getMockImplementation()!;
+      fetchMock.mockImplementation(async (url, init) =>
+        String(url).includes('/thumbnails/set') ? new Response('{}', { status: 403 }) : thumbnailMock(url, init)
+      );
+
+      const { successful, failed } = await publisher.publishToAccounts(
+        { title: '', text: '', cloudinaryMedia: [withThumbnail] },
+        [channel(3_600_000)]
+      );
+
+      expect(failed).toEqual([]);
+      expect(successful[0].post_id).toBe('vid-42');
+      expect(successful[0].warning).toMatch(/thumbnail was not set: This channel cannot use custom thumbnails yet/);
+    });
+  });
 });
 
 describe('revokeYouTubeTokens', () => {

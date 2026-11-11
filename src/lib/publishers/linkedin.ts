@@ -28,6 +28,8 @@ export interface LinkedInPublishResult {
   account_id: string;
   name: string;
   post_id: string;
+  /** Set when the post was published but the video's custom thumbnail was not. */
+  warning?: string;
 }
 
 export interface LinkedInPublishError {
@@ -68,8 +70,14 @@ export class LinkedInPublisher {
 
     for (const token of tokens) {
       try {
-        const postId = await this.publishPost(token, options);
-        successful.push({ platform: 'linkedin', account_id: token.linkedin_user_id, name: token.name, post_id: postId });
+        const { postId, warning } = await this.publishPost(token, options);
+        successful.push({
+          platform: 'linkedin',
+          account_id: token.linkedin_user_id,
+          name: token.name,
+          post_id: postId,
+          ...(warning && { warning }),
+        });
         logger.info('Published to LinkedIn', { account_id: token.linkedin_user_id, post_id: postId });
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown error';
@@ -81,7 +89,10 @@ export class LinkedInPublisher {
     return { successful, failed };
   }
 
-  private async publishPost(token: LinkedInAccountToken, options: LinkedInPublishOptions): Promise<string> {
+  private async publishPost(
+    token: LinkedInAccountToken,
+    options: LinkedInPublishOptions
+  ): Promise<{ postId: string; warning?: string }> {
     if (new Date(token.expires_at) <= new Date()) {
       throw new Error('LinkedIn access has expired. Reconnect the account on the dashboard.');
     }
@@ -95,9 +106,15 @@ export class LinkedInPublisher {
     }
 
     const author = `urn:li:person:${token.linkedin_user_id}`;
-    const mediaUrns = videos.length === 1
-      ? [await this.uploadVideo(token.access_token, author, videos[0].publicUrl)]
-      : await Promise.all(media.map((m) => this.uploadImage(token.access_token, author, m.publicUrl)));
+    let warning: string | undefined;
+    let mediaUrns: string[];
+    if (videos.length === 1) {
+      const video = await this.uploadVideo(token.access_token, author, videos[0].publicUrl, videos[0].thumbnail?.publicUrl);
+      mediaUrns = [video.urn];
+      warning = video.warning;
+    } else {
+      mediaUrns = await Promise.all(media.map((m) => this.uploadImage(token.access_token, author, m.publicUrl)));
+    }
 
     const response = await fetch(`${API_BASE}/posts`, {
       method: 'POST',
@@ -114,7 +131,7 @@ export class LinkedInPublisher {
       }),
     });
     if (!response.ok) throw await this.apiError(response, 'create post');
-    return response.headers.get('x-restli-id') ?? '';
+    return { postId: response.headers.get('x-restli-id') ?? '', warning };
   }
 
   private async uploadImage(accessToken: string, owner: string, imageUrl: string): Promise<string> {
@@ -139,10 +156,16 @@ export class LinkedInPublisher {
   }
 
   /**
-   * Uploads a video in the parts LinkedIn assigns, finalizes it, and waits until
-   * LinkedIn has processed it, since a post can only reference an available video.
+   * Uploads a video in the parts LinkedIn assigns, and its custom thumbnail if it has one,
+   * finalizes it, and waits until LinkedIn has processed it, since a post can only reference
+   * an available video. A thumbnail failure is returned as a warning: the video posts without it.
    */
-  private async uploadVideo(accessToken: string, owner: string, videoUrl: string): Promise<string> {
+  private async uploadVideo(
+    accessToken: string,
+    owner: string,
+    videoUrl: string,
+    thumbnailUrl?: string
+  ): Promise<{ urn: string; warning?: string }> {
     // ponytail: buffers the whole video in memory; stream ranges from Cloudinary if large videos exhaust RAM.
     const download = await fetch(videoUrl);
     if (!download.ok) throw new Error(`Could not download video ${videoUrl} (HTTP ${download.status})`);
@@ -152,7 +175,7 @@ export class LinkedInPublisher {
       method: 'POST',
       headers: { ...this.headers(accessToken), 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        initializeUploadRequest: { owner, fileSizeBytes: bytes.byteLength, uploadCaptions: false, uploadThumbnail: false },
+        initializeUploadRequest: { owner, fileSizeBytes: bytes.byteLength, uploadCaptions: false, uploadThumbnail: Boolean(thumbnailUrl) },
       }),
     });
     if (!init.ok) throw await this.apiError(init, 'initialize video upload');
@@ -161,6 +184,7 @@ export class LinkedInPublisher {
         video: string;
         uploadToken: string;
         uploadInstructions: { uploadUrl: string; firstByte: number; lastByte: number }[];
+        thumbnailUploadUrl?: string;
       };
     };
 
@@ -175,6 +199,17 @@ export class LinkedInPublisher {
       uploadedPartIds.push(part.headers.get('etag') ?? '');
     }
 
+    let warning: string | undefined;
+    if (thumbnailUrl) {
+      try {
+        await this.uploadThumbnail(value.thumbnailUploadUrl, thumbnailUrl);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        logger.warn('LinkedIn thumbnail was not uploaded', { video: value.video, error: message });
+        warning = `The video was published, but its thumbnail was not set: ${message}`;
+      }
+    }
+
     const finalize = await fetch(`${API_BASE}/videos?action=finalizeUpload`, {
       method: 'POST',
       headers: { ...this.headers(accessToken), 'Content-Type': 'application/json' },
@@ -185,7 +220,19 @@ export class LinkedInPublisher {
     if (!finalize.ok) throw await this.apiError(finalize, 'finalize video upload');
 
     await this.waitForVideo(accessToken, value.video);
-    return value.video;
+    return { urn: value.video, warning };
+  }
+
+  private async uploadThumbnail(uploadUrl: string | undefined, thumbnailUrl: string): Promise<void> {
+    if (!uploadUrl) throw new Error('LinkedIn did not return a thumbnail upload URL.');
+    const image = await fetch(thumbnailUrl);
+    if (!image.ok) throw new Error(`Could not download the thumbnail (HTTP ${image.status})`);
+    const upload = await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: { 'media-type-family': 'STILLIMAGE', 'Content-Type': 'application/octet-stream' },
+      body: await image.arrayBuffer(),
+    });
+    if (!upload.ok) throw await this.apiError(upload, 'upload the thumbnail');
   }
 
   private async waitForVideo(accessToken: string, videoUrn: string): Promise<void> {
