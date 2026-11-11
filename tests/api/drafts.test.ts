@@ -7,12 +7,18 @@ jest.mock('@/lib/db', () => {
   return { __esModule: true, default: { query, connect: jest.fn(async () => ({ query, release: jest.fn() })) } };
 });
 
+jest.mock('@/lib/services/cloudinaryService', () => ({
+  cleanupCloudinaryMedia: jest.fn(),
+}));
+
 import { GET, POST, PUT, DELETE } from '@/app/api/drafts/route';
 import { getAuthUserId } from '@/lib/api-auth';
 import pool from '@/lib/db';
+import { cleanupCloudinaryMedia } from '@/lib/services/cloudinaryService';
 
 const mockGetAuthUserId = getAuthUserId as jest.MockedFunction<typeof getAuthUserId>;
 const mockQuery = pool.query as jest.Mock;
+const mockCleanup = cleanupCloudinaryMedia as jest.Mock;
 
 const draftRow = {
   id: 1,
@@ -233,6 +239,67 @@ describe('Drafts API', () => {
     expect((await response.json()).deletedCount).toBe(3);
     expect(mockQuery.mock.calls[0][0]).toContain('user_id = $2');
     expect(mockQuery.mock.calls[0][1]).toEqual([[1, 2, 3], 42]);
+  });
+
+  it('deletes the media of deleted drafts from Cloudinary unless still used elsewhere', async () => {
+    mockQuery
+      .mockResolvedValueOnce({
+        rowCount: 2,
+        rows: [
+          { media: [{ publicId: 'img', resourceType: 'image' }, { publicId: 'vid', resourceType: 'video', thumbnail: { publicId: 'thumb' } }] },
+          { media: null },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [{ id: 'vid' }] });
+
+    const response = await DELETE(request('DELETE', { ids: [1, 2] }));
+
+    expect(response.status).toBe(200);
+    expect(mockQuery.mock.calls[0][0]).toContain('RETURNING media');
+    expect(mockQuery.mock.calls[1][0]).toContain('publish_history');
+    expect(mockQuery.mock.calls[1][1]).toEqual([['img', 'vid', 'thumb']]);
+    expect(mockCleanup).toHaveBeenCalledWith([
+      { publicId: 'img', resourceType: 'image' },
+      { publicId: 'thumb', resourceType: 'image' },
+    ]);
+  });
+
+  it('touches neither Cloudinary nor the reference check when deleted drafts had no media', async () => {
+    mockQuery.mockResolvedValue({ rowCount: 1, rows: [{ media: null }] });
+
+    await DELETE(request('DELETE', { id: 1 }));
+
+    expect(mockQuery).toHaveBeenCalledTimes(1);
+    expect(mockCleanup).not.toHaveBeenCalled();
+  });
+
+  it('still reports the delete when the media cleanup fails', async () => {
+    mockQuery
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ media: [{ publicId: 'img', resourceType: 'image' }] }] })
+      .mockRejectedValueOnce(new Error('db gone'));
+
+    const response = await DELETE(request('DELETE', { id: 1 }));
+
+    expect(response.status).toBe(200);
+    expect(mockCleanup).not.toHaveBeenCalled();
+  });
+
+  it('releases the media an update replaced, after the commit', async () => {
+    mockQuery.mockImplementation(async (sql: string) => {
+      if (sql.startsWith('SELECT media FROM drafts')) {
+        return { rows: [{ media: [{ publicId: 'old', resourceType: 'image' }, { publicId: 'kept', resourceType: 'image' }] }] };
+      }
+      if (sql.includes('unnest')) return { rows: [{ id: 'kept' }] };
+      return { rows: [draftRow] };
+    });
+    const media = [{ publicUrl: 'https://x/kept.jpg', publicId: 'kept', resourceType: 'image' }];
+
+    const response = await PUT(request('PUT', { id: 1, text: 'hello', media }));
+
+    expect(response.status).toBe(200);
+    expect(callTo('SELECT media FROM drafts')[0]).toContain('FOR UPDATE');
+    expect(sqlCalls().indexOf('COMMIT')).toBeLessThan(sqlCalls().findIndex((sql) => sql.includes('unnest')));
+    expect(mockCleanup).toHaveBeenCalledWith([{ publicId: 'old', resourceType: 'image' }]);
   });
 
   it.each([{}, { ids: [] }, { ids: [1, 'x'] }, { id: -1 }])('rejects invalid delete input %j', async (body) => {

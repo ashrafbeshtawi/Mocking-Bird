@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { createLogger } from '@/lib/logger';
 import { ingestRemoteDraftMedia, type RemoteMediaItem } from '@/lib/services/cloudinaryService';
 import { findMcpToken } from '@/lib/mcpTokens';
+import { mediaAssets } from '@/lib/mediaAssets';
 import { listPublishHistory } from '@/lib/publishHistory';
 import { listConnectedAccounts } from '@/lib/connectedAccounts';
 import { formatAccountGrant, hasAccountAccess, type McpAccountAccess } from '@/lib/mcpAccess';
@@ -12,6 +13,7 @@ import {
   getDraft,
   listDrafts,
   getPlatformsOf,
+  releaseDraftMedia,
   updateDraft,
   validateDraftInput,
   type Draft,
@@ -285,6 +287,8 @@ const handler = createMcpHandler(
           youtube_title: youtube_title ?? existing.youtube_title,
           tiktok_settings,
         });
+        // Deleted since getDraft: the media just ingested for it belongs to nothing
+        if (!draft && media !== undefined) await releaseDraftMedia(mediaAssets(storedMedia));
         return json({ draft: draft && scopeDraft(auth, draft) });
       }
     );

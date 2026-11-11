@@ -68,6 +68,21 @@ describe('ingestRemoteMedia', () => {
       'Could not ingest media URL "https://gone.example/dead.jpg": 404 Not Found'
     );
   });
+
+  it('deletes the URLs that did upload when another one fails', async () => {
+    mockUpload
+      .mockResolvedValueOnce({ secure_url: 'https://res.cloudinary.com/demo/a.jpg', public_id: 'mocking-bird/drafts/a', resource_type: 'image', format: 'jpg' })
+      .mockRejectedValueOnce(new Error('404 Not Found'))
+      .mockResolvedValueOnce({ secure_url: 'https://res.cloudinary.com/demo/c.mp4', public_id: 'mocking-bird/drafts/c', resource_type: 'video', format: 'mp4' });
+
+    await expect(
+      ingestRemoteMedia(['https://ok.example/a.jpg', 'https://gone.example/b.jpg', 'https://ok.example/c.mp4'])
+    ).rejects.toThrow('Could not ingest media URL "https://gone.example/b.jpg"');
+
+    expect(mockDestroy).toHaveBeenCalledTimes(2);
+    expect(mockDestroy).toHaveBeenCalledWith('mocking-bird/drafts/a', { resource_type: 'image' });
+    expect(mockDestroy).toHaveBeenCalledWith('mocking-bird/drafts/c', { resource_type: 'video' });
+  });
 });
 
 describe('ingestRemoteDraftMedia', () => {
@@ -109,6 +124,34 @@ describe('ingestRemoteDraftMedia', () => {
     await expect(
       ingestRemoteDraftMedia([{ url: 'https://external.example/photo.jpg', thumbnail_url: 'https://external.example/cover.jpg' }])
     ).rejects.toThrow('thumbnail_url only applies to videos, and "https://external.example/photo.jpg" is an image.');
+    expect(mockDestroy).toHaveBeenCalledWith('mocking-bird/drafts/img', { resource_type: 'image' });
+  });
+
+  it('deletes every uploaded media and thumbnail when one thumbnail fails', async () => {
+    const otherVideo = { ...video, public_id: 'mocking-bird/drafts/clip2' };
+    mockUpload.mockImplementation(async (url: string) => {
+      if (url === 'https://external.example/clip.mp4') return video;
+      if (url === 'https://external.example/clip2.mp4') return otherVideo;
+      if (url === 'https://external.example/cover.png') return thumbnail;
+      throw new Error('404 Not Found');
+    });
+
+    await expect(
+      ingestRemoteDraftMedia([
+        { url: 'https://external.example/clip.mp4', thumbnail_url: 'https://external.example/cover.png' },
+        { url: 'https://external.example/clip2.mp4', thumbnail_url: 'https://gone.example/cover.png' },
+      ])
+    ).rejects.toThrow('Could not ingest thumbnail URL "https://gone.example/cover.png"');
+
+    expect(mockDestroy.mock.calls).toEqual(
+      expect.arrayContaining([
+        ['mocking-bird/drafts/thumb', { resource_type: 'image' }],
+        ['mocking-bird/drafts/clip', { resource_type: 'video' }],
+        ['mocking-bird/drafts/clip2', { resource_type: 'video' }],
+      ])
+    );
+    expect(mockDestroy).toHaveBeenCalledTimes(3);
+    mockUpload.mockReset();
   });
 
   it('deletes and rejects a thumbnail that is still over 2 MB as a JPEG', async () => {
@@ -118,5 +161,6 @@ describe('ingestRemoteDraftMedia', () => {
       ingestRemoteDraftMedia([{ url: 'https://external.example/clip.mp4', thumbnail_url: 'https://external.example/huge.jpg' }])
     ).rejects.toThrow('larger than 2 MB');
     expect(mockDestroy).toHaveBeenCalledWith('mocking-bird/drafts/thumb', { resource_type: 'image' });
+    expect(mockDestroy).toHaveBeenCalledWith('mocking-bird/drafts/clip', { resource_type: 'video' });
   });
 });

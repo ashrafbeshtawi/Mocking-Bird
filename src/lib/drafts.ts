@@ -3,6 +3,11 @@ import { PLATFORMS, type Platform, type TargetAccount } from '@/types/accounts';
 import { youtubeTitleError } from '@/lib/youtube';
 import { TIKTOK_PRIVACY_LEVELS, tiktokSettingsError, type TikTokPostSettings } from '@/lib/tiktok';
 import type { MediaThumbnail } from '@/lib/publish/types';
+import { mediaAssets, type MediaAsset } from '@/lib/mediaAssets';
+import { cleanupCloudinaryMedia } from '@/lib/services/cloudinaryService';
+import { createLogger } from '@/lib/logger';
+
+const logger = createLogger('Drafts');
 
 export interface DraftMedia {
   publicUrl: string;
@@ -213,8 +218,15 @@ async function writeDraft(userId: number, input: DraftInput, id?: number): Promi
   const { text, target_accounts = [], media = null, youtube_title = '', tiktok_settings } = input;
   const values = [text, serializeTargets(target_accounts), media === null ? null : JSON.stringify(media), youtube_title.trim()];
   const client = await pool.connect();
+  // Files of the media the update replaces; released once the new media is committed
+  let previousMedia: MediaAsset[] = [];
+  let draft: Draft;
   try {
     await client.query('BEGIN');
+    if (id !== undefined) {
+      const previous = await client.query('SELECT media FROM drafts WHERE id = $1 AND user_id = $2 FOR UPDATE', [id, userId]);
+      previousMedia = mediaAssets(previous.rows[0]?.media);
+    }
     const { rows } = id === undefined
       ? await client.query(
           `INSERT INTO drafts (text, target_accounts, media, youtube_title, user_id)
@@ -248,15 +260,18 @@ async function writeDraft(userId: number, input: DraftInput, id?: number): Promi
       }
     }
 
-    const draft = await client.query(`SELECT ${DRAFT_COLUMNS} FROM ${DRAFT_FROM} WHERE d.id = $1`, [draftId]);
+    const written = await client.query(`SELECT ${DRAFT_COLUMNS} FROM ${DRAFT_FROM} WHERE d.id = $1`, [draftId]);
     await client.query('COMMIT');
-    return mapRowToDraft(draft.rows[0]);
+    draft = mapRowToDraft(written.rows[0]);
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
     throw error;
   } finally {
     client.release();
   }
+  // Media kept by the update is still referenced by the draft, so only dropped files go
+  await releaseDraftMedia(previousMedia);
+  return draft;
 }
 
 /** Returns true if a draft was deleted, false if not found / not owned. */
@@ -266,6 +281,42 @@ export async function deleteDraft(userId: number, id: number): Promise<boolean> 
 
 /** Deletes the given drafts of this user; ids of other users' drafts are ignored. Returns the count deleted. */
 export async function deleteDrafts(userId: number, ids: number[]): Promise<number> {
-  const result = await pool.query('DELETE FROM drafts WHERE id = ANY($1::int[]) AND user_id = $2', [ids, userId]);
+  const result = await pool.query(
+    'DELETE FROM drafts WHERE id = ANY($1::int[]) AND user_id = $2 RETURNING media',
+    [ids, userId]
+  );
+  await releaseDraftMedia(result.rows.flatMap((row: { media: unknown }) => mediaAssets(row.media)));
   return result.rowCount ?? 0;
+}
+
+// The same file can be on several rows: a draft saved again from the composer, or a
+// publish history entry, whose retry downloads it from Cloudinary again.
+const REFERENCED_MEDIA_SQL = `
+  SELECT p.id FROM unnest($1::text[]) AS p(id)
+  WHERE EXISTS (SELECT 1 FROM drafts WHERE
+          media @> jsonb_build_array(jsonb_build_object('publicId', p.id)) OR
+          media @> jsonb_build_array(jsonb_build_object('thumbnail', jsonb_build_object('publicId', p.id))))
+     OR EXISTS (SELECT 1 FROM publish_history WHERE
+          media @> jsonb_build_array(jsonb_build_object('publicId', p.id)) OR
+          media @> jsonb_build_array(jsonb_build_object('thumbnail', jsonb_build_object('publicId', p.id))))`;
+
+/**
+ * Deletes from Cloudinary the files a draft dropped (removed, replaced or deleted
+ * with it), unless a draft or publish history entry still uses them. Best effort:
+ * runs after the draft write has committed and never fails it.
+ */
+export async function releaseDraftMedia(assets: MediaAsset[]): Promise<void> {
+  if (assets.length === 0) return;
+  try {
+    const { rows } = await pool.query<{ id: string }>(REFERENCED_MEDIA_SQL, [assets.map((asset) => asset.publicId)]);
+    const referenced = new Set(rows.map((row) => row.id));
+    await cleanupCloudinaryMedia(
+      assets.filter(
+        (asset, index) =>
+          !referenced.has(asset.publicId) && assets.findIndex((a) => a.publicId === asset.publicId) === index
+      )
+    );
+  } catch (error) {
+    logger.error('Failed to release draft media', { error: error instanceof Error ? error.message : String(error) });
+  }
 }

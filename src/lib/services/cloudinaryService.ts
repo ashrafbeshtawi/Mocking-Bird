@@ -1,6 +1,7 @@
 import { v2 as cloudinary } from 'cloudinary';
 import { MediaFile } from '@/types/interfaces';
 import { createLogger } from '@/lib/logger';
+import { mediaAssets, type MediaAsset } from '@/lib/mediaAssets';
 
 const logger = createLogger('CloudinaryService');
 
@@ -161,7 +162,8 @@ export async function uploadMultipleToCloudinary(
 /**
  * Ingests remote media URLs into Cloudinary so drafts reference assets we control
  * instead of external links that may expire. Cloudinary fetches the URLs itself.
- * Throws on the first URL that cannot be ingested, naming it in the message.
+ * If any URL cannot be ingested, the ones that were are deleted again and the first
+ * failure is thrown, naming its URL.
  */
 export async function ingestRemoteMedia(urls: string[]): Promise<
   Array<UploadedMedia & { originalFilename: string }>
@@ -170,7 +172,7 @@ export async function ingestRemoteMedia(urls: string[]): Promise<
 
   logger.info('Ingesting remote media into Cloudinary', { count: urls.length });
 
-  return Promise.all(
+  return allOrCleanup(
     urls.map(async (url) => {
       try {
         const result = await cloudinary.uploader.upload(url, {
@@ -192,8 +194,25 @@ export async function ingestRemoteMedia(urls: string[]): Promise<
         logger.error('Remote media ingestion failed', { url, error: message });
         throw new Error(`Could not ingest media URL "${url}": ${message}`);
       }
-    })
+    }),
+    (media) => mediaAssets([media])
   );
+}
+
+/**
+ * Like Promise.all, but waits for every upload to settle. If any failed, the files
+ * the others stored are deleted (best effort) and the first failure is thrown, so a
+ * failed batch leaves nothing behind in Cloudinary.
+ */
+async function allOrCleanup<T>(uploads: Promise<T>[], assetsOf: (value: T) => MediaAsset[]): Promise<T[]> {
+  const results = await Promise.allSettled(uploads);
+  const failure = results.find((result): result is PromiseRejectedResult => result.status === 'rejected');
+  const values = results.flatMap((result) => (result.status === 'fulfilled' ? [result.value] : []));
+  if (failure) {
+    await cleanupCloudinaryMedia(values.flatMap(assetsOf));
+    throw failure.reason;
+  }
+  return values;
 }
 
 // Same rules as thumbnails uploaded in the composer: JPEG, at most YouTube's 2 MB.
@@ -231,19 +250,34 @@ export async function ingestRemoteThumbnail(url: string): Promise<{ publicId: st
 /** A remote media URL, or a video URL with the URL of its custom thumbnail. */
 export type RemoteMediaItem = string | { url: string; thumbnail_url?: string };
 
-/** Ingests remote media and, for videos given one, their custom thumbnails. */
+type IngestedDraftMedia = UploadedMedia & {
+  originalFilename: string;
+  thumbnail?: { publicId: string; publicUrl: string };
+};
+
+/**
+ * Ingests remote media and, for videos given one, their custom thumbnails.
+ * All or nothing: on any failure every file stored so far is deleted again.
+ */
 export async function ingestRemoteDraftMedia(items: RemoteMediaItem[]) {
   const media = await ingestRemoteMedia(items.map((item) => (typeof item === 'string' ? item : item.url)));
-  return Promise.all(
-    media.map(async (m, i) => {
-      const item = items[i];
-      if (typeof item === 'string' || !item.thumbnail_url) return m;
-      if (m.resourceType !== 'video') {
-        throw new Error(`thumbnail_url only applies to videos, and "${item.url}" is an image.`);
-      }
-      return { ...m, thumbnail: await ingestRemoteThumbnail(item.thumbnail_url) };
-    })
-  );
+  try {
+    return await allOrCleanup(
+      media.map(async (m, i): Promise<IngestedDraftMedia> => {
+        const item = items[i];
+        if (typeof item === 'string' || !item.thumbnail_url) return m;
+        if (m.resourceType !== 'video') {
+          throw new Error(`thumbnail_url only applies to videos, and "${item.url}" is an image.`);
+        }
+        return { ...m, thumbnail: await ingestRemoteThumbnail(item.thumbnail_url) };
+      }),
+      // The media themselves are deleted below; only the new thumbnails are left here
+      (m) => mediaAssets([m]).filter((asset) => asset.publicId !== m.publicId)
+    );
+  } catch (error) {
+    await cleanupCloudinaryMedia(mediaAssets(media));
+    throw error;
+  }
 }
 
 /**
