@@ -23,6 +23,14 @@ export const hasAccountAccess = (access: McpAccountAccess, platform: Platform, a
   access.includes(ALL_ACCOUNTS) || access.includes(platform) || access.includes(formatAccountGrant(platform, accountId));
 
 /**
+ * SQL condition: the grants in the text[] parameter `grants` cover `target`, a jsonb
+ * { platform, account_id } element. SQL counterpart of hasAccountAccess.
+ */
+export const buildGrantCoverageSql = (target: string, grants: string): string =>
+  `('${ALL_ACCOUNTS}' = ANY(${grants}) OR ${target}->>'platform' = ANY(${grants})
+    OR (${target}->>'platform') || ':' || (${target}->>'account_id') = ANY(${grants}))`;
+
+/**
  * Validate an untrusted account_access payload against the user's connected accounts.
  * Single-account grants in currentAccess may name disconnected accounts; they apply again once reconnected.
  * Returns an error message, or null if valid.

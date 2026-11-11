@@ -50,7 +50,7 @@ import { EMPTY_TIKTOK_SETTINGS, type TikTokPostSettings } from '@/lib/tiktok';
 import { useDrafts, mapDraftMediaToUploaded, type Draft } from '@/hooks/useDrafts';
 import { useConnectedAccounts } from '@/hooks/useConnectedAccounts';
 import { usePublish } from '@/hooks/usePublish';
-import { PLATFORMS, type InstagramSelection, type Platform } from '@/types/accounts';
+import { getInstagramSelection, PLATFORMS, type InstagramSelection, type Platform } from '@/types/accounts';
 
 const SEARCH_DEBOUNCE_MS = 300;
 
@@ -65,7 +65,7 @@ export default function DraftsPage() {
   const platform: Platform | 'all' = platformParam && PLATFORMS.includes(platformParam) ? platformParam : 'all';
 
   const { drafts, total, totalPages, loading, error, refetch, deleteDrafts } = useDrafts({ page, query, platform });
-  const { facebookPages, xAccounts, instagramAccounts, telegramChannels, linkedinAccounts, youtubeChannels, tiktokAccounts, normalizedAccounts } = useConnectedAccounts();
+  const { facebookPages, xAccounts, instagramAccounts, telegramChannels, linkedinAccounts, youtubeChannels, tiktokAccounts, normalizedAccounts, loading: accountsLoading } = useConnectedAccounts();
   const { publish, isPublishing, statusMessage, error: publishError, success: publishSuccess, results: publishResults, clearStatus } =
     usePublish();
 
@@ -163,6 +163,14 @@ export default function DraftsPage() {
   };
   const getPreviewTargetIdsOn = (platform: Platform) => getPreviewTargetsOn(platform).map((account) => account.id);
   const getAccountNamesFor = (platform: Platform) => getPreviewTargetsOn(platform).map((account) => account.name);
+  /** The preview draft's target account ids on this platform that are no longer connected. */
+  const getDisconnectedPreviewTargetIdsOn = (platform: Platform) => {
+    if (accountsLoading) return [];
+    const connectedIds = getConnectedAccountsOn(platform).map((account) => account.id);
+    return (previewDraft?.target_accounts ?? [])
+      .filter((t) => t.platform === platform && !connectedIds.includes(t.account_id))
+      .map((t) => t.account_id);
+  };
 
   const previewHasMedia = (previewDraft?.media?.length ?? 0) > 0;
   const previewKinds = previewDraft ? draftKinds(previewDraft) : [];
@@ -194,10 +202,11 @@ export default function DraftsPage() {
     if (!previewDraft) return;
     const media = mapDraftMediaToUploaded(previewDraft.media);
 
-    const instagramTargets = getPreviewTargetIdsOn('instagram');
     const instagram: Record<string, InstagramSelection> = {};
     instagramAccounts.forEach((a) => {
-      instagram[a.id] = { publish: instagramTargets.includes(a.id), story: false };
+      instagram[a.id] = getInstagramSelection(
+        previewDraft.target_accounts.find((t) => t.platform === 'instagram' && t.account_id === a.id)
+      );
     });
 
     const ok = await publish({
@@ -624,6 +633,9 @@ export default function DraftsPage() {
                           ? names.join(', ')
                           : 'no connected accounts'}
                   </Typography>
+                  {getDisconnectedPreviewTargetIdsOn(platform).map((accountId) => (
+                    <Chip key={accountId} disabled size="small" label={`${accountId} (disconnected)`} />
+                  ))}
                 </Box>
               );
             })}

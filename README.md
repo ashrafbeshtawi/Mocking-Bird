@@ -117,7 +117,7 @@ Mockingbird exposes an MCP (Model Context Protocol) endpoint at `/api/mcp` so AI
 - `list_drafts` / `search_drafts` / `add_draft` / `edit_draft` / `delete_draft` — manage post drafts (text, target accounts, optional media URLs); listing and search are paginated (`limit`/`offset`, response includes `total`) and take `last_days` to return only drafts updated in the last N days
 - `get_publish_history` — what was posted where and whether it succeeded, newest first; paginated like the draft listing, `last_days` limits it to the last N days (report texts omitted for efficiency)
 
-Create a long-lived bearer token per client on the **MCP Access** page (shown once; each can be edited or revoked anytime). A token only uses the accounts it is given access to: **All accounts**, **All Facebook** (or any other platform, including accounts connected there later), or single accounts, in any mix. Accounts outside a token's access are hidden from it and cannot be draft targets. Then connect a client:
+Create a long-lived bearer token per client on the **MCP Access** page (shown once; each can be edited or revoked anytime). A token only uses the accounts it is given access to: **All accounts**, **All Facebook** (or any other platform, including accounts connected there later), or single accounts, in any mix. Accounts outside a token's access are hidden from it and cannot be draft targets. A token sees, edits and deletes only drafts whose target accounts it may all use, and sees only publish history entries that went to at least one of its accounts. Then connect a client:
 
 ```bash
 claude mcp add --transport http mockingbird https://your-host/api/mcp \

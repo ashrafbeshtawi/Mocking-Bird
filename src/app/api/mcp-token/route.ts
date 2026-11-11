@@ -34,7 +34,7 @@ const readTokenFields = async (
   return { title, accountAccess: body.account_access as McpAccountAccess };
 };
 
-// GET: The user's MCP tokens (id, title, account access, creation date).
+// GET: The user's MCP tokens (id, title, account access, creation date) and the connected accounts access can name.
 // Never returns the tokens themselves — only their hashes are stored, so they cannot be retrieved again.
 export async function GET() {
   const userId = await getUserId();
@@ -43,8 +43,8 @@ export async function GET() {
   }
 
   try {
-    const tokens = await listMcpTokens(userId);
-    return NextResponse.json({ success: true, tokens });
+    const [tokens, accounts] = await Promise.all([listMcpTokens(userId), listConnectedAccounts(userId)]);
+    return NextResponse.json({ success: true, tokens, accounts });
   } catch (error) {
     logger.error('GET failed', error);
     return NextResponse.json({ error: 'Internal Server Error.' }, { status: 500 });
