@@ -16,6 +16,9 @@ export interface DraftMedia {
   thumbnail?: MediaThumbnail;
 }
 
+/** Most media items a draft may hold: the largest any platform accepts (Instagram carousels). */
+export const MAX_DRAFT_MEDIA = 10;
+
 /** Whether an untrusted value is a thumbnail with publicId and publicUrl strings. */
 const isValidThumbnail = (thumbnail: unknown): boolean => {
   const t = thumbnail as Partial<MediaThumbnail> | null;
@@ -115,6 +118,9 @@ export function validateDraftInput(input: Record<string, unknown>): string | nul
       media.some((m) => typeof (m as DraftMedia)?.publicUrl !== 'string' || !(m as DraftMedia).publicUrl)
     ) {
       return 'media must be an array of objects with a publicUrl string.';
+    }
+    if (media.length > MAX_DRAFT_MEDIA) {
+      return `A draft can hold at most ${MAX_DRAFT_MEDIA} media items.`;
     }
     // The thumbnail is optional: only one that is present has to be well-formed
     if (media.some((m) => (m as DraftMedia).thumbnail !== undefined && !isValidThumbnail((m as DraftMedia).thumbnail))) {

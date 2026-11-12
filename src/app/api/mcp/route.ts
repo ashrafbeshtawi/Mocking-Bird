@@ -14,6 +14,7 @@ import {
   getPlatformsOf,
   updateDraft,
   validateDraftInput,
+  MAX_DRAFT_MEDIA,
   type Draft,
   type DraftMedia,
 } from '@/lib/drafts';
@@ -36,8 +37,9 @@ const mediaItems = z
       }),
     ])
   )
+  .max(MAX_DRAFT_MEDIA)
   .optional()
-  .describe('Optional list of media to attach to the draft: a URL, or { url, thumbnail_url } to give a video a custom thumbnail');
+  .describe(`Optional list of up to ${MAX_DRAFT_MEDIA} media to attach to the draft: a URL, or { url, thumbnail_url } to give a video a custom thumbnail`);
 
 const urlOf = (item: RemoteMediaItem) => (typeof item === 'string' ? item : item.url);
 const targetAccounts = z
