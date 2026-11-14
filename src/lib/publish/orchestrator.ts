@@ -11,6 +11,7 @@ import { EMPTY_TIKTOK_SETTINGS, type TikTokPostSettings } from '@/lib/tiktok';
 import { ReportLogger, CloudinaryMediaInfo } from './types';
 import type { ContentSelection } from './contentRules';
 import type { Platform } from '@/types/accounts';
+import { createLogger } from '@/lib/logger';
 import {
   mapFacebookSuccess,
   mapFacebookFailed,
@@ -28,6 +29,8 @@ import {
   mapTikTokFailed,
   formatFailedDetails
 } from './mappers/resultMappers';
+
+const logger = createLogger('PublishOrchestrator');
 
 export interface ProgressUpdate {
   platform: string;
@@ -497,6 +500,16 @@ export async function executePublishWithProgress(
   // Track completed count for progress updates
   let completedCount = 0;
 
+  // A failing progress listener (e.g. the browser closed the SSE stream) must
+  // never abort publishing: the posts and their history row matter more.
+  const emit = async (send: () => void | Promise<void>) => {
+    try {
+      await send();
+    } catch (err) {
+      logger.warn('Progress callback failed, publishing continues', (err as Error).message);
+    }
+  };
+
   const updateAccountStatus = async (accountId: string, status: AccountProgress['status'], error?: string) => {
     const account = accountsProgress.find(a => a.accountId === accountId);
     if (account) {
@@ -509,27 +522,27 @@ export async function executePublishWithProgress(
 
       // Emit account progress
       if (onAccountProgress) {
-        await onAccountProgress([...accountsProgress]);
+        await emit(() => onAccountProgress([...accountsProgress]));
       }
 
       // Emit overall progress (only for starting/completed/failed, not pending)
       if (onProgress && status !== 'pending') {
         const action = status === 'publishing' ? 'starting' : status;
-        await onProgress({
+        await emit(() => onProgress({
           platform: account.platform,
           action,
           accountName: account.accountName,
           accountId: account.accountId,
           current: completedCount,
           total: totalAccounts
-        });
+        }));
       }
     }
   };
 
   // Send initial account list
   if (onAccountProgress) {
-    await onAccountProgress([...accountsProgress]);
+    await emit(() => onAccountProgress([...accountsProgress]));
   }
 
   const facebookPublisher = new FacebookPublisher(pool);
