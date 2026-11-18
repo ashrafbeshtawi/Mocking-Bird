@@ -45,7 +45,7 @@ describe('YouTubePublisher', () => {
 
   beforeEach(() => {
     query = jest.fn().mockResolvedValue({ rows: [] });
-    publisher = new YouTubePublisher({ query } as unknown as Pool);
+    publisher = new YouTubePublisher({ query } as unknown as Pool, [0, 0, 0]);
     fetchMock = jest.spyOn(global, 'fetch').mockImplementation(async (url) => {
       const u = String(url);
       if (u === video.publicUrl) return new Response(new Uint8Array([1, 2, 3]), { headers: { 'content-type': 'video/mp4' } });
@@ -144,6 +144,50 @@ describe('YouTubePublisher', () => {
       expect(failed).toEqual([]);
       expect(successful[0].post_id).toBe('vid-42');
       expect(successful[0].warning).toMatch(/thumbnail was not set: This channel cannot use custom thumbnails yet/);
+      // Verifying the channel is a manual step, so retrying cannot help
+      expect(fetchMock.mock.calls.filter(([url]) => String(url).includes('/thumbnails/set'))).toHaveLength(1);
+    });
+
+    it('retries a thumbnail YouTube rejects while the video is still processing', async () => {
+      jest.spyOn(console, 'warn').mockImplementation(() => {});
+      const thumbnailMock = fetchMock.getMockImplementation()!;
+      let attempts = 0;
+      fetchMock.mockImplementation(async (url, init) => {
+        if (!String(url).includes('/thumbnails/set')) return thumbnailMock(url, init);
+        attempts++;
+        return attempts === 1 ? new Response('{}', { status: 503 }) : json({});
+      });
+
+      const { successful } = await publisher.publishToAccounts(
+        { title: '', text: '', cloudinaryMedia: [withThumbnail] },
+        [channel(3_600_000)]
+      );
+
+      expect(attempts).toBe(2);
+      expect(successful).toEqual([{ platform: 'youtube', account_id: 'UC123', name: 'Ada Videos', post_id: 'vid-42' }]);
+    });
+
+    it('warns with YouTube\'s reason when every attempt fails', async () => {
+      jest.spyOn(console, 'warn').mockImplementation(() => {});
+      const thumbnailMock = fetchMock.getMockImplementation()!;
+      fetchMock.mockImplementation(async (url, init) =>
+        String(url).includes('/thumbnails/set')
+          ? new Response(JSON.stringify({ error: { message: 'Backend Error', errors: [{ reason: 'backendError' }] } }), {
+              status: 500,
+            })
+          : thumbnailMock(url, init)
+      );
+
+      const { successful, failed } = await publisher.publishToAccounts(
+        { title: '', text: '', cloudinaryMedia: [withThumbnail] },
+        [channel(3_600_000)]
+      );
+
+      expect(failed).toEqual([]);
+      expect(fetchMock.mock.calls.filter(([url]) => String(url).includes('/thumbnails/set'))).toHaveLength(4);
+      expect(successful[0].warning).toBe(
+        'The video was uploaded, but its thumbnail was not set: YouTube could not set the thumbnail (HTTP 500, backendError): Backend Error. Set it by hand in YouTube Studio.'
+      );
     });
   });
 });

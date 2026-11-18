@@ -2,6 +2,7 @@ import { Pool } from 'pg';
 import { createLogger } from '@/lib/logger';
 import { CloudinaryMediaInfo } from '@/lib/publish/types';
 import { GOOGLE_REVOKE_URL, GOOGLE_TOKEN_URL, YOUTUBE_TITLE_MAX } from '@/lib/youtube';
+import { THUMBNAIL_RETRY_DELAYS_MS, ThumbnailError, isRetryableStatus, retryThumbnail } from './thumbnailRetry';
 
 const logger = createLogger('YouTubePublisher');
 
@@ -84,7 +85,7 @@ export async function revokeYouTubeTokens(refreshTokens: string[]): Promise<void
 }
 
 export class YouTubePublisher {
-  constructor(private pool: Pool) {}
+  constructor(private pool: Pool, private thumbnailRetryDelaysMs = THUMBNAIL_RETRY_DELAYS_MS) {}
 
   async getAccountTokens(userId: string, channelIds: string[]): Promise<YouTubeChannelToken[]> {
     if (channelIds.length === 0) return [];
@@ -169,19 +170,35 @@ export class YouTubePublisher {
     const { id } = (await upload.json()) as { id: string };
     if (!video.thumbnail) return { videoId: id };
 
+    const thumbnailUrl = video.thumbnail.publicUrl;
     try {
-      await this.setThumbnail(accessToken, id, video.thumbnail.publicUrl);
+      await retryThumbnail(
+        () => this.setThumbnail(accessToken, id, thumbnailUrl),
+        this.thumbnailRetryDelaysMs,
+        (attempt, error) =>
+          logger.warn('YouTube thumbnail attempt failed, retrying', {
+            channel_id: token.channel_id,
+            video_id: id,
+            attempt,
+            error: error instanceof Error ? error.message : String(error),
+          })
+      );
       return { videoId: id };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       logger.warn('YouTube thumbnail was not set', { channel_id: token.channel_id, video_id: id, error: message });
-      return { videoId: id, warning: `The video was uploaded, but its thumbnail was not set: ${message}` };
+      return {
+        videoId: id,
+        warning: `The video was uploaded, but its thumbnail was not set: ${message.replace(/\.$/, '')}. Set it by hand in YouTube Studio.`,
+      };
     }
   }
 
   private async setThumbnail(accessToken: string, videoId: string, thumbnailUrl: string): Promise<void> {
     const image = await fetch(thumbnailUrl);
-    if (!image.ok) throw new Error(`Could not download the thumbnail (HTTP ${image.status})`);
+    if (!image.ok) {
+      throw new ThumbnailError(`Could not download the thumbnail (HTTP ${image.status})`, isRetryableStatus(image.status));
+    }
 
     const response = await fetch(`${THUMBNAIL_URL}?videoId=${encodeURIComponent(videoId)}&uploadType=media`, {
       method: 'POST',
@@ -189,9 +206,15 @@ export class YouTubePublisher {
       body: await image.arrayBuffer(),
     });
     if (response.status === 403) {
-      throw new Error('This channel cannot use custom thumbnails yet. Verify the channel in YouTube Studio to unlock them.');
+      throw new ThumbnailError(
+        'This channel cannot use custom thumbnails yet. Verify the channel in YouTube Studio to unlock them.',
+        false
+      );
     }
-    if (!response.ok) throw await this.apiError(response, 'set the thumbnail');
+    if (!response.ok) {
+      const error = await this.apiError(response, 'set the thumbnail');
+      throw new ThumbnailError(error.message, isRetryableStatus(response.status));
+    }
   }
 
   /** The channel's access token, refreshed and stored first when it is about to expire. */
@@ -223,11 +246,17 @@ export class YouTubePublisher {
   }
 
   private async apiError(response: Response, action: string): Promise<Error> {
-    const body = (await response.json().catch(() => null)) as { error?: { message?: string } } | null;
+    const body = (await response.json().catch(() => null)) as {
+      error?: { message?: string; errors?: { reason?: string }[] };
+    } | null;
     if (response.status === 401) {
       return new Error('YouTube rejected the access token. Reconnect the channel on the dashboard.');
     }
     const message = body?.error?.message;
-    return new Error(`YouTube could not ${action} (HTTP ${response.status})${message ? `: ${message}` : ''}`);
+    // The reason (e.g. mediaBodyTooLarge, uploadRateLimitExceeded) says more than the status alone.
+    const reason = body?.error?.errors?.[0]?.reason;
+    return new Error(
+      `YouTube could not ${action} (HTTP ${response.status}${reason ? `, ${reason}` : ''})${message ? `: ${message}` : ''}`
+    );
   }
 }

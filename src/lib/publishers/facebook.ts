@@ -4,6 +4,7 @@ import { Pool } from 'pg';
 import FormData from 'form-data';
 import { MediaFile } from '@/types/interfaces';
 import { createLogger } from '@/lib/logger';
+import { THUMBNAIL_RETRY_DELAYS_MS, ThumbnailError, isRetryableStatus, retryThumbnail } from './thumbnailRetry';
 
 const logger = createLogger('FacebookPublisher');
 
@@ -37,7 +38,7 @@ export interface FacebookPublishOptions {
 }
 
 export class FacebookPublisher {
-  constructor(private pool: Pool) {}
+  constructor(private pool: Pool, private thumbnailRetryDelaysMs = THUMBNAIL_RETRY_DELAYS_MS) {}
 
   async getPageTokens(userId: string, pageIds: string[]): Promise<FacebookPageToken[]> {
     logger.info('Starting Facebook page token retrieval', { userId, pageCount: pageIds.length });
@@ -146,19 +147,38 @@ export class FacebookPublisher {
     const videoId = await this.uploadMediaToFacebook(pageId, accessToken, video, true, description);
     if (!video.thumbnailUrl) return { videoId };
 
-    try {
-      const image = await axios.get<ArrayBuffer>(video.thumbnailUrl, { responseType: 'arraybuffer' });
-      const formData = new FormData();
-      formData.append('source', Buffer.from(image.data), { filename: 'thumbnail.jpg', contentType: 'image/jpeg' });
-      formData.append('is_preferred', 'true');
-      await axios.post(`https://graph.facebook.com/v19.0/${videoId}/thumbnails`, formData, {
-        headers: { ...formData.getHeaders(), Authorization: `Bearer ${accessToken}` },
-      });
-      return { videoId };
-    } catch (error) {
-      const message = axios.isAxiosError(error)
+    const thumbnailUrl = video.thumbnailUrl;
+    const errorMessage = (error: unknown) =>
+      axios.isAxiosError(error)
         ? error.response?.data?.error?.message || error.message
         : error instanceof Error ? error.message : 'Unknown error';
+    try {
+      await retryThumbnail(
+        async () => {
+          try {
+            const image = await axios.get<ArrayBuffer>(thumbnailUrl, { responseType: 'arraybuffer' });
+            const formData = new FormData();
+            formData.append('source', Buffer.from(image.data), { filename: 'thumbnail.jpg', contentType: 'image/jpeg' });
+            formData.append('is_preferred', 'true');
+            await axios.post(`https://graph.facebook.com/v19.0/${videoId}/thumbnails`, formData, {
+              headers: { ...formData.getHeaders(), Authorization: `Bearer ${accessToken}` },
+            });
+          } catch (error) {
+            const status = axios.isAxiosError(error) ? error.response?.status : undefined;
+            // No response at all is a network failure, worth another try
+            throw new ThumbnailError(errorMessage(error), status === undefined || isRetryableStatus(status));
+          }
+        },
+        this.thumbnailRetryDelaysMs,
+        (attempt, error) =>
+          logger.warn(`Facebook thumbnail attempt ${attempt} failed for video ${videoId}, retrying`, {
+            pageId,
+            error: errorMessage(error),
+          })
+      );
+      return { videoId };
+    } catch (error) {
+      const message = errorMessage(error);
       logger.warn(`Facebook thumbnail was not set for video ${videoId}`, { pageId, error: message });
       return { videoId, warning: `${video.filename} was published, but its thumbnail was not set: ${message}` };
     }

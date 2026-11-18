@@ -17,7 +17,7 @@ const video: MediaFile = {
 };
 
 describe('FacebookPublisher video thumbnails', () => {
-  const publisher = new FacebookPublisher({} as Pool);
+  const publisher = new FacebookPublisher({} as Pool, [0, 0, 0]);
 
   beforeEach(() => {
     jest.resetAllMocks();
@@ -55,6 +55,19 @@ describe('FacebookPublisher video thumbnails', () => {
 
     expect(failed).toEqual([]);
     expect(successful[0].warning).toBe('launch.mp4 was published, but its thumbnail was not set: Permissions error');
+  });
+
+  it('retries a thumbnail that failed once', async () => {
+    let thumbnailAttempts = 0;
+    mockedAxios.post.mockImplementation(async (url: string) => {
+      if (url.endsWith('/thumbnails') && ++thumbnailAttempts === 1) throw new Error('socket hang up');
+      return { data: { id: 'v1' } };
+    });
+
+    const { successful } = await publisher.publishToPages({ text: 'Launch', files: [video] }, [page]);
+
+    expect(thumbnailAttempts).toBe(2);
+    expect(successful[0].warning).toBeUndefined();
   });
 
   it('does not touch thumbnails for a video without one', async () => {

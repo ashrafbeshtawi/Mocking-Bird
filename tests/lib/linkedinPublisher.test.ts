@@ -21,7 +21,7 @@ const json = (body: object, init: ResponseInit = {}) =>
   new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' }, ...init });
 
 describe('LinkedInPublisher', () => {
-  const publisher = new LinkedInPublisher({} as Pool);
+  const publisher = new LinkedInPublisher({} as Pool, [0, 0, 0]);
   let fetchMock: jest.SpyInstance;
 
   beforeEach(() => {
@@ -173,6 +173,17 @@ describe('LinkedInPublisher', () => {
       expect(failed).toEqual([]);
       expect(successful[0].post_id).toBe('urn:li:share:4');
       expect(successful[0].warning).toMatch(/thumbnail was not set: LinkedIn could not upload the thumbnail \(HTTP 500\)/);
+      expect(fetchMock.mock.calls.filter(([u]) => u === 'https://upload/thumb')).toHaveLength(4);
+    });
+
+    it('does not retry a thumbnail LinkedIn rejects as invalid', async () => {
+      jest.spyOn(console, 'warn').mockImplementation(() => {});
+      mockVideoFlow(400);
+
+      const { successful } = await publisher.publishToAccounts({ text: 'clip', cloudinaryMedia: [video] }, [account]);
+
+      expect(successful[0].warning).toMatch(/HTTP 400/);
+      expect(fetchMock.mock.calls.filter(([u]) => u === 'https://upload/thumb')).toHaveLength(1);
     });
   });
 

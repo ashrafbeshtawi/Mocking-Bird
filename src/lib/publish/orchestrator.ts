@@ -384,6 +384,9 @@ export async function executePublish(
   ];
 
   reportLogger.add(`Publishing complete. Successful posts: ${allSuccessful.length}, Failed posts: ${allFailed.length}`);
+  for (const item of allSuccessful) {
+    if (item.warning) reportLogger.add(`WARN: ${item.platform}: ${item.warning}`);
+  }
 
   if (allFailed.length > 0) {
     reportLogger.add(`Failed posts details: ${formatFailedDetails(allFailed)}`);
@@ -881,6 +884,9 @@ export async function executePublishWithProgress(
   await Promise.all(publishPromises);
 
   reportLogger.add(`Publishing complete. Successful posts: ${allSuccessful.length}, Failed posts: ${allFailed.length}`);
+  for (const item of allSuccessful) {
+    if (item.warning) reportLogger.add(`WARN: ${item.platform}: ${item.warning}`);
+  }
 
   if (allFailed.length > 0) {
     reportLogger.add(`Failed posts details: ${formatFailedDetails(allFailed)}`);
