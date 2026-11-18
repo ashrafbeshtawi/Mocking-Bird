@@ -1,6 +1,7 @@
 import { Pool } from 'pg';
 import { createLogger } from '@/lib/logger';
 import { CloudinaryMediaInfo } from '@/lib/publish/types';
+import { THUMBNAIL_RETRY_DELAYS_MS, ThumbnailError, isRetryableStatus, retryThumbnail } from './thumbnailRetry';
 
 const logger = createLogger('LinkedInPublisher');
 
@@ -48,7 +49,7 @@ export function escapeCommentary(text: string): string {
 }
 
 export class LinkedInPublisher {
-  constructor(private pool: Pool) {}
+  constructor(private pool: Pool, private thumbnailRetryDelaysMs = THUMBNAIL_RETRY_DELAYS_MS) {}
 
   async getAccountTokens(userId: string, accountIds: string[]): Promise<LinkedInAccountToken[]> {
     if (accountIds.length === 0) return [];
@@ -202,7 +203,16 @@ export class LinkedInPublisher {
     let warning: string | undefined;
     if (thumbnailUrl) {
       try {
-        await this.uploadThumbnail(value.thumbnailUploadUrl, thumbnailUrl);
+        await retryThumbnail(
+          () => this.uploadThumbnail(value.thumbnailUploadUrl, thumbnailUrl),
+          this.thumbnailRetryDelaysMs,
+          (attempt, error) =>
+            logger.warn('LinkedIn thumbnail attempt failed, retrying', {
+              video: value.video,
+              attempt,
+              error: error instanceof Error ? error.message : String(error),
+            })
+        );
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown error';
         logger.warn('LinkedIn thumbnail was not uploaded', { video: value.video, error: message });
@@ -224,15 +234,20 @@ export class LinkedInPublisher {
   }
 
   private async uploadThumbnail(uploadUrl: string | undefined, thumbnailUrl: string): Promise<void> {
-    if (!uploadUrl) throw new Error('LinkedIn did not return a thumbnail upload URL.');
+    if (!uploadUrl) throw new ThumbnailError('LinkedIn did not return a thumbnail upload URL.', false);
     const image = await fetch(thumbnailUrl);
-    if (!image.ok) throw new Error(`Could not download the thumbnail (HTTP ${image.status})`);
+    if (!image.ok) {
+      throw new ThumbnailError(`Could not download the thumbnail (HTTP ${image.status})`, isRetryableStatus(image.status));
+    }
     const upload = await fetch(uploadUrl, {
       method: 'PUT',
       headers: { 'media-type-family': 'STILLIMAGE', 'Content-Type': 'application/octet-stream' },
       body: await image.arrayBuffer(),
     });
-    if (!upload.ok) throw await this.apiError(upload, 'upload the thumbnail');
+    if (!upload.ok) {
+      const error = await this.apiError(upload, 'upload the thumbnail');
+      throw new ThumbnailError(error.message, isRetryableStatus(upload.status));
+    }
   }
 
   private async waitForVideo(accessToken: string, videoUrn: string): Promise<void> {

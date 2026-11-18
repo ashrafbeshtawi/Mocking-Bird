@@ -25,6 +25,8 @@ export interface PublishDestination {
   success: boolean;
   /** Why publishing to this destination failed. */
   error?: string;
+  /** What went wrong after a successful publish, e.g. the thumbnail was not set. */
+  warning?: string;
 }
 
 /**
@@ -79,7 +81,8 @@ export function extractPublishDestinations(
       const destination: PublishDestination = {
         platform,
         account_id: accountId,
-        success: true
+        success: true,
+        ...(result.warning && { warning: result.warning }),
       };
 
       // Add post_type for Instagram

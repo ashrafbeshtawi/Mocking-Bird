@@ -65,6 +65,7 @@ interface PublishDestination {
   post_type?: 'feed' | 'story';
   success: boolean;
   error?: string;
+  warning?: string;
 }
 
 interface PublishHistoryItem {
@@ -343,7 +344,14 @@ function HistoryRow({
                           <PlatformIcon sx={{ fontSize: 18, color: platform?.color }} />
                           <Typography variant="body2">{label}</Typography>
                           {d.success ? (
-                            <CheckCircleIcon sx={{ fontSize: 16, color: '#22c55e' }} />
+                            <>
+                              <CheckCircleIcon sx={{ fontSize: 16, color: '#22c55e' }} />
+                              {d.warning && (
+                                <Typography variant="caption" color="warning.main">
+                                  {d.warning}
+                                </Typography>
+                              )}
+                            </>
                           ) : (
                             <>
                               <ErrorIcon sx={{ fontSize: 16, color: '#ef4444' }} />
