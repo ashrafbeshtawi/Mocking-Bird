@@ -12,7 +12,9 @@ const mockExecute = executePublish as jest.Mock;
 const mockTokens = fetchAllTokens as jest.Mock;
 const mockMedia = processCloudinaryMedia as jest.Mock;
 
-const image = { publicId: 'img1', publicUrl: 'https://res.cloudinary.com/x/img1.jpg', resourceType: 'image', format: 'jpg', originalFilename: 'a.jpg' };
+process.env.CLOUDINARY_URL = 'cloudinary://123456:secret@demo';
+
+const image = { publicId: 'img1', publicUrl: 'https://res.cloudinary.com/demo/image/upload/v1/img1.jpg', resourceType: 'image', format: 'jpg', originalFilename: 'a.jpg' };
 
 const entry = (overrides: Record<string, unknown> = {}) => ({
   post_text: 'hello world',
@@ -70,6 +72,17 @@ describe('retryFailedDestinations', () => {
     expect(params[3]).toBe(99);
     expect(query).toHaveBeenCalledWith('SELECT pg_advisory_unlock($1, $2)', [expect.any(Number), 99]);
     expect(client.release).toHaveBeenCalled();
+  });
+
+  it('refuses to retry stored media hosted outside our Cloudinary cloud', async () => {
+    const { pool, query } = fakePool(entry({ media: [{ ...image, publicUrl: 'http://dbgate:3000/' }] }));
+
+    const outcome = await retryFailedDestinations(pool, '7', 99);
+
+    expect(outcome).toEqual({ ok: false, status: 400, error: 'Media "a.jpg" must be uploaded to this app\'s Cloudinary account.' });
+    expect(mockMedia).not.toHaveBeenCalled();
+    expect(mockExecute).not.toHaveBeenCalled();
+    expect(updateCall(query)).toBeUndefined();
   });
 
   it('retries only the requested failed destination', async () => {

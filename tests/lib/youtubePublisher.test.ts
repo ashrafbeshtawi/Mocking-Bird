@@ -2,6 +2,8 @@ import type { Pool } from 'pg';
 import { YouTubePublisher, revokeYouTubeTokens, videoMetadata, type YouTubeChannelToken } from '@/lib/publishers/youtube';
 import type { CloudinaryMediaInfo } from '@/lib/publish/types';
 
+process.env.CLOUDINARY_URL = 'cloudinary://123456:secret@demo';
+
 const channel = (expiresInMs: number): YouTubeChannelToken => ({
   channel_id: 'UC123',
   title: 'Ada Videos',
@@ -12,7 +14,7 @@ const channel = (expiresInMs: number): YouTubeChannelToken => ({
 
 const video: CloudinaryMediaInfo = {
   publicId: 'vid1',
-  publicUrl: 'https://res.cloudinary.com/vid1.mp4',
+  publicUrl: 'https://res.cloudinary.com/demo/video/upload/v1/vid1.mp4',
   resourceType: 'video',
   format: 'mp4',
   originalFilename: 'launch-day.mp4',
@@ -105,7 +107,7 @@ describe('YouTubePublisher', () => {
   });
 
   describe('with a custom thumbnail', () => {
-    const thumbnailUrl = 'https://res.cloudinary.com/thumb1.jpg';
+    const thumbnailUrl = 'https://res.cloudinary.com/demo/image/upload/v1/thumb1.jpg';
     const withThumbnail = { ...video, thumbnail: { publicId: 'thumb1', publicUrl: thumbnailUrl } };
     const thumbnailCall = () => callTo('https://www.googleapis.com/upload/youtube/v3/thumbnails/set');
 

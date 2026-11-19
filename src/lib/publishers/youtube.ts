@@ -1,8 +1,9 @@
 import { Pool } from 'pg';
 import { createLogger } from '@/lib/logger';
-import { CloudinaryMediaInfo } from '@/lib/publish/types';
+import { CloudinaryMediaInfo, MediaThumbnail } from '@/lib/publish/types';
+import { fetchMedia } from '@/lib/publish/mediaUrl';
 import { GOOGLE_REVOKE_URL, GOOGLE_TOKEN_URL, YOUTUBE_TITLE_MAX } from '@/lib/youtube';
-import { THUMBNAIL_RETRY_DELAYS_MS, ThumbnailError, isRetryableStatus, retryThumbnail } from './thumbnailRetry';
+import { THUMBNAIL_RETRY_DELAYS_MS, ThumbnailError, fetchThumbnail, isRetryableStatus, retryThumbnail } from './thumbnailRetry';
 
 const logger = createLogger('YouTubePublisher');
 
@@ -139,10 +140,9 @@ export class YouTubePublisher {
     const accessToken = await this.freshAccessToken(token);
 
     // ponytail: buffers the whole video in memory; stream from Cloudinary if large videos exhaust RAM.
-    const download = await fetch(video.publicUrl);
-    if (!download.ok) throw new Error(`Could not download video ${video.publicUrl} (HTTP ${download.status})`);
-    const contentType = download.headers.get('content-type') ?? 'video/*';
-    const bytes = await download.arrayBuffer();
+    const download = await fetchMedia(video.publicUrl, 'video', { publicId: video.publicId });
+    const contentType = download.contentType ?? 'video/*';
+    const bytes = download.bytes;
 
     const session = await fetch(UPLOAD_URL, {
       method: 'POST',
@@ -170,10 +170,10 @@ export class YouTubePublisher {
     const { id } = (await upload.json()) as { id: string };
     if (!video.thumbnail) return { videoId: id };
 
-    const thumbnailUrl = video.thumbnail.publicUrl;
+    const thumbnail = video.thumbnail;
     try {
       await retryThumbnail(
-        () => this.setThumbnail(accessToken, id, thumbnailUrl),
+        () => this.setThumbnail(accessToken, id, thumbnail),
         this.thumbnailRetryDelaysMs,
         (attempt, error) =>
           logger.warn('YouTube thumbnail attempt failed, retrying', {
@@ -194,16 +194,13 @@ export class YouTubePublisher {
     }
   }
 
-  private async setThumbnail(accessToken: string, videoId: string, thumbnailUrl: string): Promise<void> {
-    const image = await fetch(thumbnailUrl);
-    if (!image.ok) {
-      throw new ThumbnailError(`Could not download the thumbnail (HTTP ${image.status})`, isRetryableStatus(image.status));
-    }
+  private async setThumbnail(accessToken: string, videoId: string, thumbnail: MediaThumbnail): Promise<void> {
+    const image = await fetchThumbnail(thumbnail);
 
     const response = await fetch(`${THUMBNAIL_URL}?videoId=${encodeURIComponent(videoId)}&uploadType=media`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'image/jpeg' },
-      body: await image.arrayBuffer(),
+      body: image,
     });
     if (response.status === 403) {
       throw new ThumbnailError(

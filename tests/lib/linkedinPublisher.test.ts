@@ -2,6 +2,8 @@ import type { Pool } from 'pg';
 import { LinkedInPublisher, escapeCommentary, type LinkedInAccountToken } from '@/lib/publishers/linkedin';
 import type { CloudinaryMediaInfo } from '@/lib/publish/types';
 
+process.env.CLOUDINARY_URL = 'cloudinary://123456:secret@demo';
+
 const account: LinkedInAccountToken = {
   linkedin_user_id: 'abc123',
   name: 'Ada Lovelace',
@@ -11,7 +13,7 @@ const account: LinkedInAccountToken = {
 
 const image = (n: number): CloudinaryMediaInfo => ({
   publicId: `img${n}`,
-  publicUrl: `https://res.cloudinary.com/img${n}.jpg`,
+  publicUrl: `https://res.cloudinary.com/demo/image/upload/v1/img${n}.jpg`,
   resourceType: 'image',
   format: 'jpg',
   originalFilename: `img${n}.jpg`,
@@ -126,7 +128,7 @@ describe('LinkedInPublisher', () => {
     const video: CloudinaryMediaInfo = {
       ...image(1),
       resourceType: 'video',
-      thumbnail: { publicId: 'thumb1', publicUrl: 'https://res.cloudinary.com/thumb1.jpg' },
+      thumbnail: { publicId: 'thumb1', publicUrl: 'https://res.cloudinary.com/demo/image/upload/v1/thumb1.jpg' },
     };
 
     const mockVideoFlow = (thumbnailStatus: number) =>
