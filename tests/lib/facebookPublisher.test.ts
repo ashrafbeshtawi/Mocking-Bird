@@ -13,8 +13,10 @@ const video: MediaFile = {
   buffer: Buffer.from('video'),
   filename: 'launch.mp4',
   mimetype: 'video/mp4',
-  thumbnailUrl: 'https://res.cloudinary.com/thumb1.jpg',
+  thumbnailUrl: 'https://res.cloudinary.com/demo/image/upload/v1/thumb1.jpg',
 };
+
+process.env.CLOUDINARY_URL = 'cloudinary://123456:secret@demo';
 
 describe('FacebookPublisher video thumbnails', () => {
   const publisher = new FacebookPublisher({} as Pool, [0, 0, 0]);
@@ -37,7 +39,10 @@ describe('FacebookPublisher video thumbnails', () => {
 
     expect(failed).toEqual([]);
     expect(successful).toEqual([{ platform: 'facebook', page_id: 'p1', result: { video_posts: ['v1'] } }]);
-    expect(mockedAxios.get).toHaveBeenCalledWith(video.thumbnailUrl, { responseType: 'arraybuffer' });
+    expect(mockedAxios.get).toHaveBeenCalledWith(
+      video.thumbnailUrl,
+      expect.objectContaining({ responseType: 'arraybuffer', maxContentLength: expect.any(Number), timeout: expect.any(Number) })
+    );
     const [, form, config] = postTo('/v1/thumbnails')!;
     expect(config).toMatchObject({ headers: { Authorization: 'Bearer page-token' } });
     const body = (form as { getBuffer: () => Buffer }).getBuffer().toString();
@@ -77,5 +82,17 @@ describe('FacebookPublisher video thumbnails', () => {
 
     expect(postTo('/thumbnails')).toBeUndefined();
     expect(mockedAxios.get).not.toHaveBeenCalled();
+  });
+
+  it('never downloads a thumbnail hosted outside our Cloudinary cloud', async () => {
+    mockedAxios.post.mockResolvedValue({ data: { id: 'v1' } });
+
+    const { successful } = await publisher.publishToPages(
+      { text: 'Launch', files: [{ ...video, thumbnailUrl: 'http://169.254.169.254/latest/meta-data' }] },
+      [page]
+    );
+
+    expect(mockedAxios.get).not.toHaveBeenCalled();
+    expect(successful[0].warning).toMatch(/thumbnail was not set/);
   });
 });

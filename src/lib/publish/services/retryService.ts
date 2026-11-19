@@ -1,6 +1,7 @@
 import type { Pool } from 'pg';
 import { executePublish } from '@/lib/publish/orchestrator';
 import { processCloudinaryMedia } from '@/lib/publish/validators/mediaValidator';
+import { validateCloudinaryMedia } from '@/lib/publish/validators/requestValidator';
 import { fetchAllTokens } from '@/lib/publish/services/tokenService';
 import {
   createReportLogger,
@@ -96,7 +97,12 @@ export async function retryFailedDestinations(
       return { ok: false, status: 400, error: 'No failed destinations to retry.' };
     }
 
-    const media = entry.media ?? [];
+    // Stored media came from an earlier request: check it again before the server downloads it.
+    const mediaCheck = validateCloudinaryMedia(entry.media ?? []);
+    if (!mediaCheck.success) {
+      return { ok: false, status: 400, error: mediaCheck.error ?? 'Invalid media.' };
+    }
+    const media = mediaCheck.data ?? [];
     const reportLogger = createReportLogger();
     reportLogger.add(`Retrying ${targets.length} failed destination(s)`);
 
