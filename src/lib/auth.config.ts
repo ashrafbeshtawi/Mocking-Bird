@@ -29,6 +29,15 @@ export const authConfig: NextAuthConfig = {
     error: "/auth",
   },
   callbacks: {
+    // allowDangerousEmailAccountLinking links an OAuth login to the existing
+    // user with the same e-mail, so only accept e-mails the provider verified.
+    // Auth.js runs this before it links or creates the account.
+    signIn({ account, profile }) {
+      if (account?.provider === "discord") return profile?.verified === true
+      if (account?.provider === "google") return profile?.email_verified === true
+      // GitHub only hands out verified e-mails; credentials has no profile.
+      return true
+    },
     jwt({ token, user }) {
       if (user) {
         // Store user ID in both userId and sub for compatibility
