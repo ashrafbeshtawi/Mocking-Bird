@@ -172,6 +172,7 @@ export interface TelegramSuccessItem {
   channel_title: string;
   message_id: number;
   chat_id: string;
+  warning?: string;
 }
 
 export interface ApiResponse {
