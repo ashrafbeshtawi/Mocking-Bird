@@ -137,7 +137,8 @@ export function mapTelegramSuccess(successful: TelegramSuccessItem[]): Successfu
   return successful.map(item => ({
     platform: item.platform,
     telegram_channel_id: item.channel_id,
-    telegram_message_id: item.message_id.toString()
+    telegram_message_id: item.message_id.toString(),
+    ...(item.warning && { warning: item.warning })
   }));
 }
 

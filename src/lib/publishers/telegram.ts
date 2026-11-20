@@ -4,6 +4,21 @@ import { CloudinaryMediaInfo } from '@/lib/publish/types';
 
 const logger = createLogger('TelegramPublisher');
 
+/** Telegram limit for a photo/video caption (text-only messages allow 4096). */
+export const TELEGRAM_CAPTION_LIMIT = 1024;
+/** Telegram limit for the number of items in one sendMediaGroup call. */
+export const TELEGRAM_MEDIA_GROUP_LIMIT = 10;
+
+/**
+ * Escapes plain composer text for Telegram's HTML parse mode. Telegram rejects
+ * any `<`, `>` or `&` that is not part of a tag or entity, so all of them are escaped.
+ */
+export function escapeHtml(text: string): string {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+type TelegramMessage = { message_id: number; chat: { id: number } };
+
 export interface TelegramChannelToken {
   channel_id: string;
   channel_title: string;
@@ -21,6 +36,7 @@ export interface TelegramPublishResult {
   channel_title: string;
   message_id: number;
   chat_id: string;
+  warning?: string;
 }
 
 export interface TelegramPublishError {
@@ -132,13 +148,14 @@ export class TelegramPublisher {
 
     for (const token of tokens) {
       try {
-        const result = await this.sendMessage(token.channel_id, text, cloudinaryMedia);
+        const { result, warning } = await this.sendMessage(token.channel_id, text, cloudinaryMedia);
         successful.push({
           platform: 'telegram',
           channel_id: token.channel_id,
           channel_title: token.channel_title,
           message_id: result.message_id,
           chat_id: result.chat.id.toString(),
+          ...(warning && { warning }),
         });
 
         logger.info('Successfully published to Telegram channel', {
@@ -303,82 +320,101 @@ export class TelegramPublisher {
   }
 
   /**
-   * Sends message to a channel
+   * Calls a Bot API method and returns its result, throwing Telegram's description on failure.
+   */
+  private async callApi<T>(method: string, body: object, fallbackError: string): Promise<T> {
+    const response = await fetch(`https://api.telegram.org/bot${this.botToken}/${method}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    const data = await response.json();
+    if (!data.ok) {
+      throw new Error(data.description || fallbackError);
+    }
+    return data.result;
+  }
+
+  /**
+   * Sends message to a channel. The composer text is plain text, so it is
+   * escaped before being sent with parse_mode HTML. A caption longer than
+   * Telegram's 1024 limit is sent as a separate text message after the media.
    */
   private async sendMessage(
     channelId: string,
     text: string,
     cloudinaryMedia: CloudinaryMediaInfo[]
-  ): Promise<{ message_id: number; chat: { id: number } }> {
-    const baseUrl = `https://api.telegram.org/bot${this.botToken}`;
+  ): Promise<{ result: TelegramMessage; warning?: string }> {
+    const sendText = () =>
+      this.callApi<TelegramMessage>(
+        'sendMessage',
+        { chat_id: channelId, text: escapeHtml(text), parse_mode: 'HTML' },
+        'Failed to send message'
+      );
 
-    // If we have media, send as photo/video/media group
-    if (cloudinaryMedia.length > 0) {
-      if (cloudinaryMedia.length === 1) {
-        // Single media
-        const media = cloudinaryMedia[0];
-        const isVideo = media.resourceType === 'video';
-        const endpoint = isVideo ? 'sendVideo' : 'sendPhoto';
-        const mediaKey = isVideo ? 'video' : 'photo';
-
-        const response = await fetch(`${baseUrl}/${endpoint}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            chat_id: channelId,
-            [mediaKey]: media.publicUrl,
-            cover: isVideo ? media.thumbnail?.publicUrl : undefined,
-            caption: text || undefined,
-            parse_mode: 'HTML',
-          }),
-        });
-
-        const data = await response.json();
-        if (!data.ok) {
-          throw new Error(data.description || 'Failed to send media');
-        }
-        return data.result;
-      } else {
-        // Multiple media - use sendMediaGroup
-        const media = cloudinaryMedia.slice(0, 10).map((m, i) => ({
-          type: m.resourceType === 'video' ? 'video' : 'photo',
-          media: m.publicUrl,
-          caption: i === 0 ? text || undefined : undefined,
-          parse_mode: i === 0 && text ? 'HTML' : undefined,
-        }));
-
-        const response = await fetch(`${baseUrl}/sendMediaGroup`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            chat_id: channelId,
-            media,
-          }),
-        });
-
-        const data = await response.json();
-        if (!data.ok) {
-          throw new Error(data.description || 'Failed to send media group');
-        }
-        return data.result[0];
-      }
-    } else {
-      // Text-only message
-      const response = await fetch(`${baseUrl}/sendMessage`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: channelId,
-          text: text,
-          parse_mode: 'HTML',
-        }),
-      });
-
-      const data = await response.json();
-      if (!data.ok) {
-        throw new Error(data.description || 'Failed to send message');
-      }
-      return data.result;
+    if (cloudinaryMedia.length === 0) {
+      return { result: await sendText() };
     }
+
+    const captionFits = text.length <= TELEGRAM_CAPTION_LIMIT;
+    const caption = text && captionFits ? escapeHtml(text) : undefined;
+    const warnings: string[] = [];
+    let result: TelegramMessage;
+
+    if (cloudinaryMedia.length === 1) {
+      const media = cloudinaryMedia[0];
+      const isVideo = media.resourceType === 'video';
+
+      result = await this.callApi<TelegramMessage>(
+        isVideo ? 'sendVideo' : 'sendPhoto',
+        {
+          chat_id: channelId,
+          [isVideo ? 'video' : 'photo']: media.publicUrl,
+          cover: isVideo ? media.thumbnail?.publicUrl : undefined,
+          caption,
+          parse_mode: caption ? 'HTML' : undefined,
+        },
+        'Failed to send media'
+      );
+    } else {
+      const sent = cloudinaryMedia.slice(0, TELEGRAM_MEDIA_GROUP_LIMIT);
+      const dropped = cloudinaryMedia.length - sent.length;
+      if (dropped > 0) {
+        warnings.push(
+          `Telegram allows at most ${TELEGRAM_MEDIA_GROUP_LIMIT} media per post, so ${dropped} of ${cloudinaryMedia.length} were not posted.`
+        );
+      }
+
+      const media = sent.map((m, i) => ({
+        type: m.resourceType === 'video' ? 'video' : 'photo',
+        media: m.publicUrl,
+        caption: i === 0 ? caption : undefined,
+        parse_mode: i === 0 && caption ? 'HTML' : undefined,
+      }));
+
+      const results = await this.callApi<TelegramMessage[]>(
+        'sendMediaGroup',
+        { chat_id: channelId, media },
+        'Failed to send media group'
+      );
+      result = results[0];
+    }
+
+    if (text && !captionFits) {
+      logger.info('Caption exceeds Telegram limit, sending text as a separate message', {
+        channelId,
+        textLength: text.length,
+      });
+      try {
+        await sendText();
+      } catch (error) {
+        // The media is already posted; failing the channel would invite a duplicate retry.
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        warnings.push(`The media was posted, but the text (too long for a caption) could not be sent: ${message}`);
+      }
+    }
+
+    return { result, ...(warnings.length > 0 && { warning: warnings.join(' ') }) };
   }
 }
