@@ -12,6 +12,8 @@ export interface DraftMedia {
   width?: number;
   height?: number;
   originalFilename?: string;
+  /** Videos only: length in seconds. */
+  duration?: number;
   /** Videos only: the custom thumbnail. */
   thumbnail?: MediaThumbnail;
 }
