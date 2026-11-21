@@ -42,4 +42,20 @@ describe('parsePublishRequest media thumbnails', () => {
     expect(cloudinaryMedia).toHaveLength(1);
     expect(cloudinaryMedia[0]).not.toHaveProperty('thumbnail');
   });
+
+  it('keeps the duration of a video', async () => {
+    const { cloudinaryMedia } = await parsed({ cloudinaryMedia: [item('video', { duration: 12.5 })] });
+
+    expect(cloudinaryMedia[0].duration).toBe(12.5);
+  });
+
+  it.each([
+    ['an image', item('image', { duration: 12 })],
+    ['a video with a non-numeric duration', item('video', { duration: '12' })],
+    ['a video with a negative duration', item('video', { duration: -1 })],
+  ])('drops the duration of %s', async (_case, media) => {
+    const { cloudinaryMedia } = await parsed({ cloudinaryMedia: [media] });
+
+    expect(cloudinaryMedia[0]).not.toHaveProperty('duration');
+  });
 });

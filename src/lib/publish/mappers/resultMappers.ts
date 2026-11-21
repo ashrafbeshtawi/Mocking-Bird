@@ -205,7 +205,8 @@ export function mapTikTokSuccess(successful: TikTokPublishResult[]): SuccessfulP
   return successful.map(item => ({
     platform: item.platform,
     account_id: item.account_id,
-    post_id: item.post_id
+    post_id: item.post_id,
+    ...(item.warning && { warning: item.warning })
   }));
 }
 

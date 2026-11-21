@@ -167,6 +167,10 @@ function validateCloudinaryMedia(media: unknown[]): ValidationResult<CloudinaryM
           width: mediaItem.width,
           height: mediaItem.height,
           originalFilename: mediaItem.originalFilename || 'unknown',
+          ...(mediaItem.resourceType === 'video' &&
+            typeof mediaItem.duration === 'number' &&
+            Number.isFinite(mediaItem.duration) &&
+            mediaItem.duration > 0 && { duration: mediaItem.duration }),
           ...(thumbnail && { thumbnail }),
         });
       }

@@ -1,5 +1,11 @@
 import type { Pool } from 'pg';
-import { TikTokPublisher, chunkPlan, revokeTikTokTokens, type TikTokAccountToken } from '@/lib/publishers/tiktok';
+import {
+  TikTokPublisher,
+  TIKTOK_STILL_PROCESSING_WARNING,
+  chunkPlan,
+  revokeTikTokTokens,
+  type TikTokAccountToken,
+} from '@/lib/publishers/tiktok';
 import { EMPTY_TIKTOK_SETTINGS, type TikTokPostSettings } from '@/lib/tiktok';
 import type { CloudinaryMediaInfo } from '@/lib/publish/types';
 
@@ -51,10 +57,15 @@ describe('TikTokPublisher', () => {
   let query: jest.Mock;
   let publisher: TikTokPublisher;
   let fetchMock: jest.SpyInstance;
+  /** Raw JSON bodies the status endpoint returns, one per poll; the last one repeats. */
+  let statusBodies: string[];
+
+  const statusBody = (data: object) => JSON.stringify({ data, error: { code: 'ok' } });
 
   beforeEach(() => {
     query = jest.fn().mockResolvedValue({ rows: [] });
-    publisher = new TikTokPublisher({ query } as unknown as Pool);
+    publisher = new TikTokPublisher({ query } as unknown as Pool, { intervalMs: 0, timeoutMs: 1_000 });
+    statusBodies = [statusBody({ status: 'PUBLISH_COMPLETE' })];
     fetchMock = jest.spyOn(global, 'fetch').mockImplementation(async (url) => {
       const u = String(url);
       if (u === video.publicUrl) return new Response(new Uint8Array([1, 2, 3]), { headers: { 'content-type': 'video/mp4' } });
@@ -63,11 +74,16 @@ describe('TikTokPublisher', () => {
         return json({ data: { publish_id: 'pub-42', upload_url: 'https://upload.tiktok/session' }, error: { code: 'ok' } });
       }
       if (u === 'https://upload.tiktok/session') return new Response(null, { status: 201 });
+      if (u.endsWith('/v2/post/publish/status/fetch/')) {
+        const body = statusBodies.length > 1 ? statusBodies.shift()! : statusBodies[0];
+        return new Response(body, { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
       if (u.endsWith('/v2/oauth/token/')) return json({ access_token: 'fresh', refresh_token: 'rotated', expires_in: 86400 });
       throw new Error(`unexpected fetch ${u}`);
     });
     jest.spyOn(console, 'info').mockImplementation(() => {});
     jest.spyOn(console, 'error').mockImplementation(() => {});
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
   afterEach(() => jest.restoreAllMocks());
@@ -102,6 +118,112 @@ describe('TikTokPublisher', () => {
     expect(upload.headers).toMatchObject({ 'Content-Range': 'bytes 0-2/3', 'Content-Type': 'video/mp4' });
   });
 
+  it('waits for TikTok to publish and stores the public post id, keeping its 64-bit precision', async () => {
+    statusBodies = [
+      statusBody({ status: 'PROCESSING_UPLOAD' }),
+      statusBody({ status: 'PROCESSING_DOWNLOAD' }),
+      // Raw JSON: a post id beyond Number.MAX_SAFE_INTEGER must not be rounded.
+      '{"data":{"status":"PUBLISH_COMPLETE","publicaly_available_post_id":[7301234567890123456]},"error":{"code":"ok"}}',
+    ];
+
+    const { successful, failed } = await publisher.publishToAccounts(
+      { text: '', settings: { ...settings, privacyLevel: 'PUBLIC_TO_EVERYONE' }, cloudinaryMedia: [video] },
+      [account(3_600_000)]
+    );
+
+    expect(failed).toEqual([]);
+    expect(successful).toEqual([
+      { platform: 'tiktok', account_id: 'oid-1', name: 'Ada Dances', post_id: '7301234567890123456' },
+    ]);
+    const statusCalls = fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/v2/post/publish/status/fetch/'));
+    expect(statusCalls).toHaveLength(3);
+    expect(JSON.parse(statusCalls[0][1].body)).toEqual({ publish_id: 'pub-42' });
+  });
+
+  it('fails the post with TikTok\'s reason when TikTok rejects the video after the upload', async () => {
+    statusBodies = [
+      statusBody({ status: 'PROCESSING_UPLOAD' }),
+      statusBody({ status: 'FAILED', fail_reason: 'spam_risk_too_many_posts' }),
+    ];
+
+    const { successful, failed } = await publisher.publishToAccounts(
+      { text: '', settings, cloudinaryMedia: [video] },
+      [account(3_600_000)]
+    );
+
+    expect(successful).toEqual([]);
+    expect(failed).toEqual([
+      {
+        platform: 'tiktok',
+        account_id: 'oid-1',
+        name: 'Ada Dances',
+        error: {
+          message:
+            'TikTok rejected the video (spam_risk_too_many_posts): The account has reached TikTok\'s daily post limit. Try again tomorrow.',
+        },
+      },
+    ]);
+  });
+
+  it('names an unknown fail_reason as is', async () => {
+    statusBodies = [statusBody({ status: 'FAILED', fail_reason: 'something_new' })];
+
+    const { failed } = await publisher.publishToAccounts({ text: '', settings, cloudinaryMedia: [video] }, [account(3_600_000)]);
+
+    expect(failed[0].error.message).toBe('TikTok rejected the video (something_new)');
+  });
+
+  it('reports success with a note when TikTok is still processing at the deadline', async () => {
+    publisher = new TikTokPublisher({ query } as unknown as Pool, { intervalMs: 1, timeoutMs: 20 });
+    statusBodies = [statusBody({ status: 'PROCESSING_DOWNLOAD' })];
+
+    const { successful, failed } = await publisher.publishToAccounts(
+      { text: '', settings, cloudinaryMedia: [video] },
+      [account(3_600_000)]
+    );
+
+    expect(failed).toEqual([]);
+    expect(successful).toEqual([
+      { platform: 'tiktok', account_id: 'oid-1', name: 'Ada Dances', post_id: 'pub-42', warning: TIKTOK_STILL_PROCESSING_WARNING },
+    ]);
+  });
+
+  it('does not fail an uploaded post when the status check itself errors', async () => {
+    publisher = new TikTokPublisher({ query } as unknown as Pool, { intervalMs: 1, timeoutMs: 20 });
+    statusBodies = [JSON.stringify({ error: { code: 'internal_error', message: 'oops' } })];
+
+    const { successful, failed } = await publisher.publishToAccounts(
+      { text: '', settings, cloudinaryMedia: [video] },
+      [account(3_600_000)]
+    );
+
+    expect(failed).toEqual([]);
+    expect(successful[0].warning).toBe(TIKTOK_STILL_PROCESSING_WARNING);
+  });
+
+  it('rejects a video longer than the account allows before starting the upload', async () => {
+    const { successful, failed } = await publisher.publishToAccounts(
+      { text: '', settings, cloudinaryMedia: [{ ...video, duration: 600.4 }] },
+      [account(3_600_000)]
+    );
+
+    expect(successful).toEqual([]);
+    expect(failed[0].error.message).toBe(
+      'The video is 601 seconds long, but TikTok allows at most 600 seconds for this account.'
+    );
+    expect(callTo('/v2/post/publish/video/init/')).toBeUndefined();
+    expect(callTo(video.publicUrl)).toBeUndefined();
+  });
+
+  it('posts a video within the allowed length', async () => {
+    const { failed } = await publisher.publishToAccounts(
+      { text: '', settings, cloudinaryMedia: [{ ...video, duration: 600 }] },
+      [account(3_600_000)]
+    );
+
+    expect(failed).toEqual([]);
+  });
+
   it('refreshes an expiring token and stores the rotated refresh token', async () => {
     await publisher.publishToAccounts({ text: '', settings, cloudinaryMedia: [video] }, [account(60_000)]);
 
@@ -125,6 +247,20 @@ describe('TikTokPublisher', () => {
   it('surfaces TikTok\'s reason when it refuses the post', async () => {
     fetchMock.mockImplementation(async (url) =>
       String(url).endsWith('/creator_info/query/')
+        ? json({ error: { code: 'reached_active_user_cap', message: 'Daily active user cap reached' } }, 200)
+        : new Response(null, { status: 500 })
+    );
+
+    const { failed } = await publisher.publishToAccounts({ text: '', settings, cloudinaryMedia: [video] }, [account(3_600_000)]);
+
+    expect(failed[0].error.message).toBe(
+      "TikTok could not read the account's posting options (HTTP 200, reached_active_user_cap): Daily active user cap reached"
+    );
+  });
+
+  it('explains the daily post limit in plain words', async () => {
+    fetchMock.mockImplementation(async (url) =>
+      String(url).endsWith('/creator_info/query/')
         ? json({ error: { code: 'spam_risk_too_many_posts', message: 'Daily post cap reached' } }, 200)
         : new Response(null, { status: 500 })
     );
@@ -132,7 +268,8 @@ describe('TikTokPublisher', () => {
     const { failed } = await publisher.publishToAccounts({ text: '', settings, cloudinaryMedia: [video] }, [account(3_600_000)]);
 
     expect(failed[0].error.message).toBe(
-      "TikTok could not read the account's posting options (HTTP 200, spam_risk_too_many_posts): Daily post cap reached"
+      "TikTok could not read the account's posting options (HTTP 200, spam_risk_too_many_posts): " +
+      "The account has reached TikTok's daily post limit. Try again tomorrow."
     );
   });
 

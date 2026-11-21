@@ -462,6 +462,7 @@ function PublishPageInner() {
             width: media.width,
             height: media.height,
             originalFilename: media.originalFilename,
+            ...(media.duration !== undefined && { duration: media.duration }),
             ...(media.thumbnail && { thumbnail: media.thumbnail }),
           })),
         }),

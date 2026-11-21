@@ -20,6 +20,17 @@ const CHUNK_SIZE = 10 * MB;
 // Refresh tokens this close to expiry, so they cannot lapse mid-upload.
 const TOKEN_EXPIRY_MARGIN_MS = 5 * 60_000;
 
+/** How often and how long to ask TikTok whether an uploaded video was published. */
+export interface TikTokStatusPolling {
+  intervalMs: number;
+  timeoutMs: number;
+}
+
+const DEFAULT_STATUS_POLLING: TikTokStatusPolling = { intervalMs: 3_000, timeoutMs: 120_000 };
+
+export const TIKTOK_STILL_PROCESSING_WARNING =
+  'TikTok is still processing the video. It should appear on the account shortly; check TikTok before posting it again.';
+
 export interface TikTokAccountToken {
   open_id: string;
   display_name: string;
@@ -39,8 +50,13 @@ export interface TikTokPublishResult {
   platform: 'tiktok';
   account_id: string;
   name: string;
-  /** TikTok's publish_id; the post itself appears once TikTok has processed the video. */
+  /**
+   * The public TikTok post id once TikTok has published the video; otherwise (private
+   * visibility, or still processing) TikTok's publish_id.
+   */
   post_id: string;
+  /** Set when TikTok had not finished processing the video when MockingBird stopped waiting. */
+  warning?: string;
 }
 
 export interface TikTokPublishError {
@@ -56,7 +72,42 @@ const TIKTOK_ERROR_HINTS: Record<string, string> = {
     'Until TikTok has audited this app, it can only post to private TikTok accounts. ' +
     'Make the account private in the TikTok app (Settings and privacy → Privacy → Private account) and choose "Only me".',
   privacy_level_option_mismatch: 'TikTok does not allow the chosen visibility for this account. Choose another one.',
+  // fail_reason values reported by /v2/post/publish/status/fetch/ after the upload.
+  spam_risk_too_many_posts: 'The account has reached TikTok\'s daily post limit. Try again tomorrow.',
+  spam_risk_user_banned_from_posting: 'TikTok has blocked this account from posting. Check the account in the TikTok app.',
+  spam_risk_text: 'TikTok flagged the caption as spam. Change the text and try again.',
+  spam_risk: 'TikTok flagged the post as spam.',
+  duration_check_failed: 'The video is longer (or shorter) than TikTok allows for this account.',
+  file_format_check_failed: 'TikTok does not accept this video format. Use an MP4 (H.264), WebM or MOV file.',
+  frame_rate_check_failed: 'TikTok does not accept the video\'s frame rate. Use a video between 23 and 60 FPS.',
+  picture_size_check_failed: 'TikTok does not accept the video\'s resolution. Use a video at least 360 pixels on each side.',
+  video_pull_failed: 'TikTok could not read the uploaded video. Try again.',
+  publish_cancelled: 'The post was cancelled on TikTok.',
+  auth_removed: 'The account removed MockingBird\'s access while the video was processing. Reconnect it on the dashboard.',
+  internal: 'TikTok had an internal error. Try again later.',
 };
+
+/** What /v2/post/publish/status/fetch/ reports about an upload. */
+interface TikTokPublishStatus {
+  status: 'PROCESSING_UPLOAD' | 'PROCESSING_DOWNLOAD' | 'SEND_TO_USER_INBOX' | 'PUBLISH_COMPLETE' | 'FAILED';
+  fail_reason?: string;
+  /** Spelled this way by TikTok. Present once a public post is live. */
+  publicaly_available_post_id?: (string | number)[];
+}
+
+/**
+ * Parses a TikTok response body. Post ids are 64-bit integers that JSON.parse would
+ * round, so they are turned into strings first.
+ */
+function parseTikTokJson(text: string): unknown {
+  const safe = text.replace(
+    /("publicaly_available_post_id"\s*:\s*\[)([^\]]*)\]/g,
+    (_, head: string, ids: string) => `${head}${ids.replace(/(^|,)\s*(\d+)\s*(?=,|$)/g, '$1"$2"')}]`
+  );
+  return JSON.parse(safe);
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 interface TikTokEnvelope<T> {
   data?: T;
@@ -126,7 +177,7 @@ export async function revokeTikTokTokens(
 }
 
 export class TikTokPublisher {
-  constructor(private pool: Pool) {}
+  constructor(private pool: Pool, private statusPolling: TikTokStatusPolling = DEFAULT_STATUS_POLLING) {}
 
   async getAccountTokens(userId: string, openIds: string[]): Promise<TikTokAccountToken[]> {
     if (openIds.length === 0) return [];
@@ -148,9 +199,15 @@ export class TikTokPublisher {
 
     for (const token of tokens) {
       try {
-        const publishId = await this.postVideo(token, options);
-        successful.push({ platform: 'tiktok', account_id: token.open_id, name: token.display_name, post_id: publishId });
-        logger.info('Posted to TikTok', { open_id: token.open_id, publish_id: publishId });
+        const { postId, warning } = await this.postVideo(token, options);
+        successful.push({
+          platform: 'tiktok',
+          account_id: token.open_id,
+          name: token.display_name,
+          post_id: postId,
+          ...(warning && { warning }),
+        });
+        logger.info('Posted to TikTok', { open_id: token.open_id, post_id: postId, still_processing: Boolean(warning) });
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown error';
         failed.push({ platform: 'tiktok', account_id: token.open_id, name: token.display_name, error: { message } });
@@ -182,7 +239,10 @@ export class TikTokPublisher {
     };
   }
 
-  private async postVideo(token: TikTokAccountToken, { text, settings, cloudinaryMedia = [] }: TikTokPublishOptions): Promise<string> {
+  private async postVideo(
+    token: TikTokAccountToken,
+    { text, settings, cloudinaryMedia = [] }: TikTokPublishOptions
+  ): Promise<{ postId: string; warning?: string }> {
     const settingsError = tiktokSettingsError(settings);
     if (settingsError) throw new Error(settingsError);
     const videos = cloudinaryMedia.filter((m) => m.resourceType === 'video');
@@ -194,6 +254,12 @@ export class TikTokPublisher {
     const creator = await this.creatorInfo(token);
     if (!creator.privacyLevelOptions.includes(settings.privacyLevel as TikTokCreatorInfo['privacyLevelOptions'][number])) {
       throw new Error('This TikTok account does not allow the chosen visibility. Choose another one.');
+    }
+    const duration = videos[0].duration;
+    if (typeof duration === 'number' && duration > creator.maxVideoDurationSec) {
+      throw new Error(
+        `The video is ${Math.ceil(duration)} seconds long, but TikTok allows at most ${creator.maxVideoDurationSec} seconds for this account.`
+      );
     }
     const accessToken = await this.freshAccessToken(token);
 
@@ -235,7 +301,49 @@ export class TikTokPublisher {
       });
       if (!upload.ok) throw new Error(`TikTok could not upload the video (HTTP ${upload.status})`);
     }
-    return publish_id;
+    return this.awaitPublish(token, publish_id);
+  }
+
+  /**
+   * Waits until TikTok has processed an uploaded video. Throws TikTok's reason when it
+   * rejects the video. When TikTok is still processing at the deadline the upload counts
+   * as a success with a warning, since posting it again could publish it twice.
+   */
+  private async awaitPublish(token: TikTokAccountToken, publishId: string): Promise<{ postId: string; warning?: string }> {
+    const deadline = Date.now() + this.statusPolling.timeoutMs;
+    for (;;) {
+      await sleep(this.statusPolling.intervalMs);
+      let status: TikTokPublishStatus | null = null;
+      try {
+        const accessToken = await this.freshAccessToken(token);
+        status = await this.call<TikTokPublishStatus>(
+          accessToken,
+          '/v2/post/publish/status/fetch/',
+          { publish_id: publishId },
+          'report the post\'s status'
+        );
+      } catch (error) {
+        // The video is already uploaded; a status hiccup must not turn it into a failure.
+        logger.warn('Could not fetch TikTok publish status', {
+          publish_id: publishId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+
+      if (status?.status === 'FAILED') {
+        const reason = status.fail_reason ?? 'unknown';
+        const hint = TIKTOK_ERROR_HINTS[reason];
+        throw new Error(`TikTok rejected the video (${reason})${hint ? `: ${hint}` : ''}`);
+      }
+      if (status?.status === 'PUBLISH_COMPLETE') {
+        const postId = status.publicaly_available_post_id?.[0];
+        return { postId: postId !== undefined ? String(postId) : publishId };
+      }
+      if (Date.now() >= deadline) {
+        logger.warn('TikTok still processing after polling timeout', { publish_id: publishId, status: status?.status });
+        return { postId: publishId, warning: TIKTOK_STILL_PROCESSING_WARNING };
+      }
+    }
   }
 
   /** POSTs JSON to a TikTok API path and returns its data, or throws TikTok's error. */
@@ -245,7 +353,7 @@ export class TikTokPublisher {
       headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json; charset=UTF-8' },
       body: JSON.stringify(body),
     });
-    const envelope = (await response.json().catch(() => null)) as TikTokEnvelope<T> | null;
+    const envelope = (await response.text().then(parseTikTokJson).catch(() => null)) as TikTokEnvelope<T> | null;
     if (response.status === 401 || envelope?.error?.code === 'access_token_invalid') {
       throw new Error('TikTok rejected the access token. Reconnect the account on the dashboard.');
     }
