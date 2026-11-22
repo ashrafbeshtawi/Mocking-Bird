@@ -3,26 +3,110 @@ import pool from '@/lib/db';
 import { TelegramPublisher } from '@/lib/publishers/telegram';
 import crypto from 'crypto';
 import { getAuthUserId } from '@/lib/api-auth';
+import { createLogger } from '@/lib/logger';
 
-// Store pending verifications in memory (in production, use Redis or database)
-const pendingVerifications = new Map<string, {
-  visitorCode: string;
-  channelId: string;
-  userId: string;
-  expiresAt: number;
-}>();
+const logger = createLogger('TelegramVerify');
 
-// Generate a short, easy-to-copy verification code
+const VERIFICATION_TTL_SECONDS = 10 * 60;
+const UPDATES_PAGE_SIZE = 100;
+// Telegram keeps unconfirmed updates for 24h; this bounds one scan at 10k updates.
+const MAX_UPDATE_PAGES = 100;
+const CODE_PATTERN = /MB-[0-9A-F]{8}/g;
+
+interface TelegramChannelPost {
+  message_id: number;
+  chat?: { id?: number };
+  text?: string;
+  caption?: string;
+}
+
+interface TelegramUpdate {
+  update_id: number;
+  channel_post?: TelegramChannelPost;
+}
+
+class UpdatesError extends Error {}
+
+// Short, easy-to-copy verification code
 function generateVerificationCode(): string {
   return 'MB-' + crypto.randomBytes(4).toString('hex').toUpperCase();
 }
 
-// Clean up expired verifications
-function cleanupExpired() {
-  const now = Date.now();
-  for (const [key, value] of pendingVerifications) {
-    if (value.expiresAt < now) {
-      pendingVerifications.delete(key);
+/**
+ * Reads every pending channel post and confirms it (offset = last update_id + 1), paging
+ * until Telegram returns no more updates. Confirmed updates are gone for good, so the
+ * caller must record codes for all pending verifications, not just the requester's.
+ */
+async function readNewChannelPosts(baseUrl: string): Promise<TelegramChannelPost[]> {
+  const posts: TelegramChannelPost[] = [];
+  let offset: number | undefined;
+
+  for (let page = 0; page < MAX_UPDATE_PAGES; page++) {
+    const response = await fetch(`${baseUrl}/getUpdates`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        offset,
+        limit: UPDATES_PAGE_SIZE,
+        timeout: 0,
+        allowed_updates: ['channel_post'],
+      }),
+    });
+    const data = await response.json();
+
+    if (!data.ok) {
+      logger.error('getUpdates failed', data);
+      if (data.error_code === 409) {
+        throw new UpdatesError(
+          /webhook/i.test(data.description ?? '')
+            ? 'The Telegram bot has a webhook set, so channel posts cannot be read. Remove the webhook (deleteWebhook) and try again.'
+            : 'Another check is reading Telegram updates right now. Please try again in a moment.'
+        );
+      }
+      throw new UpdatesError('Failed to verify. Please try again.');
+    }
+
+    const updates: TelegramUpdate[] = data.result ?? [];
+    if (updates.length === 0) break;
+
+    for (const update of updates) {
+      if (update.channel_post) posts.push(update.channel_post);
+    }
+    offset = Math.max(...updates.map((u) => u.update_id)) + 1;
+  }
+
+  return posts;
+}
+
+/**
+ * Marks pending verifications whose code was posted in the matching channel (by numeric
+ * chat id) as verified, and removes the code posts from the channel.
+ */
+async function recordCodePosts(baseUrl: string, posts: TelegramChannelPost[]): Promise<void> {
+  for (const post of posts) {
+    const chatId = post.chat?.id;
+    if (chatId === undefined) continue;
+
+    const codes = new Set(`${post.text ?? ''}\n${post.caption ?? ''}`.match(CODE_PATTERN) ?? []);
+    for (const code of codes) {
+      const result = await pool.query(
+        `UPDATE telegram_verifications SET verified_at = NOW()
+         WHERE code = $1 AND chat_id = $2 AND verified_at IS NULL AND expires_at > NOW()
+         RETURNING id`,
+        [code, String(chatId)]
+      );
+      if (!result.rowCount) continue;
+
+      // Keep the channel clean; failing to delete does not affect verification
+      try {
+        await fetch(`${baseUrl}/deleteMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chat_id: chatId, message_id: post.message_id }),
+        });
+      } catch {
+        // ignore
+      }
     }
   }
 }
@@ -34,79 +118,59 @@ export async function POST(req: Request) {
   try {
     const userId = await getAuthUserId();
     if (!userId) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
     const { channel_id } = await req.json();
     if (!channel_id) {
-      return NextResponse.json(
-        { error: 'Channel ID is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Channel ID is required' }, { status: 400 });
     }
 
-    // Check if bot token is configured
     if (!process.env.TELEGRAM_BOT_TOKEN) {
-      return NextResponse.json(
-        { error: 'Telegram bot is not configured' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Telegram bot is not configured' }, { status: 500 });
     }
 
     // Validate that the channel exists and bot is admin
     const publisher = new TelegramPublisher(pool);
     const validation = await publisher.validateChannelAccess(channel_id);
 
-    if (!validation.valid) {
+    if (!validation.valid || !validation.chatId) {
       return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
-    // Check if already connected
     const existing = await pool.query(
       'SELECT id FROM connected_telegram_channels WHERE user_id = $1 AND channel_id = $2',
       [userId, channel_id]
     );
 
     if (existing.rows.length > 0) {
-      return NextResponse.json(
-        { error: 'Channel already connected' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Channel already connected' }, { status: 400 });
     }
 
-    // Clean up old verifications
-    cleanupExpired();
+    await pool.query('DELETE FROM telegram_verifications WHERE expires_at < NOW()');
 
-    // Generate verification code
     const verificationCode = generateVerificationCode();
-    const verificationKey = `${userId}-${channel_id}`;
+    await pool.query(
+      `INSERT INTO telegram_verifications (user_id, channel_id, chat_id, code, expires_at)
+       VALUES ($1, $2, $3, $4, NOW() + make_interval(secs => $5))
+       ON CONFLICT (user_id, channel_id) DO UPDATE
+       SET chat_id = EXCLUDED.chat_id, code = EXCLUDED.code,
+           expires_at = EXCLUDED.expires_at, verified_at = NULL, created_at = NOW()`,
+      [userId, channel_id, validation.chatId, verificationCode, VERIFICATION_TTL_SECONDS]
+    );
 
-    // Store pending verification (expires in 10 minutes)
-    pendingVerifications.set(verificationKey, {
-      visitorCode: verificationCode,
-      channelId: channel_id,
-      userId,
-      expiresAt: Date.now() + 10 * 60 * 1000,
-    });
-
-    console.log(`[Telegram Verify] Generated code ${verificationCode} for channel ${channel_id}`);
+    logger.info('Generated verification code', { channel_id, chatId: validation.chatId });
 
     return NextResponse.json({
       success: true,
       verification_code: verificationCode,
       channel_title: validation.channelTitle,
       channel_username: validation.channelUsername,
-      expires_in: 600, // 10 minutes in seconds
+      expires_in: VERIFICATION_TTL_SECONDS,
     });
   } catch (error) {
-    console.error('[Telegram Verify Error]', error);
-    return NextResponse.json(
-      { error: 'Internal Server Error' },
-      { status: 500 }
-    );
+    logger.error('Failed to start verification', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
 
@@ -117,31 +181,23 @@ export async function PUT(req: Request) {
   try {
     const userId = await getAuthUserId();
     if (!userId) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
     const { channel_id } = await req.json();
     if (!channel_id) {
-      return NextResponse.json(
-        { error: 'Channel ID is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Channel ID is required' }, { status: 400 });
     }
 
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
     if (!botToken) {
-      return NextResponse.json(
-        { error: 'Telegram bot is not configured' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Telegram bot is not configured' }, { status: 500 });
     }
 
-    // Get pending verification
-    const verificationKey = `${userId}-${channel_id}`;
-    const pending = pendingVerifications.get(verificationKey);
+    const pendingQuery =
+      'SELECT id, verified_at, expires_at < NOW() AS expired FROM telegram_verifications WHERE user_id = $1 AND channel_id = $2';
+    const pendingResult = await pool.query(pendingQuery, [userId, channel_id]);
+    const pending = pendingResult.rows[0];
 
     if (!pending) {
       return NextResponse.json(
@@ -150,77 +206,28 @@ export async function PUT(req: Request) {
       );
     }
 
-    if (pending.expiresAt < Date.now()) {
-      pendingVerifications.delete(verificationKey);
+    if (pending.expired && !pending.verified_at) {
+      await pool.query('DELETE FROM telegram_verifications WHERE id = $1', [pending.id]);
       return NextResponse.json(
         { error: 'Verification code has expired. Please start again.' },
         { status: 400 }
       );
     }
 
-    // Check recent messages in the channel for the verification code
-    const baseUrl = `https://api.telegram.org/bot${botToken}`;
-
-    // Use getUpdates with allowed_updates to get channel posts
-    // Actually, we need to use a different approach - check channel history
-    // Telegram bots can't easily read channel history without being admin
-    // But since our bot IS admin, we can use the getChat approach
-
-    // Alternative: Try to get recent messages via updates or use a webhook
-    // For simplicity, let's check if there's a message with our code
-    // by fetching updates (this requires the bot to have received the message)
-
-    // Simpler approach: Since only admins can post, and we're checking for the code,
-    // we'll trust that if they can provide the code back, they saw it in the channel
-    // But this defeats the purpose...
-
-    // Best approach: Use getUpdates to check for messages in the channel
-    const updatesResponse = await fetch(`${baseUrl}/getUpdates?limit=100&allowed_updates=["channel_post"]`);
-    const updatesData = await updatesResponse.json();
-
-    if (!updatesData.ok) {
-      console.error('[Telegram Verify] Failed to get updates:', updatesData);
-      return NextResponse.json(
-        { error: 'Failed to verify. Please try again.' },
-        { status: 500 }
-      );
-    }
-
-    // Look for a channel post with our verification code
-    const channelPosts = updatesData.result || [];
-    let verified = false;
-
-    for (const update of channelPosts) {
-      const post = update.channel_post;
-      if (!post) continue;
-
-      // Check if this is from our target channel
-      const postChatId = post.chat?.id?.toString();
-
-      // Match by chat ID or username
-      const chatMatches = postChatId === channel_id ||
-                          postChatId === channel_id.replace('@', '') ||
-                          post.chat?.username === channel_id.replace('@', '');
-
-      if (chatMatches && post.text?.includes(pending.visitorCode)) {
-        verified = true;
-
-        // Optionally delete the verification message to keep channel clean
-        try {
-          await fetch(`${baseUrl}/deleteMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              chat_id: channel_id,
-              message_id: post.message_id,
-            }),
-          });
-        } catch {
-          // Ignore deletion errors
+    let verified = Boolean(pending.verified_at);
+    if (!verified) {
+      const baseUrl = `https://api.telegram.org/bot${botToken}`;
+      try {
+        await recordCodePosts(baseUrl, await readNewChannelPosts(baseUrl));
+      } catch (error) {
+        if (error instanceof UpdatesError) {
+          return NextResponse.json({ error: error.message }, { status: 500 });
         }
-
-        break;
+        throw error;
       }
+
+      const recheck = await pool.query(pendingQuery, [userId, channel_id]);
+      verified = Boolean(recheck.rows[0]?.verified_at);
     }
 
     if (!verified) {
@@ -239,7 +246,6 @@ export async function PUT(req: Request) {
       return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
-    // Save to database
     const result = await pool.query(
       `INSERT INTO connected_telegram_channels (user_id, channel_id, channel_title, channel_username)
        VALUES ($1, $2, $3, $4)
@@ -247,10 +253,9 @@ export async function PUT(req: Request) {
       [userId, channel_id, validation.channelTitle, validation.channelUsername]
     );
 
-    // Clean up pending verification
-    pendingVerifications.delete(verificationKey);
+    await pool.query('DELETE FROM telegram_verifications WHERE id = $1', [pending.id]);
 
-    console.log(`[Telegram Verify] Channel ${channel_id} verified and connected for user ${userId}`);
+    logger.info('Channel verified and connected', { channel_id, userId });
 
     return NextResponse.json({
       success: true,
@@ -263,10 +268,7 @@ export async function PUT(req: Request) {
       },
     });
   } catch (error) {
-    console.error('[Telegram Verify Check Error]', error);
-    return NextResponse.json(
-      { error: 'Internal Server Error' },
-      { status: 500 }
-    );
+    logger.error('Failed to check verification', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }

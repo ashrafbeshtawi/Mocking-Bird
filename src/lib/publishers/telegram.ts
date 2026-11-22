@@ -182,6 +182,8 @@ export class TelegramPublisher {
     telegramUserId?: number
   ): Promise<{
     valid: boolean;
+    /** Numeric chat id from getChat, as a string (e.g. "-1001234567890") */
+    chatId?: string;
     channelTitle?: string;
     channelUsername?: string;
     error?: string;
@@ -255,6 +257,7 @@ export class TelegramPublisher {
 
       return {
         valid: true,
+        chatId: String(chat.id),
         channelTitle: chat.title,
         channelUsername: chat.username,
       };
