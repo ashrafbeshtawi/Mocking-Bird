@@ -1,5 +1,5 @@
 import type { Pool } from 'pg';
-import { TelegramPublisher, escapeHtml, type TelegramChannelToken } from '@/lib/publishers/telegram';
+import { TelegramPublisher, escapeHtml, splitText, type TelegramChannelToken } from '@/lib/publishers/telegram';
 import type { CloudinaryMediaInfo } from '@/lib/publish/types';
 
 const channel: TelegramChannelToken = { channel_id: '-100123', channel_title: 'News' };
@@ -24,6 +24,20 @@ describe('escapeHtml', () => {
 
   it('escapes text that looks like tags so it is shown literally', () => {
     expect(escapeHtml('<b>hi</b> &amp;')).toBe('&lt;b&gt;hi&lt;/b&gt; &amp;amp;');
+  });
+});
+
+describe('splitText', () => {
+  it('keeps text within the limit as one chunk', () => {
+    expect(splitText('hello world', 11)).toEqual(['hello world']);
+  });
+
+  it('cuts at the last whitespace before the limit', () => {
+    expect(splitText('aaa bbb ccc', 8)).toEqual(['aaa bbb', 'ccc']);
+  });
+
+  it('hard-cuts text without whitespace but never inside a surrogate pair', () => {
+    expect(splitText('abc😀def', 4)).toEqual(['abc', '😀de', 'f']);
   });
 });
 
@@ -148,6 +162,51 @@ describe('TelegramPublisher', () => {
 
     expect(calls()[0].body.media).toHaveLength(10);
     expect(successful[0].warning).toBe('Telegram allows at most 10 media per post, so 2 of 12 were not posted.');
+  });
+
+  it('splits a text-only message over 4096 characters into several messages', async () => {
+    const longText = `${'a'.repeat(3000)} <${'b'.repeat(2000)}`;
+    fetchMock.mockResolvedValueOnce(ok(message(11))).mockResolvedValueOnce(ok(message(12)));
+
+    const { successful, failed } = await publisher.publishToChannels({ text: longText }, [channel]);
+
+    expect(failed).toEqual([]);
+    expect(successful[0].message_id).toBe(11);
+    expect(calls().map((c) => c.body.text)).toEqual(['a'.repeat(3000), `&lt;${'b'.repeat(2000)}`]);
+  });
+
+  it('splits the follow-up text after media when it is over 4096 characters', async () => {
+    const longText = `${'w '.repeat(2500)}end`;
+    fetchMock
+      .mockResolvedValueOnce(ok(message(13)))
+      .mockResolvedValueOnce(ok(message(14)))
+      .mockResolvedValueOnce(ok(message(15)));
+
+    const { successful, failed } = await publisher.publishToChannels(
+      { text: longText, cloudinaryMedia: [image(1)] },
+      [channel]
+    );
+
+    expect(failed).toEqual([]);
+    expect(successful[0].warning).toBeUndefined();
+    const [photo, ...texts] = calls();
+    expect(photo.method).toBe('sendPhoto');
+    expect(texts.map((t) => t.method)).toEqual(['sendMessage', 'sendMessage']);
+    texts.forEach((t) => expect(t.body.text.length).toBeLessThanOrEqual(4096));
+    expect(texts.map((t) => t.body.text).join(' ')).toBe(longText);
+  });
+
+  it('warns when a later part of a long text fails', async () => {
+    fetchMock
+      .mockResolvedValueOnce(ok(message(16)))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: false, description: 'Too Many Requests' }), { status: 429 }));
+
+    const { successful, failed } = await publisher.publishToChannels({ text: 'q'.repeat(5000) }, [channel]);
+
+    expect(failed).toEqual([]);
+    expect(successful[0].warning).toBe(
+      'Only 1 of 2 parts of the text were posted (Telegram allows 4096 characters per message): Too Many Requests'
+    );
   });
 
   it('reports Telegram errors as a failed channel', async () => {

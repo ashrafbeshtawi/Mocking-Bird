@@ -6,8 +6,40 @@ const logger = createLogger('TelegramPublisher');
 
 /** Telegram limit for a photo/video caption (text-only messages allow 4096). */
 export const TELEGRAM_CAPTION_LIMIT = 1024;
+/** Telegram limit for the text of one sendMessage call. */
+export const TELEGRAM_TEXT_LIMIT = 4096;
 /** Telegram limit for the number of items in one sendMediaGroup call. */
 export const TELEGRAM_MEDIA_GROUP_LIMIT = 10;
+
+const isHighSurrogate = (code: number) => code >= 0xd800 && code <= 0xdbff;
+
+/**
+ * Splits plain text into chunks of at most `limit` characters, cutting at the
+ * last whitespace before the limit and never inside a surrogate pair. Split
+ * the raw text, then escape each chunk: Telegram counts entities as one character.
+ */
+export function splitText(text: string, limit = TELEGRAM_TEXT_LIMIT): string[] {
+  const chunks: string[] = [];
+  let rest = text;
+  while (rest.length > limit) {
+    let cut = -1;
+    for (let i = limit; i > 0; i--) {
+      if (/\s/.test(rest[i])) {
+        cut = i;
+        break;
+      }
+    }
+    let chunk = cut > 0 ? rest.slice(0, cut).trimEnd() : '';
+    if (!chunk) {
+      cut = isHighSurrogate(rest.charCodeAt(limit - 1)) ? limit - 1 : limit;
+      chunk = rest.slice(0, cut);
+    }
+    chunks.push(chunk);
+    rest = rest.slice(cut).trimStart();
+  }
+  if (rest) chunks.push(rest);
+  return chunks;
+}
 
 /**
  * Escapes plain composer text for Telegram's HTML parse mode. Telegram rejects
@@ -339,22 +371,38 @@ export class TelegramPublisher {
   /**
    * Sends message to a channel. The composer text is plain text, so it is
    * escaped before being sent with parse_mode HTML. A caption longer than
-   * Telegram's 1024 limit is sent as a separate text message after the media.
+   * Telegram's 1024 limit is sent as a separate text message after the media,
+   * and text longer than 4096 is split into several messages.
    */
   private async sendMessage(
     channelId: string,
     text: string,
     cloudinaryMedia: CloudinaryMediaInfo[]
   ): Promise<{ result: TelegramMessage; warning?: string }> {
-    const sendText = () =>
+    const sendPart = (part: string) =>
       this.callApi<TelegramMessage>(
         'sendMessage',
-        { chat_id: channelId, text: escapeHtml(text), parse_mode: 'HTML' },
+        { chat_id: channelId, text: escapeHtml(part), parse_mode: 'HTML' },
         'Failed to send message'
       );
 
     if (cloudinaryMedia.length === 0) {
-      return { result: await sendText() };
+      const [first, ...more] = splitText(text);
+      const result = await sendPart(first ?? text);
+      for (const [i, part] of more.entries()) {
+        try {
+          await sendPart(part);
+        } catch (error) {
+          // Earlier parts are already posted; failing the channel would invite a duplicate retry.
+          const message = error instanceof Error ? error.message : 'Unknown error';
+          const total = more.length + 1;
+          return {
+            result,
+            warning: `Only ${i + 1} of ${total} parts of the text were posted (Telegram allows ${TELEGRAM_TEXT_LIMIT} characters per message): ${message}`,
+          };
+        }
+      }
+      return { result };
     }
 
     const captionFits = text.length <= TELEGRAM_CAPTION_LIMIT;
@@ -406,12 +454,20 @@ export class TelegramPublisher {
         channelId,
         textLength: text.length,
       });
-      try {
-        await sendText();
-      } catch (error) {
-        // The media is already posted; failing the channel would invite a duplicate retry.
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        warnings.push(`The media was posted, but the text (too long for a caption) could not be sent: ${message}`);
+      const parts = splitText(text);
+      for (const [i, part] of parts.entries()) {
+        try {
+          await sendPart(part);
+        } catch (error) {
+          // The media is already posted; failing the channel would invite a duplicate retry.
+          const message = error instanceof Error ? error.message : 'Unknown error';
+          warnings.push(
+            i === 0
+              ? `The media was posted, but the text (too long for a caption) could not be sent: ${message}`
+              : `The media was posted, but only ${i} of ${parts.length} parts of the text could be sent: ${message}`
+          );
+          break;
+        }
       }
     }
 
