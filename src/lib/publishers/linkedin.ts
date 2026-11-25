@@ -1,7 +1,8 @@
 import { Pool } from 'pg';
 import { createLogger } from '@/lib/logger';
-import { CloudinaryMediaInfo } from '@/lib/publish/types';
-import { THUMBNAIL_RETRY_DELAYS_MS, ThumbnailError, isRetryableStatus, retryThumbnail } from './thumbnailRetry';
+import { CloudinaryMediaInfo, MediaThumbnail } from '@/lib/publish/types';
+import { fetchMedia } from '@/lib/publish/mediaUrl';
+import { THUMBNAIL_RETRY_DELAYS_MS, ThumbnailError, fetchThumbnail, isRetryableStatus, retryThumbnail } from './thumbnailRetry';
 
 const logger = createLogger('LinkedInPublisher');
 
@@ -110,11 +111,11 @@ export class LinkedInPublisher {
     let warning: string | undefined;
     let mediaUrns: string[];
     if (videos.length === 1) {
-      const video = await this.uploadVideo(token.access_token, author, videos[0].publicUrl, videos[0].thumbnail?.publicUrl);
+      const video = await this.uploadVideo(token.access_token, author, videos[0], videos[0].thumbnail);
       mediaUrns = [video.urn];
       warning = video.warning;
     } else {
-      mediaUrns = await Promise.all(media.map((m) => this.uploadImage(token.access_token, author, m.publicUrl)));
+      mediaUrns = await Promise.all(media.map((m) => this.uploadImage(token.access_token, author, m)));
     }
 
     const response = await fetch(`${API_BASE}/posts`, {
@@ -135,7 +136,7 @@ export class LinkedInPublisher {
     return { postId: response.headers.get('x-restli-id') ?? '', warning };
   }
 
-  private async uploadImage(accessToken: string, owner: string, imageUrl: string): Promise<string> {
+  private async uploadImage(accessToken: string, owner: string, imageMedia: CloudinaryMediaInfo): Promise<string> {
     const init = await fetch(`${API_BASE}/images?action=initializeUpload`, {
       method: 'POST',
       headers: { ...this.headers(accessToken), 'Content-Type': 'application/json' },
@@ -144,13 +145,12 @@ export class LinkedInPublisher {
     if (!init.ok) throw await this.apiError(init, 'initialize image upload');
     const { value } = (await init.json()) as { value: { uploadUrl: string; image: string } };
 
-    const image = await fetch(imageUrl);
-    if (!image.ok) throw new Error(`Could not download image ${imageUrl} (HTTP ${image.status})`);
+    const image = await fetchMedia(imageMedia.publicUrl, 'image', { publicId: imageMedia.publicId });
 
     const upload = await fetch(value.uploadUrl, {
       method: 'PUT',
       headers: { Authorization: `Bearer ${accessToken}` },
-      body: await image.arrayBuffer(),
+      body: image.bytes,
     });
     if (!upload.ok) throw await this.apiError(upload, 'upload image');
     return value.image;
@@ -164,19 +164,17 @@ export class LinkedInPublisher {
   private async uploadVideo(
     accessToken: string,
     owner: string,
-    videoUrl: string,
-    thumbnailUrl?: string
+    video: CloudinaryMediaInfo,
+    thumbnail?: MediaThumbnail
   ): Promise<{ urn: string; warning?: string }> {
     // ponytail: buffers the whole video in memory; stream ranges from Cloudinary if large videos exhaust RAM.
-    const download = await fetch(videoUrl);
-    if (!download.ok) throw new Error(`Could not download video ${videoUrl} (HTTP ${download.status})`);
-    const bytes = new Uint8Array(await download.arrayBuffer());
+    const { bytes } = await fetchMedia(video.publicUrl, 'video', { publicId: video.publicId });
 
     const init = await fetch(`${API_BASE}/videos?action=initializeUpload`, {
       method: 'POST',
       headers: { ...this.headers(accessToken), 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        initializeUploadRequest: { owner, fileSizeBytes: bytes.byteLength, uploadCaptions: false, uploadThumbnail: Boolean(thumbnailUrl) },
+        initializeUploadRequest: { owner, fileSizeBytes: bytes.byteLength, uploadCaptions: false, uploadThumbnail: Boolean(thumbnail) },
       }),
     });
     if (!init.ok) throw await this.apiError(init, 'initialize video upload');
@@ -201,10 +199,10 @@ export class LinkedInPublisher {
     }
 
     let warning: string | undefined;
-    if (thumbnailUrl) {
+    if (thumbnail) {
       try {
         await retryThumbnail(
-          () => this.uploadThumbnail(value.thumbnailUploadUrl, thumbnailUrl),
+          () => this.uploadThumbnail(value.thumbnailUploadUrl, thumbnail),
           this.thumbnailRetryDelaysMs,
           (attempt, error) =>
             logger.warn('LinkedIn thumbnail attempt failed, retrying', {
@@ -233,16 +231,13 @@ export class LinkedInPublisher {
     return { urn: value.video, warning };
   }
 
-  private async uploadThumbnail(uploadUrl: string | undefined, thumbnailUrl: string): Promise<void> {
+  private async uploadThumbnail(uploadUrl: string | undefined, thumbnail: MediaThumbnail): Promise<void> {
     if (!uploadUrl) throw new ThumbnailError('LinkedIn did not return a thumbnail upload URL.', false);
-    const image = await fetch(thumbnailUrl);
-    if (!image.ok) {
-      throw new ThumbnailError(`Could not download the thumbnail (HTTP ${image.status})`, isRetryableStatus(image.status));
-    }
+    const image = await fetchThumbnail(thumbnail);
     const upload = await fetch(uploadUrl, {
       method: 'PUT',
       headers: { 'media-type-family': 'STILLIMAGE', 'Content-Type': 'application/octet-stream' },
-      body: await image.arrayBuffer(),
+      body: image,
     });
     if (!upload.ok) {
       const error = await this.apiError(upload, 'upload the thumbnail');

@@ -1,3 +1,6 @@
+import { fetchMedia, MediaFetchError } from '@/lib/publish/mediaUrl';
+import type { MediaThumbnail } from '@/lib/publish/types';
+
 /** Waits before each retry of a thumbnail step: platforms often reject it while the video is still processing. */
 export const THUMBNAIL_RETRY_DELAYS_MS = [2_000, 5_000, 10_000];
 
@@ -11,6 +14,21 @@ export class ThumbnailError extends Error {
 
 /** Statuses worth retrying: the video is not ready yet (404, 409), rate limits and server errors. */
 export const isRetryableStatus = (status: number) => status === 404 || status === 409 || status === 429 || status >= 500;
+
+/**
+ * Downloads a custom thumbnail from our Cloudinary cloud. Failures become ThumbnailErrors:
+ * refused URLs and oversized files are final, HTTP errors retry by status, network errors retry.
+ */
+export async function fetchThumbnail(thumbnail: MediaThumbnail): Promise<Uint8Array> {
+  try {
+    const { bytes } = await fetchMedia(thumbnail.publicUrl, 'image', { publicId: thumbnail.publicId, label: 'thumbnail' });
+    return bytes;
+  } catch (error) {
+    if (!(error instanceof MediaFetchError)) throw error;
+    const { status, refused } = error.details;
+    throw new ThumbnailError(error.message, !refused && (status === undefined || isRetryableStatus(status)));
+  }
+}
 
 /**
  * Runs a thumbnail step, retrying after each delay while it fails with a retryable error.

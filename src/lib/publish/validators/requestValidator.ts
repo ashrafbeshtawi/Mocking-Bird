@@ -2,6 +2,7 @@ import { PublishRequest, CloudinaryMediaInfo, MediaThumbnail } from '../types';
 import { parseContentSelection } from '../contentRules';
 import { youtubeTitleError } from '@/lib/youtube';
 import { parseTikTokSettings, tiktokSettingsError } from '@/lib/tiktok';
+import { isAllowedMediaUrl } from '../mediaUrl';
 
 export interface ValidationResult<T> {
   success: boolean;
@@ -124,21 +125,24 @@ export function validateAccountArrays(
   return { success: true };
 }
 
-/** The thumbnail of a video item when it is well-formed; images and malformed thumbnails get none. */
+/**
+ * The thumbnail of a video item when it is well-formed and hosted on our Cloudinary cloud;
+ * images and malformed or foreign thumbnails get none.
+ */
 function parseThumbnail(item: CloudinaryMediaInfo): MediaThumbnail | undefined {
   const thumbnail = item.thumbnail as Partial<MediaThumbnail> | undefined;
   return item.resourceType === 'video' &&
     typeof thumbnail?.publicId === 'string' &&
-    typeof thumbnail.publicUrl === 'string' &&
-    thumbnail.publicUrl
+    isAllowedMediaUrl(thumbnail.publicUrl, thumbnail.publicId)
     ? { publicId: thumbnail.publicId, publicUrl: thumbnail.publicUrl }
     : undefined;
 }
 
 /**
- * Validates Cloudinary media info
+ * Validates Cloudinary media info. The server downloads these URLs, so an item whose
+ * URL is not an asset on our Cloudinary cloud matching its publicId rejects the request.
  */
-function validateCloudinaryMedia(media: unknown[]): ValidationResult<CloudinaryMediaInfo[]> {
+export function validateCloudinaryMedia(media: unknown[]): ValidationResult<CloudinaryMediaInfo[]> {
   if (!Array.isArray(media)) {
     return { success: true, data: [] };
   }
@@ -158,6 +162,12 @@ function validateCloudinaryMedia(media: unknown[]): ValidationResult<CloudinaryM
         typeof mediaItem.publicUrl === 'string' &&
         (mediaItem.resourceType === 'image' || mediaItem.resourceType === 'video')
       ) {
+        if (!isAllowedMediaUrl(mediaItem.publicUrl, mediaItem.publicId)) {
+          return {
+            success: false,
+            error: `Media "${typeof mediaItem.originalFilename === 'string' && mediaItem.originalFilename ? mediaItem.originalFilename : mediaItem.publicId}" must be uploaded to this app's Cloudinary account.`,
+          };
+        }
         const thumbnail = parseThumbnail(mediaItem);
         validMedia.push({
           publicId: mediaItem.publicId,

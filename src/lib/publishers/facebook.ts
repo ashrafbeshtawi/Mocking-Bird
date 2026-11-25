@@ -4,6 +4,7 @@ import { Pool } from 'pg';
 import FormData from 'form-data';
 import { MediaFile } from '@/types/interfaces';
 import { createLogger } from '@/lib/logger';
+import { MEDIA_MAX_BYTES, MEDIA_TIMEOUT_MS, isAllowedMediaUrl } from '@/lib/publish/mediaUrl';
 import { THUMBNAIL_RETRY_DELAYS_MS, ThumbnailError, isRetryableStatus, retryThumbnail } from './thumbnailRetry';
 
 const logger = createLogger('FacebookPublisher');
@@ -148,6 +149,12 @@ export class FacebookPublisher {
     if (!video.thumbnailUrl) return { videoId };
 
     const thumbnailUrl = video.thumbnailUrl;
+    if (!isAllowedMediaUrl(thumbnailUrl)) {
+      return {
+        videoId,
+        warning: `${video.filename} was published, but its thumbnail was not set: it is not hosted on this app's Cloudinary account.`,
+      };
+    }
     const errorMessage = (error: unknown) =>
       axios.isAxiosError(error)
         ? error.response?.data?.error?.message || error.message
@@ -156,7 +163,11 @@ export class FacebookPublisher {
       await retryThumbnail(
         async () => {
           try {
-            const image = await axios.get<ArrayBuffer>(thumbnailUrl, { responseType: 'arraybuffer' });
+            const image = await axios.get<ArrayBuffer>(thumbnailUrl, {
+              responseType: 'arraybuffer',
+              maxContentLength: MEDIA_MAX_BYTES.image,
+              timeout: MEDIA_TIMEOUT_MS.image,
+            });
             const formData = new FormData();
             formData.append('source', Buffer.from(image.data), { filename: 'thumbnail.jpg', contentType: 'image/jpeg' });
             formData.append('is_preferred', 'true');

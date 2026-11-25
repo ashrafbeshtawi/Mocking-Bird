@@ -1,6 +1,7 @@
 import { Pool } from 'pg';
 import { createLogger } from '@/lib/logger';
 import { CloudinaryMediaInfo } from '@/lib/publish/types';
+import { fetchMedia } from '@/lib/publish/mediaUrl';
 import {
   TIKTOK_API_URL,
   TIKTOK_REVOKE_URL,
@@ -198,10 +199,9 @@ export class TikTokPublisher {
     const accessToken = await this.freshAccessToken(token);
 
     // ponytail: buffers the whole video in memory; stream from Cloudinary if large videos exhaust RAM.
-    const download = await fetch(videos[0].publicUrl);
-    if (!download.ok) throw new Error(`Could not download video ${videos[0].publicUrl} (HTTP ${download.status})`);
-    const contentType = download.headers.get('content-type') ?? 'video/mp4';
-    const bytes = new Uint8Array(await download.arrayBuffer());
+    const download = await fetchMedia(videos[0].publicUrl, 'video', { publicId: videos[0].publicId });
+    const contentType = download.contentType ?? 'video/mp4';
+    const bytes = download.bytes;
     const { chunkSize, totalChunkCount } = chunkPlan(bytes.byteLength);
 
     const { publish_id, upload_url } = await this.call<{ publish_id: string; upload_url: string }>(

@@ -1,27 +1,24 @@
 import { MediaFile } from '@/types/interfaces';
 import { ProcessedMedia, ReportLogger, CloudinaryMediaInfo } from '../types';
 import { createLogger } from '@/lib/logger';
+import { fetchMedia } from '../mediaUrl';
 
 const logger = createLogger('MediaValidator');
 
 /**
- * Downloads a file from a URL and returns it as a buffer
+ * Downloads a Cloudinary media file and returns it as a buffer
  */
 async function downloadToBuffer(
-  url: string,
-  filename: string
+  media: CloudinaryMediaInfo
 ): Promise<{ buffer: Buffer; contentType: string }> {
-  const response = await fetch(url);
-
-  if (!response.ok) {
-    throw new Error(`Failed to download ${filename}: ${response.status} ${response.statusText}`);
-  }
-
-  const arrayBuffer = await response.arrayBuffer();
-  const buffer = Buffer.from(arrayBuffer);
-  const contentType = response.headers.get('content-type') || 'application/octet-stream';
-
-  return { buffer, contentType };
+  const { bytes, contentType } = await fetchMedia(media.publicUrl, media.resourceType, {
+    publicId: media.publicId,
+    label: media.resourceType,
+  });
+  return {
+    buffer: Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength),
+    contentType: contentType || 'application/octet-stream',
+  };
 }
 
 /**
@@ -50,10 +47,7 @@ export async function processCloudinaryMedia(
     try {
       reportLogger?.add(`Downloading ${media.originalFilename} from Cloudinary...`);
 
-      const { buffer, contentType } = await downloadToBuffer(
-        media.publicUrl,
-        media.originalFilename
-      );
+      const { buffer, contentType } = await downloadToBuffer(media);
 
       // Determine mimetype from Cloudinary info or downloaded content-type
       let mimetype = contentType;

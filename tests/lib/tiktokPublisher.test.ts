@@ -5,6 +5,8 @@ import type { CloudinaryMediaInfo } from '@/lib/publish/types';
 
 const MB = 1024 * 1024;
 
+process.env.CLOUDINARY_URL = 'cloudinary://123456:secret@demo';
+
 const account = (expiresInMs: number): TikTokAccountToken => ({
   open_id: 'oid-1',
   display_name: 'Ada Dances',
@@ -15,7 +17,7 @@ const account = (expiresInMs: number): TikTokAccountToken => ({
 
 const video: CloudinaryMediaInfo = {
   publicId: 'vid1',
-  publicUrl: 'https://res.cloudinary.com/vid1.mp4',
+  publicUrl: 'https://res.cloudinary.com/demo/video/upload/v1/vid1.mp4',
   resourceType: 'video',
   format: 'mp4',
   originalFilename: 'dance.mp4',
