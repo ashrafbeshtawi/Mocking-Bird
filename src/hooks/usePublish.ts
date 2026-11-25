@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef } from 'react';
 import type { InstagramSelection, Platform } from '@/types/accounts';
 import type { UploadedMedia } from '@/components/publish/MediaUploader';
-import { contentKinds, needsChoice, resolveContent, type ContentSelection } from '@/lib/publish/contentRules';
+import { contentKinds, mediaCounts, needsChoice, resolveContent, type ContentSelection } from '@/lib/publish/contentRules';
 import { youtubeTitleError } from '@/lib/youtube';
 import { tiktokSettingsError, type TikTokPostSettings } from '@/lib/tiktok';
 import { PLATFORM_CONFIG } from '@/lib/platformConfig';
@@ -147,6 +147,7 @@ export function usePublish(): UsePublishReturn {
       // A selected platform that can take part of the post must have a choice made;
       // one that cannot take it at all is simply left out.
       const kinds = contentKinds(postText, uploadedMedia);
+      const counts = mediaCounts(uploadedMedia);
       const isSelected: Record<Platform, boolean> = {
         facebook: params.selectedFacebookPages.length > 0,
         twitter: params.selectedXAccounts.length > 0,
@@ -157,7 +158,7 @@ export function usePublish(): UsePublishReturn {
         tiktok: params.selectedTikTokAccounts.length > 0,
       };
       const undecided = (Object.keys(isSelected) as Platform[]).filter(
-        (platform) => isSelected[platform] && needsChoice(platform, kinds, params.contentSelection?.[platform])
+        (platform) => isSelected[platform] && needsChoice(platform, kinds, params.contentSelection?.[platform], counts)
       );
       if (undecided.length > 0) {
         setError({
@@ -170,7 +171,7 @@ export function usePublish(): UsePublishReturn {
 
       const contentSelection: ContentSelection = {};
       const isSendable = (platform: Platform): boolean => {
-        const sent = resolveContent(platform, kinds, params.contentSelection?.[platform]);
+        const sent = resolveContent(platform, kinds, params.contentSelection?.[platform], counts);
         if (sent && sent.length < kinds.length) contentSelection[platform] = sent;
         return sent !== null;
       };

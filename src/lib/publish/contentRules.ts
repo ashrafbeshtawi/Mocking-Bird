@@ -3,6 +3,12 @@ import type { Platform } from '@/types/accounts';
 /** The kinds of content a post can carry. */
 export type ContentKind = 'text' | 'image' | 'video';
 
+/** The media kinds, the ones a post can carry more than one of. */
+export type MediaKind = Exclude<ContentKind, 'text'>;
+
+/** How many images and videos a post carries. */
+export type MediaCounts = Partial<Record<MediaKind, number>>;
+
 /** Per platform, the kinds the user picked to send when the full post does not fit. */
 export type ContentSelection = Partial<Record<Platform, ContentKind[]>>;
 
@@ -14,16 +20,18 @@ export interface PlatformContentRules {
    * A kind that appears only here (e.g. Instagram text) is allowed only inside such a mix.
    */
   mixes: ContentKind[][] | 'all';
+  /** Most items of a media kind one post may carry; a kind above it cannot be sent. */
+  max?: MediaCounts;
 }
 
 export const PLATFORM_CONTENT_RULES: Record<Platform, PlatformContentRules> = {
   facebook: { supported: ['text', 'image', 'video'], mixes: 'all' },
   telegram: { supported: ['text', 'image', 'video'], mixes: 'all' },
-  twitter: { supported: ['text', 'image', 'video'], mixes: [['text', 'image'], ['text', 'video']] },
+  twitter: { supported: ['text', 'image', 'video'], mixes: [['text', 'image'], ['text', 'video']], max: { image: 4, video: 1 } },
   instagram: { supported: ['image', 'video'], mixes: [['text', 'image'], ['text', 'video']] },
-  linkedin: { supported: ['text', 'image', 'video'], mixes: [['text', 'image'], ['text', 'video']] },
-  youtube: { supported: ['video'], mixes: [['text', 'video']] },
-  tiktok: { supported: ['video'], mixes: [['text', 'video']] },
+  linkedin: { supported: ['text', 'image', 'video'], mixes: [['text', 'image'], ['text', 'video']], max: { image: 20, video: 1 } },
+  youtube: { supported: ['video'], mixes: [['text', 'video']], max: { video: 1 } },
+  tiktok: { supported: ['video'], mixes: [['text', 'video']], max: { video: 1 } },
 };
 
 /** How a post fits a platform's rules. `partial` lists the largest sendable subsets. */
@@ -53,9 +61,24 @@ export function contentKinds(
   return sortKinds([...kinds]);
 }
 
-export function isAllowed(platform: Platform, kinds: ContentKind[]): boolean {
+/** How many images and videos a post carries. */
+export function mediaCounts(media: ReadonlyArray<{ resourceType: MediaKind }>): MediaCounts {
+  const counts: MediaCounts = {};
+  media.forEach((m) => (counts[m.resourceType] = (counts[m.resourceType] ?? 0) + 1));
+  return counts;
+}
+
+/** The media kinds the post carries more of than the platform takes in one post, e.g. ['video']. */
+export function overLimit(platform: Platform, counts: MediaCounts = {}): MediaKind[] {
+  const max = PLATFORM_CONTENT_RULES[platform].max ?? {};
+  return (['image', 'video'] as const).filter((k) => max[k] !== undefined && (counts[k] ?? 0) > max[k]);
+}
+
+export function isAllowed(platform: Platform, kinds: ContentKind[], counts?: MediaCounts): boolean {
   const { supported, mixes } = PLATFORM_CONTENT_RULES[platform];
   if (kinds.length === 0) return false;
+  const tooMany = overLimit(platform, counts);
+  if (kinds.some((k) => (tooMany as ContentKind[]).includes(k))) return false;
   if (kinds.length === 1) return supported.includes(kinds[0]);
   if (mixes === 'all') return isSubset(kinds, supported);
   return mixes.some((mix) => sameKinds(mix, kinds));
@@ -70,9 +93,10 @@ const properSubsets = (kinds: ContentKind[]): ContentKind[][] => {
   return out;
 };
 
-export function fitContent(platform: Platform, kinds: ContentKind[]): ContentFit {
-  if (isAllowed(platform, kinds)) return { status: 'ok' };
-  const allowed = properSubsets(kinds).filter((s) => isAllowed(platform, s));
+/** `counts` (see `mediaCounts`) applies the platform's per-kind limits; without it only kinds count. */
+export function fitContent(platform: Platform, kinds: ContentKind[], counts?: MediaCounts): ContentFit {
+  if (isAllowed(platform, kinds, counts)) return { status: 'ok' };
+  const allowed = properSubsets(kinds).filter((s) => isAllowed(platform, s, counts));
   // Keep only the largest subsets: a smaller one is never a better choice.
   const options = allowed.filter((s) => !allowed.some((o) => o.length > s.length && isSubset(s, o)));
   return options.length > 0 ? { status: 'partial', options } : { status: 'unsupported' };
@@ -85,9 +109,10 @@ export function fitContent(platform: Platform, kinds: ContentKind[]): ContentFit
 export function resolveContent(
   platform: Platform,
   kinds: ContentKind[],
-  selection?: ContentKind[]
+  selection?: ContentKind[],
+  counts?: MediaCounts
 ): ContentKind[] | null {
-  const fit = fitContent(platform, kinds);
+  const fit = fitContent(platform, kinds, counts);
   if (fit.status === 'ok') return kinds;
   if (fit.status === 'partial' && selection && fit.options.some((o) => sameKinds(o, selection))) {
     return sortKinds(selection);
@@ -96,8 +121,16 @@ export function resolveContent(
 }
 
 /** Whether the platform can take part of the post but the user has not yet chosen which part. */
-export function needsChoice(platform: Platform, kinds: ContentKind[], selection?: ContentKind[]): boolean {
-  return fitContent(platform, kinds).status === 'partial' && resolveContent(platform, kinds, selection) === null;
+export function needsChoice(
+  platform: Platform,
+  kinds: ContentKind[],
+  selection?: ContentKind[],
+  counts?: MediaCounts
+): boolean {
+  return (
+    fitContent(platform, kinds, counts).status === 'partial' &&
+    resolveContent(platform, kinds, selection, counts) === null
+  );
 }
 
 const KIND_LABELS: Record<ContentKind, string> = { text: 'text', image: 'images', video: 'video' };
@@ -105,6 +138,16 @@ const KIND_LABELS: Record<ContentKind, string> = { text: 'text', image: 'images'
 /** "text + images", "video" */
 export function describeKinds(kinds: ContentKind[]): string {
   return sortKinds(kinds).map((k) => KIND_LABELS[k]).join(' + ');
+}
+
+const LIMIT_LABELS: Record<MediaKind, [string, string]> = { image: ['image', 'images'], video: ['video', 'videos'] };
+
+/** "1 video", "4 images and 1 video": what the platform takes at most of each kind the post has too many of. */
+export function describeLimits(platform: Platform, counts?: MediaCounts): string {
+  const max = PLATFORM_CONTENT_RULES[platform].max ?? {};
+  return overLimit(platform, counts)
+    .map((k) => `${max[k]} ${LIMIT_LABELS[k][max[k] === 1 ? 0 : 1]}`)
+    .join(' and ');
 }
 
 /** Parses an untrusted selection into one keyed by known platforms with known kinds. */

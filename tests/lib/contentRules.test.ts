@@ -4,6 +4,9 @@ import {
   resolveContent,
   needsChoice,
   describeKinds,
+  describeLimits,
+  mediaCounts,
+  overLimit,
   parseContentSelection,
 } from '@/lib/publish/contentRules';
 
@@ -87,6 +90,47 @@ describe('needsChoice', () => {
     expect(needsChoice('twitter', [...mixed], ['text', 'video'])).toBe(false);
     expect(needsChoice('facebook', [...mixed])).toBe(false);
     expect(needsChoice('instagram', ['text'])).toBe(false);
+  });
+});
+
+describe('media count limits', () => {
+  it('counts images and videos', () => {
+    expect(mediaCounts([image, video, image])).toEqual({ image: 2, video: 1 });
+    expect(mediaCounts([])).toEqual({});
+  });
+
+  it('rejects a second video on YouTube and TikTok', () => {
+    const twoVideos = mediaCounts([video, video]);
+    expect(fitContent('youtube', ['text', 'video'], twoVideos)).toEqual({ status: 'unsupported' });
+    expect(fitContent('tiktok', ['video'], twoVideos)).toEqual({ status: 'unsupported' });
+    expect(fitContent('youtube', ['text', 'video'], mediaCounts([video]))).toEqual({ status: 'ok' });
+  });
+
+  it('drops a kind over its limit from the options', () => {
+    expect(fitContent('twitter', ['text', 'image'], { image: 5 })).toEqual({ status: 'partial', options: [['text']] });
+    expect(fitContent('twitter', ['text', 'image'], { image: 4 })).toEqual({ status: 'ok' });
+    expect(fitContent('linkedin', ['text', 'image', 'video'], { image: 21, video: 1 })).toEqual({
+      status: 'partial',
+      options: [['text', 'video']],
+    });
+  });
+
+  it('leaves platforms without limits alone', () => {
+    expect(fitContent('facebook', ['text', 'image', 'video'], { image: 30, video: 5 })).toEqual({ status: 'ok' });
+    expect(overLimit('telegram', { image: 30 })).toEqual([]);
+  });
+
+  it('applies the limits when resolving and when asking for a choice', () => {
+    expect(resolveContent('twitter', ['text', 'image'], undefined, { image: 5 })).toBeNull();
+    expect(resolveContent('twitter', ['text', 'image'], ['text'], { image: 5 })).toEqual(['text']);
+    expect(needsChoice('twitter', ['text', 'image'], undefined, { image: 5 })).toBe(true);
+    expect(needsChoice('youtube', ['text', 'video'], undefined, { video: 2 })).toBe(false);
+  });
+
+  it('describes what the platform takes at most', () => {
+    expect(describeLimits('youtube', { video: 2 })).toBe('1 video');
+    expect(describeLimits('twitter', { image: 5, video: 2 })).toBe('4 images and 1 video');
+    expect(describeLimits('twitter', { image: 2 })).toBe('');
   });
 });
 

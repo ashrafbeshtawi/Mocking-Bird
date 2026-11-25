@@ -7,9 +7,11 @@ import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import { PLATFORM_CONFIG } from '@/lib/platformConfig';
 import {
   describeKinds,
+  describeLimits,
   fitContent,
   sameKinds,
   type ContentKind,
+  type MediaCounts,
 } from '@/lib/publish/contentRules';
 import type { Platform } from '@/types/accounts';
 
@@ -17,6 +19,8 @@ interface ContentFitBadgeProps {
   platform: Platform;
   /** Kinds present in the post. */
   kinds: ContentKind[];
+  /** How many images and videos the post has; drives the per-platform limits. */
+  counts?: MediaCounts;
   /** The option chosen for this platform, if any. */
   selection?: ContentKind[];
   /** Enables the chooser; without it the badge only reports. */
@@ -28,15 +32,18 @@ interface ContentFitBadgeProps {
  * platform cannot take it, a clickable warning (then the chosen part) when only
  * part of it can go.
  */
-export function ContentFitBadge({ platform, kinds, selection, onSelect }: ContentFitBadgeProps) {
+export function ContentFitBadge({ platform, kinds, counts, selection, onSelect }: ContentFitBadgeProps) {
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
-  const fit = fitContent(platform, kinds);
+  const fit = fitContent(platform, kinds, counts);
   const label = PLATFORM_CONFIG[platform].label;
 
   if (fit.status === 'ok') return null;
 
   const stop = (e: React.MouseEvent) => e.stopPropagation();
-  const problem = `${label} can't post ${describeKinds(kinds)}${kinds.length > 1 ? ' together' : ''}`;
+  const limits = describeLimits(platform, counts);
+  const problem = limits
+    ? `${label} takes at most ${limits} per post`
+    : `${label} can't post ${describeKinds(kinds)}${kinds.length > 1 ? ' together' : ''}`;
 
   if (fit.status === 'unsupported') {
     return (

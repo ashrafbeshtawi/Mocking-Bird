@@ -14,7 +14,7 @@ import {
 } from '@mui/material';
 import { PLATFORM_CONFIG } from '@/lib/platformConfig';
 import { ContentFitBadge } from '@/components/publish/ContentFitBadge';
-import { fitContent, type ContentKind, type ContentSelection } from '@/lib/publish/contentRules';
+import { fitContent, type ContentKind, type ContentSelection, type MediaCounts } from '@/lib/publish/contentRules';
 import type {
   ConnectedPage,
   ConnectedXAccount,
@@ -51,6 +51,8 @@ interface AccountSelectorProps {
   onTikTokChange: (openId: string) => void;
   /** Kinds present in the post; drives the per-row fit badges. */
   contentKinds: ContentKind[];
+  /** How many images and videos the post has; drives the per-platform limits. */
+  contentCounts?: MediaCounts;
   contentSelection: ContentSelection;
   onContentSelect: (platform: Platform, kinds: ContentKind[]) => void;
 }
@@ -78,6 +80,7 @@ export function AccountSelector({
   onYouTubeChange,
   onTikTokChange,
   contentKinds,
+  contentCounts,
   contentSelection,
   onContentSelect,
 }: AccountSelectorProps) {
@@ -85,11 +88,12 @@ export function AccountSelector({
     <ContentFitBadge
       platform={platform}
       kinds={contentKinds}
+      counts={contentCounts}
       selection={contentSelection[platform]}
       onSelect={(kinds) => onContentSelect(platform, kinds)}
     />
   );
-  const isInstagramPossible = fitContent('instagram', contentKinds).status !== 'unsupported';
+  const isInstagramPossible = fitContent('instagram', contentKinds, contentCounts).status !== 'unsupported';
   const hasAnyAccount =
     facebookPages.length > 0 ||
     xAccounts.length > 0 ||

@@ -42,7 +42,7 @@ import type { UploadedMedia } from '@/components/publish/MediaUploader';
 import { mapDraftMediaToUploaded } from '@/hooks/useDrafts';
 import type { InstagramSelection, Platform, TargetAccount } from '@/types/accounts';
 import { TWITTER_CHAR_LIMIT } from '@/types/accounts';
-import { contentKinds, fitContent, needsChoice, resolveContent, type ContentKind, type ContentSelection } from '@/lib/publish/contentRules';
+import { contentKinds, fitContent, mediaCounts, needsChoice, resolveContent, type ContentKind, type ContentSelection } from '@/lib/publish/contentRules';
 import { PLATFORM_CONFIG } from '@/lib/platformConfig';
 
 export default function PublishPage() {
@@ -492,6 +492,7 @@ function PublishPageInner() {
   const hasAnyAccount =
     facebookPages.length > 0 || xAccounts.length > 0 || instagramAccounts.length > 0 || telegramChannels.length > 0 || linkedinAccounts.length > 0 || youtubeChannels.length > 0 || tiktokAccounts.length > 0;
   const kinds = contentKinds(postText, uploadedMedia);
+  const counts = mediaCounts(uploadedMedia);
   const selectedPerPlatform: Record<Platform, number> = {
     facebook: selectedFacebookPages.length,
     twitter: selectedXAccounts.length,
@@ -502,17 +503,17 @@ function PublishPageInner() {
     tiktok: selectedTikTokAccounts.length,
   };
   const platforms = Object.keys(selectedPerPlatform) as Platform[];
-  const showYouTubeTitle = selectedYouTubeChannels.length > 0 && fitContent('youtube', kinds).status !== 'unsupported';
-  const showTikTokSettings = selectedTikTokAccounts.length > 0 && resolveContent('tiktok', kinds, contentSelection.tiktok) !== null;
+  const showYouTubeTitle = selectedYouTubeChannels.length > 0 && fitContent('youtube', kinds, counts).status !== 'unsupported';
+  const showTikTokSettings = selectedTikTokAccounts.length > 0 && resolveContent('tiktok', kinds, contentSelection.tiktok, counts) !== null;
   // Selected destinations whose platform can take the post (or has a choice made)
   const selectedCount = platforms.reduce(
     (count, platform) =>
-      count + (resolveContent(platform, kinds, contentSelection[platform]) !== null ? selectedPerPlatform[platform] : 0),
+      count + (resolveContent(platform, kinds, contentSelection[platform], counts) !== null ? selectedPerPlatform[platform] : 0),
     0
   );
   // Selected platforms that can take part of the post but have no choice made yet
   const undecided = platforms.filter(
-    (platform) => selectedPerPlatform[platform] > 0 && needsChoice(platform, kinds, contentSelection[platform])
+    (platform) => selectedPerPlatform[platform] > 0 && needsChoice(platform, kinds, contentSelection[platform], counts)
   );
   const canSaveDraft =
     !isPublishing &&
@@ -785,6 +786,7 @@ function PublishPageInner() {
                   onYouTubeChange={handleYouTubeChange}
                   onTikTokChange={handleTikTokChange}
                   contentKinds={kinds}
+                  contentCounts={counts}
                   contentSelection={contentSelection}
                   onContentSelect={handleContentSelect}
                 />

@@ -41,7 +41,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { PublishResults } from '@/components/publish/PublishResults';
 import { ContentFitBadge } from '@/components/publish/ContentFitBadge';
 import { getPlatformConfig } from '@/lib/platformConfig';
-import { contentKinds, fitContent, needsChoice, resolveContent, type ContentSelection } from '@/lib/publish/contentRules';
+import { contentKinds, fitContent, mediaCounts, needsChoice, resolveContent, type ContentSelection } from '@/lib/publish/contentRules';
 import { MediaPreviewDialog, type PreviewMedia } from '@/components/publish/MediaPreviewDialog';
 import { YouTubeTitleField } from '@/components/publish/YouTubeTitleField';
 import { youtubeTitleError } from '@/lib/youtube';
@@ -55,6 +55,7 @@ import { PLATFORMS, type InstagramSelection, type Platform } from '@/types/accou
 const SEARCH_DEBOUNCE_MS = 300;
 
 const draftKinds = (draft: Draft) => contentKinds(draft.text, mapDraftMediaToUploaded(draft.media));
+const draftCounts = (draft: Draft) => mediaCounts(mapDraftMediaToUploaded(draft.media));
 
 export default function DraftsPage() {
   const router = useRouter();
@@ -166,10 +167,12 @@ export default function DraftsPage() {
 
   const previewHasMedia = (previewDraft?.media?.length ?? 0) > 0;
   const previewKinds = previewDraft ? draftKinds(previewDraft) : [];
+  const previewCounts = previewDraft ? draftCounts(previewDraft) : {};
   const isPreviewSendable = (platform: Platform) =>
-    resolveContent(platform, previewKinds, previewSelection[platform]) !== null;
+    resolveContent(platform, previewKinds, previewSelection[platform], previewCounts) !== null;
   const previewNeedsChoice = (platform: Platform) =>
-    getAccountNamesFor(platform).length > 0 && needsChoice(platform, previewKinds, previewSelection[platform]);
+    getAccountNamesFor(platform).length > 0 &&
+    needsChoice(platform, previewKinds, previewSelection[platform], previewCounts);
   const isPreviewUndecided = previewDraft?.target_platforms.some(previewNeedsChoice) ?? false;
 
   const isPreviewTikTok = getPreviewTargetIdsOn('tiktok').length > 0 &&
@@ -268,7 +271,7 @@ export default function DraftsPage() {
     draft.target_platforms.map((platform) => (
       <Box key={platform} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
         {renderPlatformChips([platform])}
-        <ContentFitBadge platform={platform} kinds={draftKinds(draft)} />
+        <ContentFitBadge platform={platform} kinds={draftKinds(draft)} counts={draftCounts(draft)} />
       </Box>
     ));
 
@@ -612,6 +615,7 @@ export default function DraftsPage() {
                   <ContentFitBadge
                     platform={platform}
                     kinds={previewKinds}
+                    counts={previewCounts}
                     selection={previewSelection[platform]}
                     onSelect={(kinds) => setPreviewSelection((prev) => ({ ...prev, [platform]: kinds }))}
                   />
@@ -630,7 +634,7 @@ export default function DraftsPage() {
           </Box>
 
           {getPreviewTargetIdsOn('youtube').length > 0 &&
-            fitContent('youtube', previewKinds).status !== 'unsupported' && (
+            fitContent('youtube', previewKinds, previewCounts).status !== 'unsupported' && (
               <Box sx={{ mt: 2 }}>
                 <YouTubeTitleField value={previewYoutubeTitle} onChange={setPreviewYoutubeTitle} />
               </Box>
