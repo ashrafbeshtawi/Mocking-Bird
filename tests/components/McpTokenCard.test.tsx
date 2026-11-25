@@ -1,16 +1,5 @@
 /** @jest-environment jsdom */
 jest.mock('@/lib/fetch', () => ({ fetchWithAuth: jest.fn() }));
-jest.mock('@/hooks/useConnectedAccounts', () => ({
-  useConnectedAccounts: () => ({
-    normalizedAccounts: {
-      facebook: [
-        { id: 'p1', name: 'My Page', platform: 'facebook' },
-        { id: 'p2', name: 'Other Page', platform: 'facebook' },
-      ],
-      twitter: [{ id: 'x1', name: 'handle', platform: 'twitter' }],
-    },
-  }),
-}));
 
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -19,6 +8,12 @@ import { McpTokenCard } from '@/components/dashboard/McpTokenCard';
 
 const mockFetch = fetchWithAuth as jest.Mock;
 const json = (body: unknown) => Promise.resolve({ ok: true, json: async () => body });
+
+const accounts = [
+  { id: 'p1', name: 'My Page', platform: 'facebook' },
+  { id: 'p2', name: 'Other Page', platform: 'facebook' },
+  { id: 'x1', name: 'handle', platform: 'twitter' },
+];
 
 const existingToken = {
   id: 1,
@@ -40,7 +35,7 @@ describe('McpTokenCard', () => {
         return json({ tokenInfo: { ...existingToken, id, title, account_access } });
       }
       if (init?.method === 'DELETE') return json({ success: true });
-      return json({ tokens: [existingToken] });
+      return json({ tokens: [existingToken], accounts });
     });
   });
 
@@ -94,6 +89,15 @@ describe('McpTokenCard', () => {
       body: JSON.stringify({ id: 1, title: 'Claude Desktop', account_access: ['facebook:p1'] }),
     });
     expect(await screen.findByText(/My Page \(Facebook\)/)).toBeInTheDocument();
+  });
+
+  it('marks only granted accounts missing from the connected accounts as disconnected', async () => {
+    mockFetch.mockImplementation(() =>
+      json({ tokens: [{ ...existingToken, account_access: ['facebook:p1', 'facebook:p9'] }], accounts })
+    );
+    render(<McpTokenCard />);
+
+    expect(await screen.findByText(/My Page \(Facebook\), p9 \(Facebook, disconnected\)/)).toBeInTheDocument();
   });
 
   it('revokes a single token', async () => {
