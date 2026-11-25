@@ -53,6 +53,8 @@ export interface UploadedMedia {
   format: string;
   width?: number;
   height?: number;
+  /** Videos only: length in seconds. */
+  duration?: number;
 }
 
 export interface CloudinaryUploadError {
@@ -185,6 +187,7 @@ export async function ingestRemoteMedia(urls: string[]): Promise<
           format: result.format,
           width: result.width,
           height: result.height,
+          ...(typeof result.duration === 'number' && { duration: result.duration }),
           originalFilename: url,
         };
       } catch (error) {

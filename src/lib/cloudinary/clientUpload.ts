@@ -14,6 +14,8 @@ export interface CloudinaryUploadResult {
   height?: number;
   bytes: number;
   originalFilename: string;
+  /** Videos only: length in seconds. */
+  duration?: number;
 }
 
 export interface CloudinaryUploadError {
@@ -90,6 +92,7 @@ export async function uploadToCloudinaryClient(
             height: response.height,
             bytes: response.bytes,
             originalFilename: file.name,
+            ...(typeof response.duration === 'number' && { duration: response.duration }),
           });
         } catch {
           reject(new Error(`Failed to parse Cloudinary response for ${file.name}`));

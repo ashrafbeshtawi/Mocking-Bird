@@ -19,6 +19,8 @@ export interface CloudinaryMediaInfo {
   width?: number;
   height?: number;
   originalFilename: string;
+  /** Videos only: length in seconds, as reported by Cloudinary's upload response. */
+  duration?: number;
   /** Videos only: sent to the platforms that take a custom thumbnail or cover. */
   thumbnail?: MediaThumbnail;
 }

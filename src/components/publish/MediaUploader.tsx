@@ -26,6 +26,8 @@ export interface UploadedMedia {
   width?: number;
   height?: number;
   originalFilename: string;
+  /** Videos only: length in seconds. */
+  duration?: number;
   // For preview
   previewUrl: string;
   /** Videos only: the custom thumbnail sent to platforms that support one. */
@@ -107,6 +109,7 @@ export function MediaUploader({ uploadedMedia, onMediaChange, onUploadingChange 
             width: result.width,
             height: result.height,
             originalFilename: result.originalFilename,
+            ...(result.duration !== undefined && { duration: result.duration }),
             previewUrl,
           };
 
