@@ -8,7 +8,8 @@ if (!process.env.DATABASE_STRING) {
 // Create a single instance of the PostgreSQL pool
 const pool = new Pool({
   connectionString: process.env.DATABASE_STRING,
-  // You can add other pool configurations here, e.g., max, idleTimeoutMillis
+  // Fail fast instead of waiting forever when every pooled client is checked out.
+  connectionTimeoutMillis: 10_000,
 });
 
 // Add an error listener to the pool

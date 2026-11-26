@@ -1,12 +1,24 @@
 import { NextResponse } from 'next/server';
 import pool from '@/lib/db';
 import { getAuthUserId } from '@/lib/api-auth';
+import { createLogger } from '@/lib/logger';
+
+const logger = createLogger('PublishTemplatesAPI');
+
+// publish_templates.id is a SERIAL (int4) column.
+const MAX_TEMPLATE_ID = 2147483647;
 
 const getUserId = async (): Promise<number | null> => {
   const userId = await getAuthUserId();
   const parsedUserId = userId ? parseInt(userId, 10) : null;
   return parsedUserId && !isNaN(parsedUserId) ? parsedUserId : null;
 };
+
+const isValidTemplateId = (id: unknown): id is number =>
+  typeof id === 'number' && Number.isInteger(id) && id > 0 && id <= MAX_TEMPLATE_ID;
+
+const invalidIdResponse = () =>
+  NextResponse.json({ error: 'Template ID must be a positive integer.' }, { status: 400 });
 
 // GET: List all templates for the current user
 export async function GET() {
@@ -16,19 +28,17 @@ export async function GET() {
   }
 
   try {
-    const client = await pool.connect();
-    const { rows } = await client.query(
+    const { rows } = await pool.query(
       `SELECT id, title, content, created_at, updated_at
        FROM publish_templates
        WHERE user_id = $1
        ORDER BY updated_at DESC`,
       [userId]
     );
-    client.release();
 
     return NextResponse.json({ success: true, templates: rows });
   } catch (error) {
-    console.error('API Error (GET /publish/templates):', error);
+    logger.error('GET failed', error);
     return NextResponse.json({ error: 'Internal Server Error.' }, { status: 500 });
   }
 }
@@ -49,18 +59,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Content is required.' }, { status: 400 });
     }
 
-    const client = await pool.connect();
-    const result = await client.query(
+    const result = await pool.query(
       `INSERT INTO publish_templates (user_id, title, content)
        VALUES ($1, $2, $3)
        RETURNING id, title, content, created_at, updated_at`,
       [userId, title.trim(), content]
     );
-    client.release();
 
     return NextResponse.json({ success: true, template: result.rows[0] }, { status: 201 });
   } catch (error) {
-    console.error('API Error (POST /publish/templates):', error);
+    logger.error('POST failed', error);
     return NextResponse.json({ error: 'Internal Server Error.' }, { status: 500 });
   }
 }
@@ -74,8 +82,11 @@ export async function PUT(req: Request) {
 
   try {
     const { id, title, content } = await req.json();
-    if (!id) {
+    if (id === undefined || id === null) {
       return NextResponse.json({ error: 'Template ID is required.' }, { status: 400 });
+    }
+    if (!isValidTemplateId(id)) {
+      return invalidIdResponse();
     }
     if (!title || typeof title !== 'string' || !title.trim()) {
       return NextResponse.json({ error: 'Title is required.' }, { status: 400 });
@@ -84,15 +95,13 @@ export async function PUT(req: Request) {
       return NextResponse.json({ error: 'Content is required.' }, { status: 400 });
     }
 
-    const client = await pool.connect();
-    const result = await client.query(
+    const result = await pool.query(
       `UPDATE publish_templates
        SET title = $1, content = $2, updated_at = CURRENT_TIMESTAMP
        WHERE id = $3 AND user_id = $4
        RETURNING id, title, content, created_at, updated_at`,
       [title.trim(), content, id, userId]
     );
-    client.release();
 
     if (result.rowCount === 0) {
       return NextResponse.json({ error: 'Template not found or access denied.' }, { status: 404 });
@@ -100,7 +109,7 @@ export async function PUT(req: Request) {
 
     return NextResponse.json({ success: true, template: result.rows[0] });
   } catch (error) {
-    console.error('API Error (PUT /publish/templates):', error);
+    logger.error('PUT failed', error);
     return NextResponse.json({ error: 'Internal Server Error.' }, { status: 500 });
   }
 }
@@ -114,16 +123,17 @@ export async function DELETE(req: Request) {
 
   try {
     const { id } = await req.json();
-    if (!id) {
+    if (id === undefined || id === null) {
       return NextResponse.json({ error: 'Template ID is required.' }, { status: 400 });
     }
+    if (!isValidTemplateId(id)) {
+      return invalidIdResponse();
+    }
 
-    const client = await pool.connect();
-    const result = await client.query(
+    const result = await pool.query(
       'DELETE FROM publish_templates WHERE id = $1 AND user_id = $2',
       [id, userId]
     );
-    client.release();
 
     if (result.rowCount === 0) {
       return NextResponse.json({ error: 'Template not found or access denied.' }, { status: 404 });
@@ -131,7 +141,7 @@ export async function DELETE(req: Request) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('API Error (DELETE /publish/templates):', error);
+    logger.error('DELETE failed', error);
     return NextResponse.json({ error: 'Internal Server Error.' }, { status: 500 });
   }
 }
