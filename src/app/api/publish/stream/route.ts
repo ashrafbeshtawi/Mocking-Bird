@@ -29,10 +29,32 @@ export async function POST(req: NextRequest) {
   const stream = new TransformStream();
   const writer = stream.writable.getWriter();
 
-  // Helper to send SSE events
+  // Once the browser drops the stream (tab closed, network blip, proxy timeout)
+  // writes reject. Publishing must still run to the end and save its history
+  // row, so a lost client only stops further events.
+  let clientGone = false;
+  let closed = false;
+
+  // Helper to send SSE events; never throws
   const sendEvent = async (event: string, data: unknown) => {
+    if (clientGone || closed) return;
     const message = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
-    await writer.write(encoder.encode(message));
+    try {
+      await writer.write(encoder.encode(message));
+    } catch {
+      clientGone = true;
+      logger.warn(`Client disconnected from publish stream [${requestId}], publishing continues`);
+    }
+  };
+
+  const closeStream = async () => {
+    if (closed) return;
+    closed = true;
+    try {
+      await writer.close();
+    } catch {
+      // Stream already cancelled by the client
+    }
   };
 
   // Step tracking for progress bar
@@ -60,7 +82,6 @@ export async function POST(req: NextRequest) {
 
       if (!parseResult.success || !parseResult.data) {
         await sendEvent('error', { message: parseResult.error || 'Failed to parse request' });
-        await writer.close();
         return;
       }
 
@@ -71,7 +92,6 @@ export async function POST(req: NextRequest) {
       const textValidation = validateTextContent(text, cloudinaryMedia.length > 0, hasAnyDestination(parseResult.data));
       if (!textValidation.success) {
         await sendEvent('error', { message: textValidation.error });
-        await writer.close();
         return;
       }
 
@@ -79,7 +99,6 @@ export async function POST(req: NextRequest) {
       const accountValidation = validateAccountArrays(facebookPages, xAccounts, instagramPublishAccounts, instagramStoryAccounts, telegramChannels, linkedinAccounts, youtubeChannels, tiktokAccounts);
       if (!accountValidation.success) {
         await sendEvent('error', { message: accountValidation.error });
-        await writer.close();
         return;
       }
 
@@ -98,7 +117,6 @@ export async function POST(req: NextRequest) {
 
       if (needsDownload && mediaResult.allFailed && cloudinaryMedia.length > 0) {
         await sendEvent('error', { message: 'Failed to process media files' });
-        await writer.close();
         return;
       }
 
@@ -136,7 +154,6 @@ export async function POST(req: NextRequest) {
           message: 'Some selected accounts could not be found',
           details: missingAccounts
         });
-        await writer.close();
         return;
       }
 
@@ -218,7 +235,7 @@ export async function POST(req: NextRequest) {
       logger.error('Streaming publish error', err);
       await sendEvent('error', { message: errorMessage });
     } finally {
-      await writer.close();
+      await closeStream();
     }
   })();
 
