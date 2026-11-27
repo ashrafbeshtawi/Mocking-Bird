@@ -41,7 +41,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { PublishResults } from '@/components/publish/PublishResults';
 import { ContentFitBadge } from '@/components/publish/ContentFitBadge';
 import { getPlatformConfig } from '@/lib/platformConfig';
-import { contentKinds, fitContent, mediaCounts, needsChoice, resolveContent, type ContentSelection } from '@/lib/publish/contentRules';
+import { contentKinds, mediaCounts, planContent, type ContentSelection, type MediaSelection } from '@/lib/publish/contentRules';
 import { MediaPreviewDialog, type PreviewMedia } from '@/components/publish/MediaPreviewDialog';
 import { YouTubeTitleField } from '@/components/publish/YouTubeTitleField';
 import { youtubeTitleError } from '@/lib/youtube';
@@ -73,6 +73,8 @@ export default function DraftsPage() {
   const [previewDraft, setPreviewDraft] = useState<Draft | null>(null);
   // What to send to platforms that cannot take the whole previewed draft
   const [previewSelection, setPreviewSelection] = useState<ContentSelection>({});
+  // Which media items go to platforms that cannot take all of the draft's media
+  const [previewMediaSelection, setPreviewMediaSelection] = useState<MediaSelection>({});
   const [previewYoutubeTitle, setPreviewYoutubeTitle] = useState('');
   const [previewTiktokSettings, setPreviewTiktokSettings] = useState<TikTokPostSettings>(EMPTY_TIKTOK_SETTINGS);
   const [isPreviewTiktokReady, setIsPreviewTiktokReady] = useState(false);
@@ -167,12 +169,15 @@ export default function DraftsPage() {
 
   const previewHasMedia = (previewDraft?.media?.length ?? 0) > 0;
   const previewKinds = previewDraft ? draftKinds(previewDraft) : [];
-  const previewCounts = previewDraft ? draftCounts(previewDraft) : {};
-  const isPreviewSendable = (platform: Platform) =>
-    resolveContent(platform, previewKinds, previewSelection[platform], previewCounts) !== null;
+  const previewUploaded = previewDraft ? mapDraftMediaToUploaded(previewDraft.media) : [];
+  const previewPlan = (platform: Platform) =>
+    planContent(platform, previewKinds.includes('text'), previewUploaded, {
+      kinds: previewSelection[platform],
+      media: previewMediaSelection[platform],
+    });
+  const isPreviewSendable = (platform: Platform) => previewPlan(platform).sent !== null;
   const previewNeedsChoice = (platform: Platform) =>
-    getAccountNamesFor(platform).length > 0 &&
-    needsChoice(platform, previewKinds, previewSelection[platform], previewCounts);
+    getAccountNamesFor(platform).length > 0 && previewPlan(platform).needsChoice;
   const isPreviewUndecided = previewDraft?.target_platforms.some(previewNeedsChoice) ?? false;
 
   const isPreviewTikTok = getPreviewTargetIdsOn('tiktok').length > 0 &&
@@ -188,6 +193,7 @@ export default function DraftsPage() {
 
   const openPreview = (draft: Draft) => {
     setPreviewSelection({});
+    setPreviewMediaSelection({});
     setPreviewYoutubeTitle(draft.youtube_title);
     setPreviewTiktokSettings(EMPTY_TIKTOK_SETTINGS);
     setPreviewDraft(draft);
@@ -216,6 +222,7 @@ export default function DraftsPage() {
       selectedTikTokAccounts: getPreviewTargetIdsOn('tiktok'),
       tiktokSettings: previewTiktokSettings,
       contentSelection: previewSelection,
+      mediaSelection: previewMediaSelection,
     });
 
     // The results dialog shows the outcome per account; the draft stays when nothing went out.
@@ -615,9 +622,11 @@ export default function DraftsPage() {
                   <ContentFitBadge
                     platform={platform}
                     kinds={previewKinds}
-                    counts={previewCounts}
+                    media={previewUploaded}
                     selection={previewSelection[platform]}
                     onSelect={(kinds) => setPreviewSelection((prev) => ({ ...prev, [platform]: kinds }))}
+                    mediaSelection={previewMediaSelection[platform]}
+                    onSelectMedia={(chosen) => setPreviewMediaSelection((prev) => ({ ...prev, [platform]: chosen }))}
                   />
                   <Typography variant="caption" color={names.length && !skipped ? 'text.secondary' : 'warning.main'}>
                     {undecided
@@ -634,7 +643,7 @@ export default function DraftsPage() {
           </Box>
 
           {getPreviewTargetIdsOn('youtube').length > 0 &&
-            fitContent('youtube', previewKinds, previewCounts).status !== 'unsupported' && (
+            (previewPlan('youtube').fit.status !== 'unsupported' || previewPlan('youtube').canPickMedia) && (
               <Box sx={{ mt: 2 }}>
                 <YouTubeTitleField value={previewYoutubeTitle} onChange={setPreviewYoutubeTitle} />
               </Box>
@@ -644,7 +653,7 @@ export default function DraftsPage() {
             <Box sx={{ mt: 2 }}>
               <TikTokSettingsField
                 accountIds={getPreviewTargetIdsOn('tiktok')}
-                videoUrl={previewDraft?.media?.find((m) => m.resourceType === 'video')?.publicUrl}
+                videoUrl={previewPlan('tiktok').media.find((m) => m.resourceType === 'video')?.publicUrl}
                 value={previewTiktokSettings}
                 onChange={setPreviewTiktokSettings}
                 onReadyChange={setIsPreviewTiktokReady}

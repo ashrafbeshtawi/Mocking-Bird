@@ -1,5 +1,7 @@
 import { PublishRequest, CloudinaryMediaInfo, MediaThumbnail } from '../types';
-import { parseContentSelection } from '../contentRules';
+import { limitError, parseContentSelection, parseMediaSelection } from '../contentRules';
+import { PLATFORM_CONFIG } from '@/lib/platformConfig';
+import type { Platform } from '@/types/accounts';
 import { youtubeTitleError } from '@/lib/youtube';
 import { parseTikTokSettings, tiktokSettingsError } from '@/lib/tiktok';
 
@@ -237,22 +239,57 @@ export async function parsePublishRequest(
     return { success: false, error: mediaValidation.error };
   }
 
-  return {
-    success: true,
-    data: {
-      text,
-      facebookPages,
-      xAccounts,
-      instagramPublishAccounts,
-      instagramStoryAccounts,
-      telegramChannels,
-      linkedinAccounts,
-      youtubeChannels,
-      youtubeTitle,
-      tiktokAccounts,
-      tiktokSettings,
-      cloudinaryMedia: mediaValidation.data || [],
-      contentSelection: parseContentSelection(data.contentSelection),
-    },
+  const cloudinaryMedia = mediaValidation.data || [];
+  const request: PublishRequest = {
+    text,
+    facebookPages,
+    xAccounts,
+    instagramPublishAccounts,
+    instagramStoryAccounts,
+    telegramChannels,
+    linkedinAccounts,
+    youtubeChannels,
+    youtubeTitle,
+    tiktokAccounts,
+    tiktokSettings,
+    cloudinaryMedia,
+    contentSelection: parseContentSelection(data.contentSelection),
+    mediaSelection: parseMediaSelection(data.mediaSelection, cloudinaryMedia),
   };
+
+  const limitsError = selectionLimitsError(request);
+  if (limitsError) {
+    return { success: false, error: limitsError };
+  }
+
+  return { success: true, data: request };
+}
+
+/**
+ * Checks, for every platform the request posts to, that the media it would send
+ * (after the media and kind selections) is within the platform's limits.
+ */
+export function selectionLimitsError(request: PublishRequest): string | null {
+  const destinations: Record<Platform, string[]> = {
+    facebook: request.facebookPages,
+    twitter: request.xAccounts,
+    instagram: [...request.instagramPublishAccounts, ...request.instagramStoryAccounts],
+    telegram: request.telegramChannels,
+    linkedin: request.linkedinAccounts,
+    youtube: request.youtubeChannels,
+    tiktok: request.tiktokAccounts,
+  };
+  for (const platform of Object.keys(destinations) as Platform[]) {
+    if (destinations[platform].length === 0) continue;
+    const limits = limitError(
+      platform,
+      request.cloudinaryMedia,
+      request.contentSelection[platform],
+      request.mediaSelection[platform]
+    );
+    if (limits) {
+      return `${PLATFORM_CONFIG[platform].label} takes at most ${limits} per post. Choose which media to send.`;
+    }
+  }
+  return null;
 }

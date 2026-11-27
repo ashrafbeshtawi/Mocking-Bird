@@ -42,7 +42,7 @@ import type { UploadedMedia } from '@/components/publish/MediaUploader';
 import { mapDraftMediaToUploaded } from '@/hooks/useDrafts';
 import type { InstagramSelection, Platform, TargetAccount } from '@/types/accounts';
 import { TWITTER_CHAR_LIMIT } from '@/types/accounts';
-import { contentKinds, fitContent, mediaCounts, needsChoice, resolveContent, type ContentKind, type ContentSelection } from '@/lib/publish/contentRules';
+import { contentKinds, mediaCounts, planContent, type ContentKind, type ContentSelection, type MediaSelection } from '@/lib/publish/contentRules';
 import { PLATFORM_CONFIG } from '@/lib/platformConfig';
 
 export default function PublishPage() {
@@ -135,6 +135,8 @@ function PublishPageInner() {
   const [isTiktokReady, setIsTiktokReady] = useState(false);
   // What to send to platforms that cannot take the whole post
   const [contentSelection, setContentSelection] = useState<ContentSelection>({});
+  // Which media items go to platforms that cannot take all of them
+  const [mediaSelection, setMediaSelection] = useState<MediaSelection>({});
 
   // Publishing overlay visibility
   const [publishingHidden, setPublishingHidden] = useState(false);
@@ -364,10 +366,15 @@ function PublishPageInner() {
     setContentSelection((prev) => ({ ...prev, [platform]: kinds }));
   }, []);
 
+  const handleMediaSelect = useCallback((platform: Platform, chosen: string[]) => {
+    setMediaSelection((prev) => ({ ...prev, [platform]: chosen }));
+  }, []);
+
   const resetForm = useCallback(() => {
     setPostText('');
     setUploadedMedia([]);
     setContentSelection({});
+    setMediaSelection({});
     setYoutubeTitle('');
     setTiktokSettings(EMPTY_TIKTOK_SETTINGS);
     setTiktokSuggestion(null);
@@ -407,6 +414,7 @@ function PublishPageInner() {
       selectedTikTokAccounts,
       tiktokSettings,
       contentSelection,
+      mediaSelection,
     });
 
     if (wasSuccessful) {
@@ -503,17 +511,24 @@ function PublishPageInner() {
     tiktok: selectedTikTokAccounts.length,
   };
   const platforms = Object.keys(selectedPerPlatform) as Platform[];
-  const showYouTubeTitle = selectedYouTubeChannels.length > 0 && fitContent('youtube', kinds, counts).status !== 'unsupported';
-  const showTikTokSettings = selectedTikTokAccounts.length > 0 && resolveContent('tiktok', kinds, contentSelection.tiktok, counts) !== null;
+  const planFor = (platform: Platform) =>
+    planContent(platform, kinds.includes('text'), uploadedMedia, {
+      kinds: contentSelection[platform],
+      media: mediaSelection[platform],
+    });
+  const youtubePlan = planFor('youtube');
+  const tiktokPlan = planFor('tiktok');
+  const showYouTubeTitle =
+    selectedYouTubeChannels.length > 0 && (youtubePlan.fit.status !== 'unsupported' || youtubePlan.canPickMedia);
+  const showTikTokSettings = selectedTikTokAccounts.length > 0 && tiktokPlan.sent !== null;
   // Selected destinations whose platform can take the post (or has a choice made)
   const selectedCount = platforms.reduce(
-    (count, platform) =>
-      count + (resolveContent(platform, kinds, contentSelection[platform], counts) !== null ? selectedPerPlatform[platform] : 0),
+    (count, platform) => count + (planFor(platform).sent !== null ? selectedPerPlatform[platform] : 0),
     0
   );
   // Selected platforms that can take part of the post but have no choice made yet
   const undecided = platforms.filter(
-    (platform) => selectedPerPlatform[platform] > 0 && needsChoice(platform, kinds, contentSelection[platform], counts)
+    (platform) => selectedPerPlatform[platform] > 0 && planFor(platform).needsChoice
   );
   const canSaveDraft =
     !isPublishing &&
@@ -789,6 +804,9 @@ function PublishPageInner() {
                   contentCounts={counts}
                   contentSelection={contentSelection}
                   onContentSelect={handleContentSelect}
+                  contentMedia={uploadedMedia}
+                  mediaSelection={mediaSelection}
+                  onMediaSelect={handleMediaSelect}
                 />
                 {showYouTubeTitle && (
                   <Box sx={{ mt: 2 }}>
@@ -799,7 +817,7 @@ function PublishPageInner() {
                   <Box sx={{ mt: 2 }}>
                     <TikTokSettingsField
                       accountIds={selectedTikTokAccounts}
-                      videoUrl={uploadedMedia.find((m) => m.resourceType === 'video')?.previewUrl}
+                      videoUrl={tiktokPlan.media.find((m) => m.resourceType === 'video')?.previewUrl}
                       value={tiktokSettings}
                       onChange={setTiktokSettings}
                       onReadyChange={setIsTiktokReady}

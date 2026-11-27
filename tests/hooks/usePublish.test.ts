@@ -144,6 +144,47 @@ describe('usePublish destination filtering', () => {
   });
 });
 
+describe('usePublish media count limits', () => {
+  const video2 = { ...video, publicId: 'v2', publicUrl: 'https://cdn/v2.mp4' };
+  const twoVideoPost = {
+    postText: 'Two clips',
+    uploadedMedia: [video, video2],
+    selectedFacebookPages: ['p1'],
+    selectedXAccounts: [],
+    selectedInstagramAccounts: {},
+    selectedTelegramChannels: [],
+    selectedLinkedInAccounts: [],
+    selectedYouTubeChannels: ['UC1'],
+    selectedTikTokAccounts: [],
+  };
+
+  beforeEach(() => {
+    global.fetch = jest.fn().mockResolvedValue(emptyStream());
+  });
+
+  it('asks which video goes to YouTube when the post has two', async () => {
+    const { result } = renderHook(() => usePublish());
+
+    await act(() => result.current.publish(twoVideoPost));
+
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(result.current.error?.message).toBe('Choose what to send to YouTube.');
+  });
+
+  it('sends the chosen video to YouTube and everything to the others', async () => {
+    const { result } = renderHook(() => usePublish());
+
+    await act(() => result.current.publish({ ...twoVideoPost, mediaSelection: { youtube: ['v2'], facebook: ['v'] } }));
+
+    const body = sentBody();
+    expect(body.youtubeChannels).toEqual(['UC1']);
+    expect(body.facebookPages).toEqual(['p1']);
+    // Facebook takes both videos, so its stale pick is not sent.
+    expect(body.mediaSelection).toEqual({ youtube: ['v2'] });
+    expect(body.cloudinaryMedia).toHaveLength(2);
+  });
+});
+
 describe('usePublish YouTube title', () => {
   const youtubePost = (youtubeTitle: string) => ({
     postText: 'We shipped it.',

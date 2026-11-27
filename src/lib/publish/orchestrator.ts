@@ -9,7 +9,7 @@ import { YouTubePublisher, YouTubeChannelToken } from '@/lib/publishers/youtube'
 import { TikTokPublisher, TikTokAccountToken } from '@/lib/publishers/tiktok';
 import { EMPTY_TIKTOK_SETTINGS, type TikTokPostSettings } from '@/lib/tiktok';
 import { ReportLogger, CloudinaryMediaInfo } from './types';
-import type { ContentSelection } from './contentRules';
+import type { ContentSelection, MediaSelection } from './contentRules';
 import type { Platform } from '@/types/accounts';
 import { createLogger } from '@/lib/logger';
 import {
@@ -71,6 +71,8 @@ export interface ExecutePublishOptions {
   tiktokSettings?: TikTokPostSettings;
   reportLogger: ReportLogger;
   contentSelection?: ContentSelection;
+  /** Per platform, the media items to send when the post has more than the platform takes. */
+  mediaSelection?: MediaSelection;
   onProgress?: ProgressCallback;
   onAccountProgress?: AccountProgressCallback;
 }
@@ -80,17 +82,23 @@ export interface ExecutePublishResult {
   failed: FailedPublishResult[];
 }
 
-/** The part of the post that goes to one platform, per its content selection. */
-function contentFor(
+/** The part of the post that goes to one platform: the picked media items, then the selected kinds. */
+export function contentFor(
   platform: Platform,
-  { text, mediaFiles, cloudinaryMedia, contentSelection }: ExecutePublishOptions
+  { text, mediaFiles, cloudinaryMedia, contentSelection, mediaSelection }: Pick<
+    ExecutePublishOptions,
+    'text' | 'mediaFiles' | 'cloudinaryMedia' | 'contentSelection' | 'mediaSelection'
+  >
 ): { text: string; mediaFiles: MediaFile[]; cloudinaryMedia: CloudinaryMediaInfo[] } {
+  const chosen = mediaSelection?.[platform];
+  const pickedFiles = chosen ? mediaFiles.filter((f) => f.publicId !== undefined && chosen.includes(f.publicId)) : mediaFiles;
+  const pickedMedia = chosen ? cloudinaryMedia.filter((m) => chosen.includes(m.publicId)) : cloudinaryMedia;
   const kinds = contentSelection?.[platform];
-  if (!kinds) return { text, mediaFiles, cloudinaryMedia };
+  if (!kinds) return { text, mediaFiles: pickedFiles, cloudinaryMedia: pickedMedia };
   return {
     text: kinds.includes('text') ? text : '',
-    mediaFiles: mediaFiles.filter((f) => kinds.includes(f.mimetype.startsWith('video/') ? 'video' : 'image')),
-    cloudinaryMedia: cloudinaryMedia.filter((m) => kinds.includes(m.resourceType)),
+    mediaFiles: pickedFiles.filter((f) => kinds.includes(f.mimetype.startsWith('video/') ? 'video' : 'image')),
+    cloudinaryMedia: pickedMedia.filter((m) => kinds.includes(m.resourceType)),
   };
 }
 

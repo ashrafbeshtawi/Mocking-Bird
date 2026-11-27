@@ -191,6 +191,8 @@ export interface MediaFile {
   mimetype: string;
   /** Videos only: URL of the custom thumbnail. */
   thumbnailUrl?: string;
+  /** Cloudinary public ID of the item the file was downloaded from. */
+  publicId?: string;
 }
 
 export interface TwitterMediaUploadResult {

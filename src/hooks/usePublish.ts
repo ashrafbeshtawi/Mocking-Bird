@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef } from 'react';
 import type { InstagramSelection, Platform } from '@/types/accounts';
 import type { UploadedMedia } from '@/components/publish/MediaUploader';
-import { contentKinds, mediaCounts, needsChoice, resolveContent, type ContentSelection } from '@/lib/publish/contentRules';
+import { planContent, type ContentSelection, type MediaSelection } from '@/lib/publish/contentRules';
 import { youtubeTitleError } from '@/lib/youtube';
 import { tiktokSettingsError, type TikTokPostSettings } from '@/lib/tiktok';
 import { PLATFORM_CONFIG } from '@/lib/platformConfig';
@@ -48,6 +48,8 @@ interface PublishParams {
   tiktokSettings?: TikTokPostSettings;
   /** What the user chose to send to platforms that cannot take the whole post. */
   contentSelection?: ContentSelection;
+  /** Which media items the user picked for platforms that cannot take all of them. */
+  mediaSelection?: MediaSelection;
 }
 
 interface ProgressUpdate {
@@ -146,8 +148,12 @@ export function usePublish(): UsePublishReturn {
 
       // A selected platform that can take part of the post must have a choice made;
       // one that cannot take it at all is simply left out.
-      const kinds = contentKinds(postText, uploadedMedia);
-      const counts = mediaCounts(uploadedMedia);
+      const hasText = postText.trim() !== '';
+      const planFor = (platform: Platform) =>
+        planContent(platform, hasText, uploadedMedia, {
+          kinds: params.contentSelection?.[platform],
+          media: params.mediaSelection?.[platform],
+        });
       const isSelected: Record<Platform, boolean> = {
         facebook: params.selectedFacebookPages.length > 0,
         twitter: params.selectedXAccounts.length > 0,
@@ -158,7 +164,7 @@ export function usePublish(): UsePublishReturn {
         tiktok: params.selectedTikTokAccounts.length > 0,
       };
       const undecided = (Object.keys(isSelected) as Platform[]).filter(
-        (platform) => isSelected[platform] && needsChoice(platform, kinds, params.contentSelection?.[platform], counts)
+        (platform) => isSelected[platform] && planFor(platform).needsChoice
       );
       if (undecided.length > 0) {
         setError({
@@ -170,10 +176,12 @@ export function usePublish(): UsePublishReturn {
       }
 
       const contentSelection: ContentSelection = {};
+      const mediaSelection: MediaSelection = {};
       const isSendable = (platform: Platform): boolean => {
-        const sent = resolveContent(platform, kinds, params.contentSelection?.[platform], counts);
-        if (sent && sent.length < kinds.length) contentSelection[platform] = sent;
-        return sent !== null;
+        const plan = planFor(platform);
+        if (plan.sent && plan.sent.length < plan.kinds.length) contentSelection[platform] = plan.sent;
+        if (plan.sent && plan.mediaPicked) mediaSelection[platform] = plan.media.map((m) => m.publicId);
+        return plan.sent !== null;
       };
       const selectedFacebookPages = isSendable('facebook') ? params.selectedFacebookPages : [];
       const selectedXAccounts = isSendable('twitter') ? params.selectedXAccounts : [];
@@ -255,6 +263,7 @@ export function usePublish(): UsePublishReturn {
         tiktokAccounts: selectedTikTokAccounts,
         tiktokSettings,
         contentSelection,
+        mediaSelection,
         // Send Cloudinary media info instead of raw files
         cloudinaryMedia: uploadedMedia.map((media) => ({
           publicId: media.publicId,

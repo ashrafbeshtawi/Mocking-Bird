@@ -34,7 +34,7 @@ export async function POST(req: Request) {
       return buildErrorResponse(reportLogger.getReport(), 400, parseResult.error || 'Failed to parse request');
     }
 
-    const { text, facebookPages, xAccounts, instagramPublishAccounts, instagramStoryAccounts, telegramChannels, linkedinAccounts, youtubeChannels, youtubeTitle, tiktokAccounts, tiktokSettings, cloudinaryMedia, contentSelection } = parseResult.data;
+    const { text, facebookPages, xAccounts, instagramPublishAccounts, instagramStoryAccounts, telegramChannels, linkedinAccounts, youtubeChannels, youtubeTitle, tiktokAccounts, tiktokSettings, cloudinaryMedia, contentSelection, mediaSelection } = parseResult.data;
     reportLogger.add(`Request payload parsed. Text length: ${text?.length || 0}, Facebook pages: ${facebookPages?.length || 0}, X accounts: ${xAccounts?.length || 0}, Instagram feed: ${instagramPublishAccounts?.length || 0}, Instagram stories: ${instagramStoryAccounts?.length || 0}, Telegram channels: ${telegramChannels?.length || 0}, LinkedIn accounts: ${linkedinAccounts?.length || 0}, YouTube channels: ${youtubeChannels?.length || 0}, Cloudinary media: ${cloudinaryMedia?.length || 0}`);
 
     // 3. Validate text content
@@ -155,7 +155,8 @@ export async function POST(req: Request) {
       reportLogger,
       youtubeTitle,
       tiktokSettings,
-      contentSelection
+      contentSelection,
+      mediaSelection
     });
 
     const { successful, failed } = publishResult;
