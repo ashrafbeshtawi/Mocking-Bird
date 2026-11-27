@@ -18,6 +18,59 @@ describe('hasAnyDestination', () => {
   });
 });
 
+describe('parsePublishRequest media limits', () => {
+  const video = (id: string) => ({ publicId: id, publicUrl: `https://res.cloudinary.com/${id}`, resourceType: 'video' });
+  const twoVideos = [video('v1'), video('v2')];
+
+  it('rejects more videos than YouTube takes when no item is picked', async () => {
+    const result = await parsePublishRequest({ text: 'hi', youtubeChannels: ['yt1'], cloudinaryMedia: twoVideos });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('YouTube takes at most 1 video per post. Choose which media to send.');
+  });
+
+  it('accepts a pick within the limit and keeps it', async () => {
+    const result = await parsePublishRequest({
+      text: 'hi',
+      youtubeChannels: ['yt1'],
+      cloudinaryMedia: twoVideos,
+      mediaSelection: { youtube: ['v2'] },
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.data?.mediaSelection).toEqual({ youtube: ['v2'] });
+  });
+
+  it('rejects a pick that is still over the limit', async () => {
+    const result = await parsePublishRequest({
+      text: 'hi',
+      youtubeChannels: ['yt1'],
+      cloudinaryMedia: twoVideos,
+      mediaSelection: { youtube: ['v1', 'v2'] },
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts a kind selection that leaves the over-limit kind out', async () => {
+    const images = Array.from({ length: 5 }, (_, i) => ({ ...video(`i${i}`), resourceType: 'image' }));
+    const result = await parsePublishRequest({
+      text: 'hi',
+      xAccounts: ['x1'],
+      cloudinaryMedia: images,
+      contentSelection: { twitter: ['text'] },
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('ignores platforms the request does not post to', async () => {
+    const result = await parsePublishRequest({ text: 'hi', facebookPages: ['p1'], cloudinaryMedia: twoVideos });
+
+    expect(result.success).toBe(true);
+  });
+});
+
 describe('parsePublishRequest media thumbnails', () => {
   const thumbnail = { publicId: 'thumb1', publicUrl: 'https://res.cloudinary.com/thumb1.jpg' };
   const item = (resourceType: 'image' | 'video', extra: object) => ({

@@ -57,6 +57,50 @@ describe('AccountSelector content fit', () => {
     expect(screen.queryByRole('button', { name: 'X: choose what to send' })).not.toBeInTheDocument();
   });
 
+  describe('media count limits', () => {
+    const clip = (id: string) => ({ publicId: id, publicUrl: `https://cdn/${id}.mp4`, resourceType: 'video' as const, originalFilename: `${id}.mp4` });
+    const youtubeProps: Partial<React.ComponentProps<typeof AccountSelector>> = {
+      xAccounts: [],
+      instagramAccounts: [],
+      youtubeChannels: [{ id: 'yt1', name: 'Channel' }],
+      selectedXAccounts: [],
+      selectedYouTubeChannels: ['yt1'],
+      contentKinds: ['text', 'video'],
+      contentMedia: [clip('v1'), clip('v2')],
+    };
+
+    it('lets the user pick which video goes to YouTube', async () => {
+      const user = userEvent.setup();
+      const onMediaSelect = jest.fn();
+      const onYouTubeChange = jest.fn();
+      renderSelector({ ...youtubeProps, onMediaSelect, onYouTubeChange });
+
+      await user.click(screen.getByRole('button', { name: 'YouTube: choose what to send' }));
+      await user.click(screen.getByRole('menuitem', { name: /choose which media/i }));
+      // The chooser starts from the first video; switch to the second.
+      await user.click(screen.getByRole('checkbox', { name: 'Send v1.mp4' }));
+      await user.click(screen.getByRole('checkbox', { name: 'Send v2.mp4' }));
+      await user.click(screen.getByRole('button', { name: 'Send 1 of 2' }));
+
+      expect(onMediaSelect).toHaveBeenCalledWith('youtube', ['v2']);
+      // Clicks inside the chooser must not toggle the YouTube row.
+      expect(onYouTubeChange).not.toHaveBeenCalled();
+    });
+
+    it('shows the pick once made', () => {
+      renderSelector({ ...youtubeProps, onMediaSelect: jest.fn(), mediaSelection: { youtube: ['v2'] } });
+
+      expect(screen.getByText('1 of 2 media')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'YouTube: choose what to send' })).not.toBeInTheDocument();
+    });
+
+    it('keeps the old unsupported badge without a media chooser', () => {
+      renderSelector(youtubeProps);
+
+      expect(screen.getByLabelText('YouTube: unsupported content')).toBeInTheDocument();
+    });
+  });
+
   it('marks Instagram unsupported for a text-only post and disables its checkboxes', () => {
     renderSelector({ contentKinds: ['text'] });
 

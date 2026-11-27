@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
         return;
       }
 
-      const { text, facebookPages, xAccounts, instagramPublishAccounts, instagramStoryAccounts, telegramChannels, linkedinAccounts, youtubeChannels, youtubeTitle, tiktokAccounts, tiktokSettings, cloudinaryMedia, contentSelection } = parseResult.data;
+      const { text, facebookPages, xAccounts, instagramPublishAccounts, instagramStoryAccounts, telegramChannels, linkedinAccounts, youtubeChannels, youtubeTitle, tiktokAccounts, tiktokSettings, cloudinaryMedia, contentSelection, mediaSelection } = parseResult.data;
       reportLogger.add(`Request payload parsed`);
 
       // Validate text content
@@ -192,6 +192,7 @@ export async function POST(req: NextRequest) {
         youtubeTitle,
         tiktokSettings,
         contentSelection,
+        mediaSelection,
         onProgress,
         onAccountProgress
       });

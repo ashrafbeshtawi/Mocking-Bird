@@ -14,7 +14,15 @@ import {
 } from '@mui/material';
 import { PLATFORM_CONFIG } from '@/lib/platformConfig';
 import { ContentFitBadge } from '@/components/publish/ContentFitBadge';
-import { fitContent, type ContentKind, type ContentSelection } from '@/lib/publish/contentRules';
+import type { PickableMedia } from '@/components/publish/MediaPickDialog';
+import {
+  fitContent,
+  planContent,
+  type ContentKind,
+  type ContentSelection,
+  type MediaCounts,
+  type MediaSelection,
+} from '@/lib/publish/contentRules';
 import type {
   ConnectedPage,
   ConnectedXAccount,
@@ -51,8 +59,14 @@ interface AccountSelectorProps {
   onTikTokChange: (openId: string) => void;
   /** Kinds present in the post; drives the per-row fit badges. */
   contentKinds: ContentKind[];
+  /** How many images and videos the post has; drives the per-platform limits. */
+  contentCounts?: MediaCounts;
   contentSelection: ContentSelection;
   onContentSelect: (platform: Platform, kinds: ContentKind[]) => void;
+  /** The post's media; lets the user pick items for platforms that cannot take all of them. */
+  contentMedia?: ReadonlyArray<PickableMedia>;
+  mediaSelection?: MediaSelection;
+  onMediaSelect?: (platform: Platform, chosen: string[]) => void;
 }
 
 export function AccountSelector({
@@ -78,18 +92,34 @@ export function AccountSelector({
   onYouTubeChange,
   onTikTokChange,
   contentKinds,
+  contentCounts,
   contentSelection,
   onContentSelect,
+  contentMedia,
+  mediaSelection,
+  onMediaSelect,
 }: AccountSelectorProps) {
   const badge = (platform: Platform) => (
     <ContentFitBadge
       platform={platform}
       kinds={contentKinds}
+      counts={contentCounts}
+      media={contentMedia}
       selection={contentSelection[platform]}
       onSelect={(kinds) => onContentSelect(platform, kinds)}
+      mediaSelection={mediaSelection?.[platform]}
+      onSelectMedia={onMediaSelect && ((chosen) => onMediaSelect(platform, chosen))}
     />
   );
-  const isInstagramPossible = fitContent('instagram', contentKinds).status !== 'unsupported';
+  // Instagram can still post when the user can pick fewer media items.
+  const isInstagramPossible = contentMedia
+    ? (() => {
+        const plan = planContent('instagram', contentKinds.includes('text'), contentMedia, {
+          media: mediaSelection?.instagram,
+        });
+        return plan.fit.status !== 'unsupported' || (plan.canPickMedia && !!onMediaSelect);
+      })()
+    : fitContent('instagram', contentKinds, contentCounts).status !== 'unsupported';
   const hasAnyAccount =
     facebookPages.length > 0 ||
     xAccounts.length > 0 ||

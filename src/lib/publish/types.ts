@@ -1,5 +1,5 @@
 import { MediaFile, SuccessfulPublishResult, FailedPublishResult } from '@/types/interfaces';
-import type { ContentSelection } from './contentRules';
+import type { ContentSelection, MediaSelection } from './contentRules';
 import type { TikTokPostSettings } from '@/lib/tiktok';
 
 /** A custom thumbnail for a video: a JPEG uploaded to Cloudinary. */
@@ -42,6 +42,8 @@ export interface PublishRequest {
   cloudinaryMedia: CloudinaryMediaInfo[];
   /** Per platform, which kinds of the post to send; a platform without an entry gets everything. */
   contentSelection: ContentSelection;
+  /** Per platform, which media items to send; a platform without an entry gets all of them. */
+  mediaSelection: MediaSelection;
 }
 
 /**
