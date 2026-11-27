@@ -1,7 +1,17 @@
 import { PublishRequest, CloudinaryMediaInfo, MediaThumbnail } from '../types';
 import { limitError, parseContentSelection, parseMediaSelection } from '../contentRules';
-import { PLATFORM_CONFIG } from '@/lib/platformConfig';
 import type { Platform } from '@/types/accounts';
+
+// Not PLATFORM_CONFIG: it carries client-only icon components, which server routes cannot load.
+const PLATFORM_LABELS: Record<Platform, string> = {
+  facebook: 'Facebook',
+  twitter: 'X',
+  instagram: 'Instagram',
+  telegram: 'Telegram',
+  linkedin: 'LinkedIn',
+  youtube: 'YouTube',
+  tiktok: 'TikTok',
+};
 import { youtubeTitleError } from '@/lib/youtube';
 import { parseTikTokSettings, tiktokSettingsError } from '@/lib/tiktok';
 
@@ -288,7 +298,7 @@ export function selectionLimitsError(request: PublishRequest): string | null {
       request.mediaSelection[platform]
     );
     if (limits) {
-      return `${PLATFORM_CONFIG[platform].label} takes at most ${limits} per post. Choose which media to send.`;
+      return `${PLATFORM_LABELS[platform]} takes at most ${limits} per post. Choose which media to send.`;
     }
   }
   return null;
