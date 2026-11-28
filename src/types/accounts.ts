@@ -51,10 +51,17 @@ export interface AccountData {
   platform: Platform;
 }
 
+// Where an Instagram post goes: the feed, the story, or both
+export type InstagramPlacement = 'feed' | 'story';
+
+export const INSTAGRAM_PLACEMENTS: readonly InstagramPlacement[] = ['feed', 'story'];
+
 // One connected account a post goes to; account_id is the id the publish API takes
 export interface TargetAccount {
   platform: Platform;
   account_id: string;
+  /** Instagram only; omitted means the feed. */
+  placements?: InstagramPlacement[];
 }
 
 // Instagram selection state for publish page
@@ -62,6 +69,18 @@ export interface InstagramSelection {
   publish: boolean;
   story: boolean;
 }
+
+/** The feed/story selection an Instagram target asks for; a target without placements means the feed. */
+export const getInstagramSelectionOf = (target: TargetAccount): InstagramSelection => {
+  const placements = target.placements ?? ['feed'];
+  return { publish: placements.includes('feed'), story: placements.includes('story') };
+};
+
+/** The placements of a feed/story selection, or undefined for the feed alone (the default). */
+export const getPlacementsOf = (selection: InstagramSelection): InstagramPlacement[] | undefined =>
+  selection.publish && !selection.story
+    ? undefined
+    : INSTAGRAM_PLACEMENTS.filter((p) => (p === 'feed' ? selection.publish : selection.story));
 
 // API configuration for account operations
 export interface ApiConfig {

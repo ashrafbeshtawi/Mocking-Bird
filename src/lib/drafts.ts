@@ -1,5 +1,5 @@
 import pool from '@/lib/db';
-import { PLATFORMS, type Platform, type TargetAccount } from '@/types/accounts';
+import { INSTAGRAM_PLACEMENTS, PLATFORMS, type Platform, type TargetAccount } from '@/types/accounts';
 import { youtubeTitleError } from '@/lib/youtube';
 import { TIKTOK_PRIVACY_LEVELS, tiktokSettingsError, type TikTokPostSettings } from '@/lib/tiktok';
 import type { MediaThumbnail } from '@/lib/publish/types';
@@ -66,16 +66,34 @@ const mapRowToDraft = (row: Omit<Draft, 'target_platforms'>): Draft => ({
   target_platforms: getPlatformsOf(row.target_accounts),
 });
 
-/** The targets without duplicates, as stored. */
+/** The targets without duplicates or unknown fields, as stored. */
 const serializeTargets = (targets: TargetAccount[]): string =>
   JSON.stringify(
-    targets.filter(
-      (target, index) =>
-        targets.findIndex((t) => t.platform === target.platform && t.account_id === target.account_id) === index
-    )
+    targets
+      .filter(
+        (target, index) =>
+          targets.findIndex((t) => t.platform === target.platform && t.account_id === target.account_id) === index
+      )
+      .map(({ platform, account_id, placements }) => ({ platform, account_id, ...(placements && { placements }) }))
   );
 
-const TIKTOK_FLAGS = ['allowComment', 'allowDuet', 'allowStitch', 'isYourBrand', 'isBrandedContent'] as const;
+/** Why a target's placements are invalid, or null when it has none or valid ones. */
+function targetPlacementsError(target: TargetAccount): string | null {
+  const { placements } = target;
+  if (placements === undefined) return null;
+  if (target.platform !== 'instagram') return 'placements can only be set on instagram targets.';
+  if (
+    !Array.isArray(placements) ||
+    placements.length === 0 ||
+    placements.some((p) => !INSTAGRAM_PLACEMENTS.includes(p)) ||
+    new Set(placements).size !== placements.length
+  ) {
+    return `placements must be a non-empty list of: ${INSTAGRAM_PLACEMENTS.join(', ')}.`;
+  }
+  return null;
+}
+
+const TIKTOK_FLAGS =['allowComment', 'allowDuet', 'allowStitch', 'isYourBrand', 'isBrandedContent'] as const;
 
 /** Why untrusted TikTok settings cannot be stored, or null when they can. */
 function tiktokSettingsInputError(value: unknown): string | null {
@@ -111,6 +129,8 @@ export function validateDraftInput(input: Record<string, unknown>): string | nul
     ) {
       return `target_accounts must be an array of { platform, account_id } with platform one of: ${PLATFORMS.join(', ')}.`;
     }
+    const placementsError = (targets as TargetAccount[]).map(targetPlacementsError).find(Boolean);
+    if (placementsError) return placementsError;
   }
   if (media !== undefined && media !== null) {
     if (

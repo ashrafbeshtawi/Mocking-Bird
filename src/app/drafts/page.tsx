@@ -50,7 +50,8 @@ import { EMPTY_TIKTOK_SETTINGS, type TikTokPostSettings } from '@/lib/tiktok';
 import { useDrafts, mapDraftMediaToUploaded, type Draft } from '@/hooks/useDrafts';
 import { useConnectedAccounts } from '@/hooks/useConnectedAccounts';
 import { usePublish } from '@/hooks/usePublish';
-import { PLATFORMS, type InstagramSelection, type Platform } from '@/types/accounts';
+import { PLATFORMS, getInstagramSelectionOf, type InstagramSelection, type Platform } from '@/types/accounts';
+import { describeMissingTargets, findMissingTargets } from '@/lib/draftTargets';
 
 const SEARCH_DEBOUNCE_MS = 300;
 
@@ -65,7 +66,7 @@ export default function DraftsPage() {
   const platform: Platform | 'all' = platformParam && PLATFORMS.includes(platformParam) ? platformParam : 'all';
 
   const { drafts, total, totalPages, loading, error, refetch, deleteDrafts } = useDrafts({ page, query, platform });
-  const { facebookPages, xAccounts, instagramAccounts, telegramChannels, linkedinAccounts, youtubeChannels, tiktokAccounts, normalizedAccounts } = useConnectedAccounts();
+  const { facebookPages, xAccounts, instagramAccounts, telegramChannels, linkedinAccounts, youtubeChannels, tiktokAccounts, normalizedAccounts, loading: accountsLoading } = useConnectedAccounts();
   const { publish, isPublishing, statusMessage, error: publishError, success: publishSuccess, results: publishResults, clearStatus } =
     usePublish();
 
@@ -162,7 +163,24 @@ export default function DraftsPage() {
     return ids.length === 0 ? [] : getConnectedAccountsOn(platform).filter((account) => ids.includes(account.id));
   };
   const getPreviewTargetIdsOn = (platform: Platform) => getPreviewTargetsOn(platform).map((account) => account.id);
-  const getAccountNamesFor = (platform: Platform) => getPreviewTargetsOn(platform).map((account) => account.name);
+  /** The preview draft's Instagram feed/story choice for an account it targets. */
+  const getPreviewInstagramSelection = (accountId: string): InstagramSelection => {
+    const target = previewDraft?.target_accounts.find((t) => t.platform === 'instagram' && t.account_id === accountId);
+    return target ? getInstagramSelectionOf(target) : { publish: false, story: false };
+  };
+  const describeInstagramSelection = ({ publish, story }: InstagramSelection) =>
+    publish && story ? 'feed + story' : story ? 'story' : 'feed';
+  const getAccountNamesFor = (platform: Platform) =>
+    getPreviewTargetsOn(platform).map((account) =>
+      platform === 'instagram'
+        ? `${account.name} (${describeInstagramSelection(getPreviewInstagramSelection(account.id))})`
+        : account.name
+    );
+  const previewMissingTargets = previewDraft && !accountsLoading
+    ? findMissingTargets(previewDraft.target_accounts, (platform) =>
+        getConnectedAccountsOn(platform).map((account) => account.id)
+      )
+    : [];
 
   const previewHasMedia = (previewDraft?.media?.length ?? 0) > 0;
   const previewKinds = previewDraft ? draftKinds(previewDraft) : [];
@@ -197,7 +215,9 @@ export default function DraftsPage() {
     const instagramTargets = getPreviewTargetIdsOn('instagram');
     const instagram: Record<string, InstagramSelection> = {};
     instagramAccounts.forEach((a) => {
-      instagram[a.id] = { publish: instagramTargets.includes(a.id), story: false };
+      instagram[a.id] = instagramTargets.includes(a.id)
+        ? getPreviewInstagramSelection(a.id)
+        : { publish: false, story: false };
     });
 
     const ok = await publish({
@@ -627,6 +647,11 @@ export default function DraftsPage() {
                 </Box>
               );
             })}
+            {previewMissingTargets.length > 0 && (
+              <Alert severity="warning" sx={{ py: 0.5 }}>
+                {describeMissingTargets(previewMissingTargets)}
+              </Alert>
+            )}
           </Box>
 
           {getPreviewTargetIdsOn('youtube').length > 0 &&

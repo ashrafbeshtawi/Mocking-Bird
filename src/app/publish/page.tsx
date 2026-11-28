@@ -41,7 +41,8 @@ import { PageHeader } from '@/components/PageHeader';
 import type { UploadedMedia } from '@/components/publish/MediaUploader';
 import { mapDraftMediaToUploaded } from '@/hooks/useDrafts';
 import type { InstagramSelection, Platform, TargetAccount } from '@/types/accounts';
-import { TWITTER_CHAR_LIMIT } from '@/types/accounts';
+import { TWITTER_CHAR_LIMIT, getInstagramSelectionOf, getPlacementsOf } from '@/types/accounts';
+import { describeMissingTargets, findMissingTargets } from '@/lib/draftTargets';
 import { contentKinds, fitContent, needsChoice, resolveContent, type ContentKind, type ContentSelection } from '@/lib/publish/contentRules';
 import { PLATFORM_CONFIG } from '@/lib/platformConfig';
 
@@ -201,6 +202,7 @@ function PublishPageInner() {
 
   // Draft loading state
   const [draftTargets, setDraftTargets] = useState<TargetAccount[] | null>(null);
+  const [missingDraftTargets, setMissingDraftTargets] = useState<TargetAccount[]>([]);
   const draftTargetsApplied = useRef(false);
 
   // Load the draft's content into the composer
@@ -276,12 +278,22 @@ function PublishPageInner() {
     setSelectedTikTokAccounts(filterTargeted('tiktok', tiktokAccounts.map((a) => a.id)));
     const instagram: Record<string, InstagramSelection> = {};
     instagramAccounts.forEach((a) => {
-      instagram[a.id] = {
-        publish: isTargeted('instagram', a.id) && uploadedMedia.length > 0,
-        story: false,
-      };
+      const target = draftTargets.find((t) => t.platform === 'instagram' && t.account_id === a.id);
+      const selection = target ? getInstagramSelectionOf(target) : { publish: false, story: false };
+      const hasMedia = uploadedMedia.length > 0;
+      instagram[a.id] = { publish: selection.publish && hasMedia, story: selection.story && hasMedia };
     });
     setSelectedInstagramAccounts(instagram);
+    const connectedIds: Record<Platform, string[]> = {
+      facebook: facebookPages.map((p) => p.page_id),
+      twitter: xAccounts.map((a) => a.id),
+      instagram: instagramAccounts.map((a) => a.id),
+      telegram: telegramChannels.map((c) => c.channel_id),
+      linkedin: linkedinAccounts.map((a) => a.id),
+      youtube: youtubeChannels.map((c) => c.id),
+      tiktok: tiktokAccounts.map((a) => a.id),
+    };
+    setMissingDraftTargets(findMissingTargets(draftTargets, (platform) => connectedIds[platform]));
   }, [draftTargets, loading, facebookPages, xAccounts, telegramChannels, linkedinAccounts, youtubeChannels, tiktokAccounts, instagramAccounts, uploadedMedia.length]);
 
   // A published or queued draft is consumed: delete it and drop the ?draft param
@@ -429,15 +441,15 @@ function PublishPageInner() {
     // Targets = the selected accounts; an Instagram account counts when its feed or story is selected
     const buildTargetsOn = (platform: Platform, ids: string[]): TargetAccount[] =>
       ids.map((account_id) => ({ platform, account_id }));
-    const targetAccounts = [
+    const targetAccounts: TargetAccount[] = [
       ...buildTargetsOn('facebook', selectedFacebookPages),
       ...buildTargetsOn('twitter', selectedXAccounts),
-      ...buildTargetsOn(
-        'instagram',
-        Object.entries(selectedInstagramAccounts)
-          .filter(([, s]) => s.publish || s.story)
-          .map(([id]) => id)
-      ),
+      ...Object.entries(selectedInstagramAccounts)
+        .filter(([, s]) => s.publish || s.story)
+        .map(([account_id, s]) => {
+          const placements = getPlacementsOf(s);
+          return { platform: 'instagram' as const, account_id, ...(placements && { placements }) };
+        }),
       ...buildTargetsOn('telegram', selectedTelegramChannels),
       ...buildTargetsOn('linkedin', selectedLinkedInAccounts),
       ...buildTargetsOn('youtube', selectedYouTubeChannels),
@@ -693,6 +705,12 @@ function PublishPageInner() {
           title={<>Compose</>}
           lead="Write once. Tailor per platform — limits, tone and media adapt automatically."
         />
+
+        {missingDraftTargets.length > 0 && (
+          <Alert severity="warning" onClose={() => setMissingDraftTargets([])} sx={{ mb: 3 }}>
+            {describeMissingTargets(missingDraftTargets)}
+          </Alert>
+        )}
 
         {/* Results */}
         <PublishResults error={error} success={success} results={results} accounts={normalizedAccounts} onClose={clearStatus} />
