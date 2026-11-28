@@ -43,7 +43,17 @@ const mediaItems = z
 
 const urlOf = (item: RemoteMediaItem) => (typeof item === 'string' ? item : item.url);
 const targetAccounts = z
-  .array(z.object({ platform: platformEnum, account_id: z.string().min(1) }))
+  .array(
+    z.object({
+      platform: platformEnum,
+      account_id: z.string().min(1),
+      placements: z
+        .array(z.enum(['feed', 'story']))
+        .min(1)
+        .optional()
+        .describe('Instagram only: post to the feed, the story, or both. Omitted means the feed.'),
+    })
+  )
   .optional()
   .describe('Accounts this draft is meant to be published to: { platform, account_id } from list_connected_accounts');
 

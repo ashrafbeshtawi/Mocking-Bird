@@ -108,6 +108,28 @@ describe('Drafts API', () => {
     }
   );
 
+  it('stores Instagram placements and drops unknown target fields', async () => {
+    mockQuery.mockResolvedValue({ rows: [draftRow] });
+
+    const response = await POST(
+      request('POST', {
+        text: 'hello',
+        target_accounts: [
+          { platform: 'instagram', account_id: 'ig1', placements: ['feed', 'story'] },
+          { platform: 'facebook', account_id: 'p1', extra: 'x' },
+        ],
+      })
+    );
+
+    expect(response.status).toBe(201);
+    expect(callTo('INSERT INTO drafts ')[1][1]).toBe(
+      JSON.stringify([
+        { platform: 'instagram', account_id: 'ig1', placements: ['feed', 'story'] },
+        { platform: 'facebook', account_id: 'p1' },
+      ])
+    );
+  });
+
   it('rejects a draft with neither text nor media', async () => {
     const response = await POST(request('POST', { text: '   ' }));
 

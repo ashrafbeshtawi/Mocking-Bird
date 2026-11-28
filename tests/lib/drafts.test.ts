@@ -23,3 +23,27 @@ describe('validateDraftInput media limit', () => {
     expect(validateDraftInput({ text: 'hi', media: null })).toBeNull();
   });
 });
+
+describe('validateDraftInput Instagram placements', () => {
+  const withTarget = (target: Record<string, unknown>) => validateDraftInput({ text: 'hi', target_accounts: [target] });
+
+  it.each([[['feed']], [['story']], [['feed', 'story']]])('accepts placements %j on Instagram', (placements) => {
+    expect(withTarget({ platform: 'instagram', account_id: 'ig1', placements })).toBeNull();
+  });
+
+  it('accepts an Instagram target without placements', () => {
+    expect(withTarget({ platform: 'instagram', account_id: 'ig1' })).toBeNull();
+  });
+
+  it('rejects placements on other platforms', () => {
+    expect(withTarget({ platform: 'facebook', account_id: 'p1', placements: ['feed'] })).toBe(
+      'placements can only be set on instagram targets.'
+    );
+  });
+
+  it.each([[[]], [['reel']], [['feed', 'feed']], ['story']])('rejects placements %j', (placements) => {
+    expect(withTarget({ platform: 'instagram', account_id: 'ig1', placements })).toBe(
+      'placements must be a non-empty list of: feed, story.'
+    );
+  });
+});
